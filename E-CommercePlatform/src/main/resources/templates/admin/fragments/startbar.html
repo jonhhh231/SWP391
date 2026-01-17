@@ -1,0 +1,46 @@
+<div th:fragment="startbar" xmlns:th="http://www.thymeleaf.org">
+    <div class="startbar d-print-none">
+        <div class="brand">
+            <a class="logo" href="/">
+                <span>
+                    <img class="logo-sm" src="/admin/assets/images/logo-sm.png" alt="logo-small"/>
+                </span>
+                <span>
+                    <img class="logo-lg logo-light" src="/admin/assets/images/logo-light.png" alt="logo-large"/>
+                    <img class="logo-lg logo-dark" src="/admin/assets/images/logo-dark.png" alt="logo-large"/>
+                </span>
+            </a>
+        </div>
+
+        <div class="startbar-menu">
+            <div id="startbarCollapse" class="startbar-collapse" data-simplebar>
+                <div class="d-flex align-items-start flex-column w-100">
+                    <ul class="navbar-nav mb-auto w-100">
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">
+                                <i class="iconoir-home-simple menu-icon"></i>
+                                <span>Tổng quan</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="#sidebarProduct" role="button">
+                                <i class="iconoir-shop-four-tiles menu-icon"></i>
+                                <span>Sản phẩm</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="iconoir-media-image-folder menu-icon"></i>
+                                <span>Danh mục sản phẩm</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="startbar-overlay d-print-none"></div>
+    </div>
+</div>

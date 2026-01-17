@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html
+        xmlns:th="http://www.thymeleaf.org"
+        xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+        lang="en"
+        dir="ltr"
+        data-bs-theme="light"
+        data-startbar="light"
+>
+
+<head>
+    <meta charset="utf-8"/>
+
+    <title th:text="${title}">Admin</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+    <meta name="description" content="Premium Multipurpose Admin & Dashboard Template"/>
+    <meta name="author" content=""/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+
+    <!-- App favicon -->
+    <link rel="shortcut icon" th:href="@{/admin/assets/images/favicon.ico}"/>
+
+    <!-- App css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css"/>
+
+    <link rel="stylesheet" th:href="@{/admin/assets/css/bootstrap.min.css}"/>
+    <link rel="stylesheet" th:href="@{/admin/assets/css/icons.min.css}"/>
+    <link rel="stylesheet" th:href="@{/admin/assets/libs/vanillajs-datepicker/css/datepicker.min.css}"/>
+    <link rel="stylesheet" th:href="@{/admin/assets/css/app.min.css}"/>
+
+    <!-- Uppy -->
+    <link rel="stylesheet" href="https://releases.transloadit.com/uppy/v4.18.2/uppy.min.css"/>
+    <link rel="stylesheet" th:href="@{/admin/assets/css/main.css}"/>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/mobius1/selectr@latest/dist/selectr.min.css"/>
+</head>
+
+<body>
+
+<!-- Topbar -->
+<div th:replace="~{admin/fragments/header :: header}"></div>
+<!-- Startbar -->
+<div th:replace="~{admin/fragments/startbar :: startbar}"></div>
+
+<div class="page-wrapper">
+    <div class="page-content">
+        <div class="container-xxl">
+
+            <!-- == block main == -->
+            <div layout:fragment="main"></div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Core JS -->
+<script th:src="@{/admin/assets/libs/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/admin/assets/libs/simplebar/simplebar.min.js}"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+<script src="https://cdn.tiny.cloud/1/8qjor01gapcuv966c31ykqqlaxelga8gax0ewa3581kdopmk/tinymce/8/tinymce.min.js"
+        referrerpolicy="origin"
+        crossorigin="anonymous"></script>
+
+<script src="https://unpkg.com/just-validate@latest/dist/just-validate.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/gh/mobius1/selectr@latest/dist/selectr.min.js"></script>
+
+<script th:src="@{/admin/assets/libs/apexcharts/apexcharts.min.js}"></script>
+<script th:src="@{/admin/assets/js/pages/ecommerce-index.init.js}"></script>
+
+<script th:src="@{/admin/assets/libs/vanillajs-datepicker/js/datepicker-full.min.js}"></script>
+<script th:src="@{/admin/assets/js/app.js}"></script>
+<script th:src="@{/admin/assets/js/main.js}"></script>
+<script th:src="@{/admin/assets/js/uppy.js}" type="module"></script>
+
+</body>
+</html>
