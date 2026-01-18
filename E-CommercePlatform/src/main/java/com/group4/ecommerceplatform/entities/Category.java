@@ -12,7 +12,7 @@ import java.util.List;
 @Getter
 
 @Entity
-@Table(name="Category")
+@Table(name="Categories")
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -25,11 +25,12 @@ public class Category {
     @Column(name="Description", nullable = false)
     private String description;
 
-    @Column(name="CreateAt", nullable = false)
-    private LocalDateTime createdAt;
+    @Column(name="Create_Time", nullable = false)
+    private LocalDateTime created_at;
 
-    @Column(name="UpdateAt", nullable = false)
-    private LocalDateTime updatedAt;
+    @Column(name="Update_Time", nullable = false)
+    private LocalDateTime updated_at;
+
 
     public Category(String name, String description) {
         this.name = name;
@@ -41,7 +42,7 @@ public class Category {
 
 
     @OneToMany(
-            mappedBy = "category", cascade = CascadeType.ALL, orphanRemoval = true,fetch =  FetchType.LAZY
+            mappedBy = "category",cascade = CascadeType.ALL,fetch =  FetchType.LAZY
     )
     private List<Product> products = new ArrayList<>();
 

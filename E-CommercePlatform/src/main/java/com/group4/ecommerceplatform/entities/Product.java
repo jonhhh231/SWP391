@@ -1,16 +1,18 @@
 package com.group4.ecommerceplatform.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
 
 @Entity
-@Table(name="Product")
+@Table(name="Products")
 public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -32,6 +34,11 @@ public class Product {
             nullable = false
     )
     private Category category;
+
+
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
+    private List<Review> reviews; // chi can truy nguoc ve review chu khong can phai truy ve lai order voi cart product
 
     @Column(nullable = false, name="IsActive")
     private Boolean isActive;
