@@ -4,13 +4,14 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
 @Setter
 
 @Entity
-@Table(name = "User")
+@Table(name = "users")
 public class User {
     @Id
     @GeneratedValue
@@ -29,7 +30,7 @@ public class User {
     @Column(name = "PhoneNumber", nullable = false)
     private String phoneNumber;
 
-    @Column(name = "Address")
+    @Column(name = "Address", nullable = false)
     private String address;
 
     @Column(name = "Role", nullable = false)
@@ -38,6 +39,18 @@ public class User {
     @Column(name = "IsActive", nullable = false)
     private boolean isActive;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    @JsonIgnore
+    private Cart cart;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Order> orders;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Review> reviews;
+  
     @Column(name = "CreatedAt", nullable = false)
     private LocalDateTime createdAt;
 
