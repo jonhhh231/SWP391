@@ -25,11 +25,11 @@ public class Category {
     @Column(name="Description", nullable = false)
     private String description;
 
-    @Column(name="Create_Time", nullable = false)
-    private LocalDateTime created_at;
+    @Column(name="CreateAt", nullable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name="Update_Time", nullable = false)
-    private LocalDateTime updated_at;
+    @Column(name="UpdatedAt", nullable = false)
+    private LocalDateTime updatedAt;
 
 
     public Category(String name, String description) {

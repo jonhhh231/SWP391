@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -38,7 +39,7 @@ public class Product {
 
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonIgnore
-    private List<Review> reviews; // chi can truy nguoc ve review chu khong can phai truy ve lai order voi cart product
+    private List<Review> reviews = new ArrayList<>(); // chi can truy nguoc ve review chu khong can phai truy ve lai order voi cart product
 
     @Column(nullable = false, name="IsActive")
     private Boolean isActive;
