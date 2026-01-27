@@ -43,8 +43,10 @@ public class Product {
 
     @Column(nullable = false, name="IsActive")
     private Boolean isActive;
+
     @Column(nullable = false, name="CreatedAt")
     private LocalDateTime createdAt;
+
     @Column(nullable = false, name="UpdatedAt")
     private LocalDateTime updatedAt;
 
