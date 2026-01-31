@@ -1,0 +1,29 @@
+package com.groupSWP.centralkitchenplatform.entities.procurement;
+
+import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
+import jakarta.persistence.*;
+import lombok.*;
+import java.math.BigDecimal;
+import java.util.List;
+
+@Entity
+@Table(name = "import_tickets")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class ImportTicket extends BaseEntity {
+    @Id
+    private String ticketId;
+    private BigDecimal totalAmount;
+    private String note;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private SystemUser createdBy;
+
+    @OneToMany(mappedBy = "importTicket", cascade = CascadeType.ALL)
+    private List<ImportItem> importItems;
+}

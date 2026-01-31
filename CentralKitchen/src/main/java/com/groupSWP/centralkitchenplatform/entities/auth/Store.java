@@ -1,0 +1,34 @@
+package com.groupSWP.centralkitchenplatform.entities.auth;
+
+
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
+import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
+import com.groupSWP.centralkitchenplatform.entities.product.Stock;
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.List;
+
+@Entity
+@Table(name = "stores")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class Store extends BaseEntity {
+    @Id
+    private String storeId; // ST01
+    private String name;
+    private String address;
+    private String phone;
+
+    @Column(name = "type")
+    private String type;
+
+    private boolean isActive = true;
+
+    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL)
+    private Account account;
+
+    @OneToMany(mappedBy = "store")
+    private List<Order> orders;
+
+    @OneToMany(mappedBy = "store")
+    private List<Stock> stocks;
+}

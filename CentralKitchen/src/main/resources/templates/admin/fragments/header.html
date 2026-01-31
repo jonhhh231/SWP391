@@ -1,0 +1,63 @@
+<div th:fragment="header" xmlns:th="http://www.thymeleaf.org">
+    <div class="topbar d-print-none">
+        <div class="container-xxl">
+            <nav id="topbar-custom" class="topbar-custom d-flex justify-content-between">
+
+                <ul class="topbar-item list-unstyled d-inline-flex align-items-center mb-0">
+                    <li>
+                        <button id="togglemenu" class="nav-link mobile-menu-btn nav-icon">
+                            <i class="iconoir-menu-scale"></i>
+                        </button>
+                    </li>
+                </ul>
+
+                <ul class="topbar-item list-unstyled d-inline-flex align-items-center mb-0">
+
+                    <li class="topbar-item">
+                        <a id="light-dark-mode" class="nav-link nav-icon" href="javascript:void(0);">
+                            <i class="icofont-moon dark-mode"></i>
+                            <i class="icofont-sun light-mode"></i>
+                        </a>
+                    </li>
+
+                    <li class="dropdown topbar-item">
+                        <a class="nav-link dropdown-toggle arrow-none nav-icon" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="icofont-bell-alt"></i>
+                            <span class="alert-badge"></span>
+                        </a>
+                    </li>
+
+                    <li class="dropdown topbar-item">
+                        <a class="nav-link dropdown-toggle arrow-none nav-icon" href="#" role="button" data-bs-toggle="dropdown">
+                            <img class="thumb-lg rounded-circle" src="/admin/assets/images/users/avatar-1.jpg" alt="avatar"/>
+                        </a>
+
+                        <div class="dropdown-menu dropdown-menu-end py-0">
+                            <div class="d-flex align-items-center dropdown-item py-2 bg-secondary-subtle">
+                                <div class="flex-shrink-0">
+                                    <img class="thumb-md rounded-circle" src="/admin/assets/images/users/avatar-1.jpg" alt="user"/>
+                                </div>
+                                <div class="flex-grow-1 ms-2 text-truncate align-self-center">
+                                    <h6 class="my-0 fw-medium text-dark fs-13">Admin Name</h6>
+                                </div>
+                            </div>
+
+                            <div class="dropdown-divider mt-0"></div>
+                            <small class="text-muted px-2 pb-1 d-block">Tài khoản</small>
+
+                            <a class="dropdown-item" href="#">
+                                <i class="las la-user fs-18 me-1 align-text-bottom"></i> Profile
+                            </a>
+
+                            <div class="dropdown-divider mb-0"></div>
+
+                            <a class="dropdown-item text-danger" href="javascript:;" btn-logout>
+                                <i class="las la-power-off fs-18 me-1 align-text-bottom"></i> Logout
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>

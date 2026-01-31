@@ -1,0 +1,37 @@
+package com.groupSWP.centralkitchenplatform.entities.product;
+
+
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
+import jakarta.persistence.*;
+import lombok.*;
+import java.math.BigDecimal;
+import java.util.List;
+
+@Entity
+@Table(name = "products")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class Product extends BaseEntity {
+    @Id
+    private String productId;
+    private String productName;
+    private String category;
+    private BigDecimal sellingPrice;
+    private BigDecimal costPrice;
+    private String baseUnit;
+    private boolean isActive;
+
+    @OneToMany(mappedBy = "product")
+    private List<Stock> stocks;
+
+    @OneToMany(mappedBy = "product")
+    private List<Formula> formulas; // BOM
+
+    @OneToMany(mappedBy = "product")
+    private List<ProductionRun> productionRuns;
+
+    @OneToMany(mappedBy = "product")
+    private List<OrderItem> orderItems;
+}
