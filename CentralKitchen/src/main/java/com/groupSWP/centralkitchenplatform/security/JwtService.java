@@ -1,5 +1,7 @@
 package com.groupSWP.centralkitchenplatform.security;
 
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -8,21 +10,11 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class JwtService {
-
-    // Tạo một Key an toàn đủ độ dài cho thuật toán HS256
-//    private final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-//
-//    public String generateToken(String username) {
-//        return Jwts.builder()
-//                .setSubject(username)
-//                .setIssuedAt(new Date(System.currentTimeMillis()))
-//                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // Hết hạn sau 24h
-//                .signWith(SECRET_KEY) // Sử dụng đối tượng Key thay vì String
-//                .compact();
-//    }
 
     private final String SECRET_KEY = "nha_be_trung_tam_nen_tang_quan_ly_chuoi_cung_ung_thuc_pham_2026";
 
@@ -48,5 +40,32 @@ public class JwtService {
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
+    }
+
+    public String generateToken(Account account) {
+        Map<String, Object> claims = new HashMap<>();
+
+        // Đảm bảo lấy đúng Role từ entity Account
+        claims.put("role", account.getRole());
+
+        return Jwts.builder()
+                .setClaims(claims) // Thiết lập claims trước
+                .setSubject(account.getUsername()) // Sau đó mới set Subject
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // Thêm hàm lấy Role từ Token
+    public String extractRole(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        // Ép kiểu về String và kiểm tra null
+        System.out.println("Full Claims: " + claims);
+        return claims.get("role", String.class);
     }
 }
