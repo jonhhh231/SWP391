@@ -26,7 +26,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sai mật khẩu!");
         }
         // Trả về Token
-        String token = jwtService.generateToken(account.getUsername());
+        String token = jwtService.generateToken(account);
         return new AuthResponse(token, account.getUsername(), account.getRole());
     }
 }
