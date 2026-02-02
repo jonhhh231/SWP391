@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportTicket;
 import jakarta.persistence.*;
@@ -21,6 +22,7 @@ public class SystemUser {
 
     @OneToOne(fetch = FetchType.LAZY) // Thêm Lazy để tối ưu hiệu năng
     @JoinColumn(name = "account_id", referencedColumnName = "account_id")
+    @JsonIgnore
     private Account account;
 
     @Column(name = "full_name", nullable = false, columnDefinition = "NVARCHAR(255)")
