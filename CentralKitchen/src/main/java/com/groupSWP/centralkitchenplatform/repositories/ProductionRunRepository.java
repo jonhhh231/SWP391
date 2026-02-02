@@ -1,0 +1,9 @@
+package com.groupSWP.centralkitchenplatform.repositories;
+
+import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ProductionRunRepository extends JpaRepository<ProductionRun, String> {
+}
