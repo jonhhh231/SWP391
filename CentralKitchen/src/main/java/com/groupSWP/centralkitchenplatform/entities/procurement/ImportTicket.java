@@ -20,8 +20,8 @@ public class ImportTicket extends BaseEntity {
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @ManyToOne
+    @JoinColumn(name = "created_by", columnDefinition = "VARCHAR(20)")
     private SystemUser createdBy;
 
     @OneToMany(mappedBy = "importTicket", cascade = CascadeType.ALL)
