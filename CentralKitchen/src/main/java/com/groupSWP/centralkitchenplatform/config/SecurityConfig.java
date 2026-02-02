@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Công khai endpoint login/logout
                         .requestMatchers("/api/auth/check-me").permitAll()
+                        .requestMatchers("/api/products/**").permitAll()
                         // 1. Cấu hình phân quyền theo đường dẫn (URL-based)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "KITCHEN_MANAGER")
