@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest;
+import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse; // <--- Import DTO
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository productRepository;
-    private final FormulaService formulaService; // Inject FormulaService vào đây
+    private final FormulaService formulaService;
 
     @Transactional
-    public Product createProduct(ProductRequest request) {
-        // 1. Tạo và lưu Product trước
+    public ProductResponse createProduct(ProductRequest request) { // <--- Đổi kiểu trả về
+        // 1. Tạo và lưu Product
         Product product = Product.builder()
                 .productId(request.getProductId())
                 .productName(request.getProductName())
@@ -27,9 +28,17 @@ public class ProductService {
 
         Product savedProduct = productRepository.save(product);
 
-        // 2. Gọi FormulaService để xử lý định mức (BOM)
+        // 2. Lưu công thức (BOM)
         formulaService.saveFormulas(savedProduct, request.getIngredients());
 
-        return savedProduct;
+        // 3. Convert sang DTO để trả về (Cắt đứt vòng lặp)
+        return ProductResponse.builder()
+                .productId(savedProduct.getProductId())
+                .productName(savedProduct.getProductName())
+                .category(savedProduct.getCategory())
+                .sellingPrice(savedProduct.getSellingPrice())
+                .baseUnit(savedProduct.getBaseUnit())
+                .isActive(savedProduct.isActive())
+                .build();
     }
 }
