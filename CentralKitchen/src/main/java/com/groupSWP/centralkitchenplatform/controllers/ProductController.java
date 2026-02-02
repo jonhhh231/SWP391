@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.controllers;
 
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest; // Import đúng DTO mới đổi tên
+import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +16,7 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    public ResponseEntity<Product> createProduct(@RequestBody ProductRequest request) {
-        // Bạn có thể thêm validation ở đây
-        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
+    public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.createProduct(request));
     }
 }
