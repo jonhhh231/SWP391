@@ -13,6 +13,7 @@ import java.util.List;
 @Entity
 @Table(name = "products")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Builder
 public class Product extends BaseEntity {
     @Id
     private String productId;

@@ -11,13 +11,18 @@ import java.util.UUID;
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "account_id", columnDefinition = "BINARY(16)") // MySQL lưu dạng binary để đạt hiệu năng tốt nhất
+    @Column(name = "account_id", columnDefinition = "BINARY(16)")
     private UUID accountId;
 
     @Column(unique = true)
     private String username;
-    private String password;
-    private String role;
+    private String password; // Mật khẩu CHỈ để ở đây
+
+    private String role; // Role để filter nhanh ở JWT
+
+    // Liên kết 1-1 với thông tin chi tiết người dùng
+    @OneToOne(mappedBy = "account", cascade = CascadeType.ALL)
+    private SystemUser systemUser;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", unique = true)

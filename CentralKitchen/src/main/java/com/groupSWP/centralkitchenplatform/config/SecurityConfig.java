@@ -26,13 +26,13 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Công khai endpoint login/logout
-                        .requestMatchers("/api/auth/check-me").permitAll()
                         .requestMatchers("/api/products/**").permitAll()
+                        .requestMatchers("/api/ingredients/**").permitAll()
+                        .requestMatchers("/api/auth/check-me").permitAll()// de test jwt
                         // 1. Cấu hình phân quyền theo đường dẫn (URL-based)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "KITCHEN_MANAGER")
                         .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
-
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

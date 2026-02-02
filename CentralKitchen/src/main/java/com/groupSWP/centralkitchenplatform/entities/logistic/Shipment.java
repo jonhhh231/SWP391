@@ -22,8 +22,8 @@ public class Shipment {
     @Enumerated(EnumType.STRING)
     private ShipmentType shipmentType;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "coord_id")
+    @ManyToOne
+    @JoinColumn(name = "coord_id", columnDefinition = "VARCHAR(20)")
     private SystemUser coordinator;
 
     @OneToMany(mappedBy = "shipment")
