@@ -3,6 +3,7 @@ package com.groupSWP.centralkitchenplatform.service;
 import com.groupSWP.centralkitchenplatform.dto.auth.AuthRequest;
 import com.groupSWP.centralkitchenplatform.dto.auth.AuthResponse;
 import com.groupSWP.centralkitchenplatform.dto.auth.RegisterRequest; // DTO mới tạo
+import com.groupSWP.centralkitchenplatform.dto.auth.UpdateProfileRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser; // Entity Profile
 import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
@@ -123,5 +124,27 @@ public class AuthService {
             case COORDINATOR -> "COD";
             default -> "STF"; // Staff thường
         };
+    }
+
+    @Transactional
+    public SystemUser updateProfile(String currentUsername, UpdateProfileRequest request) {
+        // 1. Tìm Account đang đăng nhập
+        Account account = accountRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+
+        // 2. Lấy Profile đi kèm
+        SystemUser profile = account.getSystemUser();
+        if (profile == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
+        }
+
+        // 3. Cập nhật thông tin (Chỉ update nếu có gửi lên)
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            profile.setFullName(request.getFullName());
+        }
+
+        // Nếu sau này Sếp có thêm field SĐT hay Email thì if tiếp ở đây...
+
+        return systemUserRepository.save(profile);
     }
 }
