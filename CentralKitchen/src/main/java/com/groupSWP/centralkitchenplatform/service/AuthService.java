@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // Import cho Transaction
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor // Tự động tạo Constructor cho các biến final (Dependency Injection)
 public class AuthService {
@@ -67,7 +69,7 @@ public class AuthService {
         // BƯỚC 3: Tạo SystemUser (Profile chi tiết nhân viên)
         // Dùng Builder Pattern cho gọn code
         SystemUser userProfile = SystemUser.builder()
-                .userId(generateStaffId())       // Tự động sinh mã NV (VD: NV839210)
+                .userId(generateStaffId(request.getRole()))       // Tự động sinh mã NV
                 .fullName(request.getFullName()) // Lấy tên thật từ request
                 .role(request.getRole())         // Lấy Enum Role
                 .account(account)                // Quan trọng: Gắn Profile này vào Account vừa tạo ở trên
@@ -84,8 +86,42 @@ public class AuthService {
     // =========================================================================
 
     // Hàm sinh mã nhân viên tự động
-    // Logic: Ghép chữ "NV" với 6 số cuối của thời gian hiện tại (để ít trùng)
-    private String generateStaffId() {
-        return "NV" + (System.currentTimeMillis() % 1000000);
+    private String generateStaffId(SystemUser.SystemRole role) {
+        // 1. Xác định Prefix (Mã chức vụ)
+        String prefix = getPrefixByRole(role);
+
+        // 2. Tìm mã nhân viên lớn nhất hiện tại trong DB của Role này
+        Optional<String> lastUserId = systemUserRepository.findLastUserIdByRole(role);
+
+        // 3. Nếu chưa có ai -> Đây là người đầu tiên
+        if (lastUserId.isEmpty()) {
+            return prefix + "00001"; // Format 5 số
+        }
+
+        // 4. Nếu đã có -> Lấy số đuôi + 1
+        String lastId = lastUserId.get();
+        // Cắt bỏ phần Prefix để lấy số (VD: "KIT00009" -> lấy "00009")
+        String numberPart = lastId.substring(prefix.length());
+
+        try {
+            int number = Integer.parseInt(numberPart);
+            number++; // Tăng lên 1
+            // Format lại thành chuỗi 5 số (VD: 10 -> "00010")
+            return prefix + String.format("%05d", number);
+        } catch (NumberFormatException e) {
+            // Fallback nếu dữ liệu cũ bị lỗi format
+            return prefix + System.currentTimeMillis();
+        }
+    }
+
+    // Hàm phụ để map Enum sang String ngắn gọn
+    private String getPrefixByRole(SystemUser.SystemRole role) {
+        return switch (role) {
+            case ADMIN -> "ADM";
+            case MANAGER -> "MNG";
+            case KITCHEN_STAFF -> "KIT";
+            case COORDINATOR -> "COD";
+            default -> "STF"; // Staff thường
+        };
     }
 }
