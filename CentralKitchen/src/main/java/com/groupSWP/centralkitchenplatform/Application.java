@@ -37,7 +37,7 @@ public class Application {
 //
 //            // Set lại thông tin mới nhất (ghi đè cái cũ)
 //            admin.setPassword(passwordEncoder.encode("123456"));
-//            admin.setRole("ROLE_ADMIN"); // QUAN TRỌNG: Phải có chữ ROLE_ thì Spring Security mới hiểu
+//            admin.setRole("ADMIN"); // QUAN TRỌNG: Phải có chữ ROLE_ thì Spring Security mới hiểu
 //            // admin.setStore(null);
 //
 //            accountRepository.save(admin);
