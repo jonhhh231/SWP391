@@ -2,6 +2,9 @@ package com.groupSWP.centralkitchenplatform.controllers;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.AuthRequest;
 import com.groupSWP.centralkitchenplatform.dto.auth.AuthResponse;
+import com.groupSWP.centralkitchenplatform.dto.auth.RegisterRequest;
+import com.groupSWP.centralkitchenplatform.dto.auth.UpdateProfileRequest;
+import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -9,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,6 +33,26 @@ public class AuthController {
         // Backend trả về JSON xác nhận.
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
+
+    // API Đăng ký tài khoản mới (Public)
+    @PostMapping("/register")
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
+        // Gọi xuống Service để xử lý
+        String result = authService.register(request);
+
+        // Trả về 200 OK kèm thông báo
+        return ResponseEntity.ok(result);
+    }
+
+    // API Cập nhật thông tin bản thân
+    @PutMapping("/update-profile")
+    public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest request, Principal principal) {
+        // principal.getName() sẽ tự động lấy username từ cái Token mà người dùng gửi lên
+        SystemUser updatedUser = authService.updateProfile(principal.getName(), request);
+
+        return ResponseEntity.ok(updatedUser);
+    }
+
 
     @GetMapping("/check-me")
     public ResponseEntity<?> checkMe(Authentication authentication) {
