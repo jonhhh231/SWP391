@@ -7,12 +7,11 @@ import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.CategoryRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 
@@ -63,20 +62,23 @@ public class ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String sortBy, String sortDir
     ) {
-        // 1. Xử lý hướng sắp xếp (ASC/DESC)
+        // 1. Xử lý hướng sắp xếp (Giữ nguyên)
         Sort sort = sortDir.equalsIgnoreCase("desc")
                 ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
 
-        // 2. Tạo đối tượng phân trang (Lưu ý: Page trong code bắt đầu từ 0)
+        // 2. Tạo đối tượng phân trang (Giữ nguyên)
         Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size, sort);
 
-        // 3. Gọi Repository để query dữ liệu theo nhiều tiêu chí
-        Page<Product> productPage = productRepository.searchProducts(
-                keyword, category, isActive, minPrice, maxPrice, pageable
+        // 3. TẠO SPECIFICATION (Thay đổi lớn ở đây)
+        Specification<Product> spec = ProductSpecification.filterProducts(
+                keyword, category, isActive, minPrice, maxPrice
         );
 
-        // 4. Convert List<Entity> sang List<DTO>
+        // 4. Gọi Repository với Specification
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+
+        // 5. Convert sang DTO (Giữ nguyên)
         return productPage.map(this::mapToResponse);
     }
 
