@@ -1,14 +1,16 @@
 package com.groupSWP.centralkitchenplatform.dto.product;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.math.BigDecimal; // Import cái này
 import java.util.List;
 
 @Data
 public class ProductRequest {
+    @NotBlank(message = "productId không được để trống")
     private String productId;
     private String productName;
-    private String category;
+    private Long categoryId;
     private BigDecimal sellingPrice; // Sửa ở đây
     private String baseUnit;
     private List<Formula> ingredients;

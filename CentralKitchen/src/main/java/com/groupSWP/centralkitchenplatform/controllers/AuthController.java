@@ -1,9 +1,6 @@
 package com.groupSWP.centralkitchenplatform.controllers;
 
-import com.groupSWP.centralkitchenplatform.dto.auth.AuthRequest;
-import com.groupSWP.centralkitchenplatform.dto.auth.AuthResponse;
-import com.groupSWP.centralkitchenplatform.dto.auth.RegisterRequest;
-import com.groupSWP.centralkitchenplatform.dto.auth.UpdateProfileRequest;
+import com.groupSWP.centralkitchenplatform.dto.auth.*;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -46,11 +43,25 @@ public class AuthController {
 
     // API Cập nhật thông tin bản thân
     @PutMapping("/update-profile")
-    public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest request, Principal principal) {
-        // principal.getName() sẽ tự động lấy username từ cái Token mà người dùng gửi lên
+    public ResponseEntity<UserResponse> updateProfile(
+            @RequestBody UpdateProfileRequest request,
+            Principal principal
+    ) {
+        // 1. Gọi Service để xử lý Logic (Vẫn trả về Entity SystemUser)
+        // principal.getName() trả về username từ Token
         SystemUser updatedUser = authService.updateProfile(principal.getName(), request);
 
-        return ResponseEntity.ok(updatedUser);
+        // 2. --- QUAN TRỌNG: MAP TỪ ENTITY SANG DTO TẠI ĐÂY ---
+        // Bước này giúp cắt bỏ hoàn toàn các mối quan hệ rườm rà gây lỗi vòng lặp
+        UserResponse response = UserResponse.builder()
+                .userId(updatedUser.getUserId())
+                .fullName(updatedUser.getFullName())
+                .role(updatedUser.getRole().name()) // Enum -> String
+                .username(principal.getName()) // Hoặc updatedUser.getAccount().getUsername()
+                .build();
+
+        // 3. Trả về DTO
+        return ResponseEntity.ok(response);
     }
 
 
