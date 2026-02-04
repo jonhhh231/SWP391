@@ -22,6 +22,7 @@ public class Product extends BaseEntity {
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false) // Tạo cột category_id trong DB
     private Category category;
+
     private BigDecimal sellingPrice;
     private BigDecimal costPrice;
     private String baseUnit;
