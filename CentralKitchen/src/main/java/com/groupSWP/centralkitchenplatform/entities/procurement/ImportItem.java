@@ -8,11 +8,12 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "import_items")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ImportItem {
 
-    @EmbeddedId
-    private ImportItemKey id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false)
     private BigDecimal quantity;
@@ -21,12 +22,11 @@ public class ImportItem {
     private BigDecimal importPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("ticketId")
     @JoinColumn(name = "ticket_id")
     private ImportTicket importTicket;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("ingredientId")
+
     @JoinColumn(name = "ingredient_id")
     private Ingredient ingredient;
 }

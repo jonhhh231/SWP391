@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +23,7 @@ public class Account {
 
     // Liên kết 1-1 với thông tin chi tiết người dùng
     @OneToOne(mappedBy = "account", cascade = CascadeType.ALL)
+    @JsonIgnore
     private SystemUser systemUser;
 
     @OneToOne(fetch = FetchType.LAZY)
