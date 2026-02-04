@@ -23,12 +23,12 @@ public class Store extends BaseEntity {
 
     private boolean isActive = true;
 
-    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL, orphanRemoval = true)
     private Account account;
+
+    @OneToMany(mappedBy = "store", cascade = CascadeType.ALL)
+    private List<Stock> stocks;
 
     @OneToMany(mappedBy = "store")
     private List<Order> orders;
-
-    @OneToMany(mappedBy = "store")
-    private List<Stock> stocks;
 }
