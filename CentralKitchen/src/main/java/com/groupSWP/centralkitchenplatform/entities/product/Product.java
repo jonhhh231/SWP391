@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.product;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
@@ -27,14 +28,18 @@ public class Product extends BaseEntity {
     private boolean isActive;
 
     @OneToMany(mappedBy = "product")
+    @JsonIgnore
     private List<Stock> stocks;
 
     @OneToMany(mappedBy = "product")
+    @JsonIgnore
     private List<Formula> formulas; // BOM
 
     @OneToMany(mappedBy = "product")
+    @JsonIgnore
     private List<ProductionRun> productionRuns;
 
     @OneToMany(mappedBy = "product")
+    @JsonIgnore
     private List<OrderItem> orderItems;
 }

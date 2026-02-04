@@ -1,14 +1,20 @@
 package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest;
-import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse; // <--- Import DTO
+import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse;
 import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.CategoryRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -16,38 +22,77 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final FormulaService formulaService;
     private final CategoryRepository categoryRepository;
+
+    /**
+     * Tạo mới sản phẩm và công thức (BOM) đi kèm.
+     * Transactional: Đảm bảo nếu lưu công thức lỗi thì roll back lại việc lưu sản phẩm.
+     */
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
-        // 1. Tìm Category từ ID gửi lên
+        // 1. Tìm Category từ ID gửi lên (Logic mới - Entity)
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-        // 2. Tạo Product
+        // 2. Map request sang Entity và lưu Product
         Product product = Product.builder()
                 .productId(request.getProductId())
                 .productName(request.getProductName())
-                .category(category) // <--- Set Object Category vào đây
+                .category(category) // Set Object Category vào đây
                 .sellingPrice(request.getSellingPrice())
                 .baseUnit(request.getBaseUnit())
-                .isActive(true)
+                .isActive(true) // Mặc định tạo mới là Active
                 .build();
 
         Product savedProduct = productRepository.save(product);
 
-        // 3. Xử lý Formula (giữ nguyên)
+        // 3. Lưu danh sách nguyên liệu (BOM) vào bảng Formula
         formulaService.saveFormulas(savedProduct, request.getIngredients());
 
         // 4. Return DTO
         return mapToResponse(savedProduct);
     }
 
-    // Hàm map mới
+    /**
+     * Lấy danh sách sản phẩm có Phân trang (Pagination) & Lọc (Filter)
+     * Dùng cho cả Franchise Staff (đặt hàng) và Manager (quản lý).
+     */
+    public Page<ProductResponse> getAllProducts(
+            int page, int size,
+            String keyword, String category,
+            Boolean isActive,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            String sortBy, String sortDir
+    ) {
+        // 1. Xử lý hướng sắp xếp (ASC/DESC)
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+
+        // 2. Tạo đối tượng phân trang (Lưu ý: Page trong code bắt đầu từ 0)
+        Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size, sort);
+
+        // 3. Gọi Repository để query dữ liệu theo nhiều tiêu chí
+        Page<Product> productPage = productRepository.searchProducts(
+                keyword, category, isActive, minPrice, maxPrice, pageable
+        );
+
+        // 4. Convert List<Entity> sang List<DTO>
+        return productPage.map(this::mapToResponse);
+    }
+
+    // --- HÀM HELPER (Dùng chung) ---
+
+    /**
+     * Chuyển đổi Entity Product sang DTO ProductResponse.
+     * Mục đích: Cắt đứt vòng lặp vô hạn (Infinite Recursion) của JPA khi trả về JSON.
+     */
     private ProductResponse mapToResponse(Product product) {
         return ProductResponse.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
-                .categoryName(product.getCategory().getName()) // Lấy tên từ bảng Category
-                .categoryId(product.getCategory().getId())
+                // Lấy thông tin từ Category Entity
+                .categoryName(product.getCategory() != null ? product.getCategory().getName() : "Chưa phân loại")
+                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .sellingPrice(product.getSellingPrice())
                 .baseUnit(product.getBaseUnit())
                 .isActive(product.isActive())
