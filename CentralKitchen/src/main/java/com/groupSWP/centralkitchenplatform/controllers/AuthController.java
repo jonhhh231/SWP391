@@ -34,16 +34,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 
-    // API Đăng ký tài khoản mới (Public)
-    @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-        // Gọi xuống Service để xử lý
-        String result = authService.register(request);
-
-        // Trả về 200 OK kèm thông báo
-        return ResponseEntity.ok(result);
-    }
-
     // API Cập nhật thông tin bản thân
     @PutMapping("/update-profile")
     public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest request, Principal principal) {
