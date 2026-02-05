@@ -31,16 +31,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 
-    // API Đăng ký tài khoản mới (Public)
-    @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-        // Gọi xuống Service để xử lý
-        String result = authService.register(request);
-
-        // Trả về 200 OK kèm thông báo
-        return ResponseEntity.ok(result);
-    }
-
     // API Cập nhật thông tin bản thân
     @PutMapping("/update-profile")
     public ResponseEntity<UserResponse> updateProfile(
@@ -79,3 +69,5 @@ public class AuthController {
         return ResponseEntity.ok(debugInfo);
     }
 }
+
+// TODO: [Feature] Implement Full CRUD (List, Delete, Reset Pass) for Admin usage later
