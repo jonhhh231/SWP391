@@ -26,6 +26,9 @@ public class Account {
     @JsonIgnore
     private SystemUser systemUser;
 
+    @Column(name = "is_active")
+    private boolean isActive = true;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", unique = true)
     private Store store;

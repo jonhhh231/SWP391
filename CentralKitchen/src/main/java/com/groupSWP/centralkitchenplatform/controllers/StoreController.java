@@ -31,4 +31,10 @@ public class StoreController {
         StoreResponse updatedStore = storeService.updateStore(storeId, request);
         return ResponseEntity.ok(updatedStore);
     }
+
+    @DeleteMapping("/{storeId}")
+    public ResponseEntity<String> deleteStore(@PathVariable String storeId) {
+        storeService.deleteStore(storeId);
+        return ResponseEntity.ok("Đã xóa cửa hàng và nhân viên liên quan thành công!");
+    }
 }

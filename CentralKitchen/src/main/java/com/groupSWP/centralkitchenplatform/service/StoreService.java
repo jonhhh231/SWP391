@@ -39,15 +39,11 @@ public class StoreService {
         return mapToResponse(savedStore);
     }
 
-
     @Transactional
     public StoreResponse updateStore(String storeId, StoreRequest request) {
-        // 1. Tìm Store bằng ID truyền vào từ URL
+
         Store existingStore = storeRepository.findById(storeId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng với ID: " + storeId));
-
-        // 2. LOGIC CẬP NHẬT (Giữ nguyên logic kiểm tra null)
-        // Lưu ý: Không quan tâm ID trong request (nếu có), chỉ tin tưởng storeId từ tham số
 
         if (request.getName() != null && !request.getName().isEmpty()) {
             existingStore.setName(request.getName());
@@ -65,12 +61,37 @@ public class StoreService {
             existingStore.setType(request.getType());
         }
 
-        // 3. Lưu và trả về
         Store savedStore = storeRepository.save(existingStore);
         return mapToResponse(savedStore);
     }
 
-    // --- HÀM HELPER: Chuyển Entity sang DTO (Dùng chung) ---
+    @Transactional
+    public void softDeleteStore(String storeId) { // chưa test
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new RuntimeException("Not found"));
+
+        // 1. Tắt hoạt động cửa hàng
+        store.setActive(false);
+
+        // 2. Tắt luôn hoạt động của nhân viên/account đi kèm
+        if (store.getAccount() != null) {
+            store.getAccount().setActive(false);
+        }
+
+        storeRepository.save(store);
+    }
+
+    @Transactional
+    public void deleteStore(String storeId) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng!"));
+
+        if (store.getOrders() != null && !store.getOrders().isEmpty()) {
+            throw new RuntimeException("Không thể xóa cửa hàng này vì đã có phát sinh đơn hàng! Hãy dùng chức năng 'Khóa' (Soft Delete) thay vì xóa.");
+        }
+        storeRepository.delete(store);
+    }
+
     private StoreResponse mapToResponse(Store store) {
         return StoreResponse.builder()
                 .storeId(store.getStoreId())
