@@ -32,6 +32,13 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
+    // API 1.3 MỚI: XÓA MỀM
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteProduct(@PathVariable String id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok("Đã ẩn sản phẩm thành công (Soft Delete)!");
+    }
+
     // API 2: Lấy danh sách sản phẩm (Có phân trang & Lọc)
     // URL mẫu: GET /api/products?page=1&size=10&keyword=thịt&isActive=true
     @GetMapping
