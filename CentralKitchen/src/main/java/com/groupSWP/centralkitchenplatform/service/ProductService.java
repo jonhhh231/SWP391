@@ -79,6 +79,22 @@ public class ProductService {
     }
 
     /**
+     * Xóa mềm (Soft Delete): Chỉ ẩn sản phẩm đi, không xóa khỏi DB.
+     * Để bảo toàn lịch sử giao dịch.
+     */
+    @Transactional //
+    public void deleteProduct(String id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
+
+        // Chuyển trạng thái sang Inactive (Ẩn)
+        // Lưu ý: Tùy Lombok sinh ra mà là setActive() hoặc setIsActive()
+        product.setActive(false);
+
+        productRepository.save(product);
+    }
+
+    /**
      * Lấy danh sách sản phẩm có Phân trang (Pagination) & Lọc (Filter)
      * Dùng cho cả Franchise Staff (đặt hàng) và Manager (quản lý).
      */
