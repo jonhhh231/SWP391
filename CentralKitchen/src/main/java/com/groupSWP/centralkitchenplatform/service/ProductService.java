@@ -75,6 +75,10 @@ public class ProductService {
             formulaService.updateFormulas(existingProduct, request.getIngredients());
         }
 
+        if (request.getIsActive() != null) {
+            existingProduct.setActive(request.getIsActive());
+        }
+
         return productRepository.save(existingProduct);
     }
 
