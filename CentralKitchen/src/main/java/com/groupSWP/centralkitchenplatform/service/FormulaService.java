@@ -38,4 +38,16 @@ public class FormulaService {
 
         formulaRepository.saveAll(formulaList);
     }
+
+    // 👇 THÊM HÀM NÀY
+    @org.springframework.transaction.annotation.Transactional
+    public void updateFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
+        // 1. Xóa sạch công thức cũ
+        formulaRepository.deleteByProduct_ProductId(product.getProductId());
+
+        // 2. Lưu lại cái mới (nếu có)
+        if (ingredientRequests != null && !ingredientRequests.isEmpty()) {
+            saveFormulas(product, ingredientRequests);
+        }
+    }
 }

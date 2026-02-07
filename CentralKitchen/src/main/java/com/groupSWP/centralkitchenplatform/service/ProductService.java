@@ -51,6 +51,32 @@ public class ProductService {
         return mapToResponse(savedProduct);
     }
 
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public Product updateProduct(String id, ProductRequest request) {
+        // 1. Tìm sản phẩm
+        Product existingProduct = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
+
+        // 2. Update thông tin cơ bản
+        if (request.getProductName() != null) existingProduct.setProductName(request.getProductName());
+        if (request.getSellingPrice() != null) existingProduct.setSellingPrice(request.getSellingPrice());
+        if (request.getBaseUnit() != null) existingProduct.setBaseUnit(request.getBaseUnit());
+
+        // 3. XỬ LÝ CATEGORY (Từ ID -> Object)
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Category không tồn tại: " + request.getCategoryId()));
+            existingProduct.setCategory(category);
+        }
+
+        // 4. Update công thức
+        if (request.getIngredients() != null) {
+            formulaService.updateFormulas(existingProduct, request.getIngredients());
+        }
+
+        return productRepository.save(existingProduct);
+    }
+
     /**
      * Lấy danh sách sản phẩm có Phân trang (Pagination) & Lọc (Filter)
      * Dùng cho cả Franchise Staff (đặt hàng) và Manager (quản lý).
