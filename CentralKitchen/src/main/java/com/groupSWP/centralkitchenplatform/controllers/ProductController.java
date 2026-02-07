@@ -26,6 +26,12 @@ public class ProductController {
         return ResponseEntity.ok(productService.createProduct(request));
     }
 
+    // API 1.2: Cập nhật sản phẩm
+    @PutMapping("/{id}")
+    public ResponseEntity<Product> updateProduct(@PathVariable String id, @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
+    }
+
     // API 2: Lấy danh sách sản phẩm (Có phân trang & Lọc)
     // URL mẫu: GET /api/products?page=1&size=10&keyword=thịt&isActive=true
     @GetMapping

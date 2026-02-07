@@ -6,6 +6,7 @@ import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.CategoryRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,7 @@ public class ProductService {
         return mapToResponse(savedProduct);
     }
 
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    @Transactional
     public Product updateProduct(String id, ProductRequest request) {
         // 1. Tìm sản phẩm
         Product existingProduct = productRepository.findById(id)
