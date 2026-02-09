@@ -25,14 +25,30 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // Công khai endpoint login/logout
-                        .requestMatchers("/api/products/**").permitAll()
-                        .requestMatchers("/api/ingredients/**").permitAll()
-                        .requestMatchers("/api/auth/check-me").permitAll()// de test jwt
-                        // 1. Cấu hình phân quyền theo đường dẫn (URL-based)
+                        // --- 1. CÔNG KHAI ---
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // --- 2. ADMIN & MANAGER (Sếp to) ---
+                        // Admin đi đâu cũng được
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "KITCHEN_MANAGER")
-                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
+                        // Manager quản lý chung nên thường vào được các api quản lý
+                        .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        // --- 3. SUPPLY COORDINATOR (Điều phối) ---
+                        // API liên quan đến vận chuyển, nhập hàng
+                        .requestMatchers("/api/logistics/**", "/api/shipments/**").hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
+
+                        // --- 4. CENTRAL KITCHEN STAFF (Bếp) ---
+                        // API xem công thức, cập nhật trạng thái nấu
+                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_STAFF")
+
+                        // --- 5. FRANCHISE STORE STAFF (Cửa hàng) ---
+                        // API đặt hàng, xem lịch sử đơn hàng của cửa hàng
+                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_STAFF")
+
+                        // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
+                        .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
