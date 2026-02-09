@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/check-me").permitAll()// de test jwt
                         // 1. Cấu hình phân quyền theo đường dẫn (URL-based)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "KITCHEN_MANAGER")
                         .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
                         .anyRequest().authenticated()
