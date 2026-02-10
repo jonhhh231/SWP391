@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 @RequiredArgsConstructor
 public class UnitConversionService {
@@ -44,5 +46,28 @@ public class UnitConversionService {
                 .build();
 
         return conversionRepository.save(conversion);
+    }
+
+    /**
+     * Hàm tính toán quy đổi
+     * @param ingredient: Nguyên liệu (Gà)
+     * @param inputUnit: Đơn vị nhập (Thùng)
+     * @param quantity: Số lượng nhập (5)
+     * @return Số lượng đã quy đổi ra đơn vị gốc (100)
+     */
+    public BigDecimal convertToBaseUnit(Ingredient ingredient, UnitType inputUnit, BigDecimal quantity) {
+        // 1. Nếu đơn vị nhập vào trùng với đơn vị gốc (VD: Nhập KG, gốc là KG)
+        if (inputUnit == ingredient.getUnit()) {
+            return quantity;
+        }
+
+        // 2. Tìm công thức trong DB
+        UnitConversion conversion = conversionRepository.findByIngredientAndUnit(ingredient, inputUnit)
+                .orElseThrow(() -> new RuntimeException(
+                        "Lỗi: Không tìm thấy công thức quy đổi từ '" + inputUnit +
+                                "' sang '" + ingredient.getUnit() + "' cho nguyên liệu: " + ingredient.getName()));
+
+        // 3. Tính toán: Số lượng * Hệ số (Factor)
+        return quantity.multiply(conversion.getConversionFactor());
     }
 }
