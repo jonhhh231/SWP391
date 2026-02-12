@@ -5,6 +5,7 @@ import com.groupSWP.centralkitchenplatform.entities.kitchen.*;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.IngredientRepository;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -37,5 +38,17 @@ public class FormulaService {
         }).collect(Collectors.toList());
 
         formulaRepository.saveAll(formulaList);
+    }
+
+    // 👇 THÊM HÀM NÀY
+    @Transactional
+    public void updateFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
+        // 1. Xóa sạch công thức cũ
+        formulaRepository.deleteByProduct_ProductId(product.getProductId());
+
+        // 2. Lưu lại cái mới (nếu có)
+        if (ingredientRequests != null && !ingredientRequests.isEmpty()) {
+            saveFormulas(product, ingredientRequests);
+        }
     }
 }

@@ -7,6 +7,7 @@ import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.CategoryRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,52 @@ public class ProductService {
 
         // 4. Return DTO
         return mapToResponse(savedProduct);
+    }
+
+    @Transactional
+    public Product updateProduct(String id, ProductRequest request) {
+        // 1. Tìm sản phẩm
+        Product existingProduct = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
+
+        // 2. Update thông tin cơ bản
+        if (request.getProductName() != null) existingProduct.setProductName(request.getProductName());
+        if (request.getSellingPrice() != null) existingProduct.setSellingPrice(request.getSellingPrice());
+        if (request.getBaseUnit() != null) existingProduct.setBaseUnit(request.getBaseUnit());
+
+        // 3. XỬ LÝ CATEGORY (Từ ID -> Object)
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Category không tồn tại: " + request.getCategoryId()));
+            existingProduct.setCategory(category);
+        }
+
+        // 4. Update công thức
+        if (request.getIngredients() != null) {
+            formulaService.updateFormulas(existingProduct, request.getIngredients());
+        }
+
+        if (request.getIsActive() != null) {
+            existingProduct.setActive(request.getIsActive());
+        }
+
+        return productRepository.save(existingProduct);
+    }
+
+    /**
+     * Xóa mềm (Soft Delete): Chỉ ẩn sản phẩm đi, không xóa khỏi DB.
+     * Để bảo toàn lịch sử giao dịch.
+     */
+    @Transactional //
+    public void deleteProduct(String id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
+
+        // Chuyển trạng thái sang Inactive (Ẩn)
+        // Lưu ý: Tùy Lombok sinh ra mà là setActive() hoặc setIsActive()
+        product.setActive(false);
+
+        productRepository.save(product);
     }
 
     /**
