@@ -117,12 +117,28 @@ public class AuthService {
 
     // Hàm phụ để map Enum sang String ngắn gọn
     private String getPrefixByRole(SystemUser.SystemRole role) {
+        if (role == null) return "UNK"; // Unknown (Phòng hờ lỗi null)
+
         return switch (role) {
+            // 1. Admin (Quản trị hệ thống) -> ADM
             case ADMIN -> "ADM";
+
+            // 2. Manager (Quản lý vận hành) -> MNG
             case MANAGER -> "MNG";
+
+            // 3. Supply Coordinator (Điều phối cung ứng) -> COR
+            // (Em đổi COD -> COR cho nó chuẩn tiếng Anh Coordinator hơn nha Sếp)
+            case COORDINATOR -> "COR";
+
+            // 4. Central Kitchen Staff (Nhân viên bếp) -> KIT
             case KITCHEN_STAFF -> "KIT";
-            case COORDINATOR -> "COD";
-            default -> "STF"; // Staff thường
+
+            // 5. Franchise Store Staff (Nhân viên cửa hàng) -> STR
+            // (Đây là vai trò mới Sếp vừa thêm)
+            case STORE_STAFF -> "STR";
+
+            // Trường hợp lạ (Fallback)
+            default -> "USR";
         };
     }
 
