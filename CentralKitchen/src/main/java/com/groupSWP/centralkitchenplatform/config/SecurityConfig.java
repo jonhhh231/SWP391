@@ -36,6 +36,7 @@ public class SecurityConfig {
                         // --- 2. ADMIN & MANAGER (Sếp to) ---
                         // Admin đi đâu cũng được
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         // Manager quản lý chung nên thường vào được các api quản lý
                         .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
 
@@ -53,7 +54,6 @@ public class SecurityConfig {
 
                         // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
                         .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
-
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

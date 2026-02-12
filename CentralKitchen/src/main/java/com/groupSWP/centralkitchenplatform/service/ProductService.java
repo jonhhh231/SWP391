@@ -2,6 +2,7 @@ package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest;
 import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse;
+import com.groupSWP.centralkitchenplatform.entities.common.UnitType; // 👈 NHỚ IMPORT CÁI NÀY
 import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.CategoryRepository;
@@ -39,7 +40,9 @@ public class ProductService {
                 .productName(request.getProductName())
                 .category(category) // Set Object Category vào đây
                 .sellingPrice(request.getSellingPrice())
-                .baseUnit(request.getBaseUnit())
+                // 👇 SỬA CHỖ NÀY: Chuyển String ("KG") -> Enum (UnitType.KG)
+                // Lưu ý: Nếu request gửi bậy bạ (vd: "ABC") thì dòng này sẽ ném lỗi IllegalArgumentException
+                .baseUnit(UnitType.valueOf(request.getBaseUnit()))
                 .isActive(true) // Mặc định tạo mới là Active
                 .build();
 
@@ -143,7 +146,8 @@ public class ProductService {
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : "Chưa phân loại")
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .sellingPrice(product.getSellingPrice())
-                .baseUnit(product.getBaseUnit())
+                // 👇 SỬA CHỖ NÀY: Chuyển Enum (UnitType.KG) -> String ("KG")
+                .baseUnit(product.getBaseUnit().name())
                 .isActive(product.isActive())
                 .build();
     }

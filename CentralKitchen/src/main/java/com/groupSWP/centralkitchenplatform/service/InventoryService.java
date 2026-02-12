@@ -92,7 +92,8 @@ public class InventoryService {
         List<ImportTicketResponse.ImportItemResponse> itemResponses = ticket.getImportItems().stream()
                 .map(item -> ImportTicketResponse.ImportItemResponse.builder()
                         .ingredientName(item.getIngredient().getName()) // Hoặc .getName() tuỳ entity
-                        .unit(item.getIngredient().getUnit())
+                        // Thêm .name() để lấy tên Enum ra (VD: "KG", "L")
+                        .unit(item.getIngredient().getUnit().name())
                         .quantity(item.getQuantity())
                         .importPrice(item.getImportPrice())
                         .totalPrice(item.getImportPrice().multiply(item.getQuantity()))
