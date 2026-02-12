@@ -13,6 +13,7 @@ public class ProductRequest {
     private Long categoryId;
     private BigDecimal sellingPrice; // Sửa ở đây
     private String baseUnit;
+    private Boolean isActive;
     private List<Formula> ingredients;
 
     @Data
