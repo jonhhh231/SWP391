@@ -34,10 +34,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/**").permitAll()
                         .requestMatchers("/api/ingredients/**").permitAll()
                         .requestMatchers("/api/auth/check-me").permitAll()// de test jwt
+                        .requestMatchers("/api/formulas/**").permitAll()
+
                         // 1. Cấu hình phân quyền theo đường dẫn (URL-based)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "KITCHEN_MANAGER")
                         .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
