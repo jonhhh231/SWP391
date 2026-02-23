@@ -131,11 +131,11 @@ public class AuthService {
             case COORDINATOR -> "COR";
 
             // 4. Central Kitchen Staff (Nhân viên bếp) -> KIT
-            case KITCHEN_STAFF -> "KIT";
+            case KITCHEN_MANAGER -> "KIT";
 
             // 5. Franchise Store Staff (Nhân viên cửa hàng) -> STR
             // (Đây là vai trò mới Sếp vừa thêm)
-            case STORE_STAFF -> "STR";
+            case STORE_MANAGER -> "STR";
 
             // Trường hợp lạ (Fallback)
             default -> "USR";
