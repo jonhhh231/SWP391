@@ -64,7 +64,13 @@ public class ProductService {
         // 2. Update thông tin cơ bản
         if (request.getProductName() != null) existingProduct.setProductName(request.getProductName());
         if (request.getSellingPrice() != null) existingProduct.setSellingPrice(request.getSellingPrice());
-        if (request.getBaseUnit() != null) existingProduct.setBaseUnit(request.getBaseUnit());
+        if (request.getBaseUnit() != null && !request.getBaseUnit().trim().isEmpty()) {
+            try {
+                existingProduct.setBaseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Đơn vị tính không hợp lệ: " + request.getBaseUnit());
+            }
+        }
 
         // 3. XỬ LÝ CATEGORY (Từ ID -> Object)
         if (request.getCategoryId() != null) {
