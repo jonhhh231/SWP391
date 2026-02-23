@@ -46,11 +46,11 @@ public class SecurityConfig {
 
                         // --- 4. CENTRAL KITCHEN STAFF (Bếp) ---
                         // API xem công thức, cập nhật trạng thái nấu
-                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_STAFF")
+                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
                         // --- 5. FRANCHISE STORE STAFF (Cửa hàng) ---
                         // API đặt hàng, xem lịch sử đơn hàng của cửa hàng
-                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_STAFF")
+                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
 
                         // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
                         .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
