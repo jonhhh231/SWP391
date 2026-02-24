@@ -48,7 +48,7 @@ public class SystemUser {
         ADMIN,              // 1. Quản trị hệ thống
         MANAGER,            // 2. Quản lý vận hành (Sếp to)
         COORDINATOR,        // 3. Điều phối cung ứng (Logistics)
-        KITCHEN_STAFF,      // 4. Nhân viên bếp trung tâm
-        STORE_STAFF         // 5. Nhân viên cửa hàng (Franchise)
+        KITCHEN_MANAGER,      // 4. Nhân viên quản lý bếp trung tâm
+        STORE_MANAGER         // 5. Nhân viên quản lý cửa hàng (Franchise)
     }
 }
