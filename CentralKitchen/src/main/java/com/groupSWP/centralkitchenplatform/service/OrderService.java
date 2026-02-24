@@ -112,4 +112,67 @@ public class OrderService {
         String randomPart = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
         return String.format("STD-%s-%s-%s", storeId, datePart, randomPart);
     }
+
+    @Transactional
+    public OrderResponse createUrgentOrder(OrderRequest request) {
+        // 1. Phí phạt khẩn cấp: 100.000 VNĐ
+        BigDecimal URGENT_SURCHARGE = new BigDecimal("100000");
+
+        // 2. Xác thực Cửa hàng
+        Store store = storeRepository.findById(request.getStoreId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Cửa hàng với ID: " + request.getStoreId()));
+
+        Order order = new Order();
+
+        // 3. Đổi Prefix thành URG (Urgent) thay vì STD
+        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+        String randomPart = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        order.setOrderId(String.format("URG-%s-%s-%s", store.getStoreId(), datePart, randomPart));
+
+        order.setStore(store);
+        order.setStatus(Order.OrderStatus.NEW);
+
+        // 4. Đánh dấu đây là đơn KHẨN CẤP
+        order.setOrderType(Order.OrderType.URGENT);
+        order.setDeliveryWindow(Order.DeliveryWindow.valueOf(request.getDeliveryWindow().toUpperCase()));
+        order.setNote(request.getNote());
+
+        // 5. Cộng phụ phí vào đơn
+        order.setSurcharge(URGENT_SURCHARGE);
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+
+        for (OrderRequest.OrderItemRequest itemReq : request.getItems()) {
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy Sản phẩm với ID: " + itemReq.getProductId()));
+
+            OrderItem orderItem = new OrderItem();
+            OrderItemKey itemKey = new OrderItemKey(order.getOrderId(), product.getProductId());
+            orderItem.setId(itemKey);
+            orderItem.setOrder(order);
+            orderItem.setProduct(product);
+            orderItem.setQuantity(itemReq.getQuantity());
+
+            BigDecimal currentPrice = product.getSellingPrice();
+            orderItem.setPriceAtOrder(currentPrice);
+
+            BigDecimal lineTotal = currentPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            totalAmount = totalAmount.add(lineTotal);
+            orderItems.add(orderItem);
+        }
+
+        // 6. Tổng tiền thanh toán = Tiền hàng + Phụ phí khẩn cấp
+        order.setTotalAmount(totalAmount.add(URGENT_SURCHARGE));
+        order.setOrderItems(orderItems);
+
+        Order savedOrder = orderRepository.save(order);
+
+        return OrderResponse.builder()
+                .orderId(savedOrder.getOrderId())
+                .status(savedOrder.getStatus().name())
+                .totalAmount(savedOrder.getTotalAmount())
+                .message("Tạo đơn hàng KHẨN CẤP thành công! Đã cộng thêm 100k phí giao gấp.")
+                .build();
+    }
 }
