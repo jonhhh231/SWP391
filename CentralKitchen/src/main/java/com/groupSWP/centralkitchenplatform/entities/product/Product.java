@@ -3,6 +3,7 @@ package com.groupSWP.centralkitchenplatform.entities.product;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
+import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
@@ -25,7 +26,8 @@ public class Product extends BaseEntity {
 
     private BigDecimal sellingPrice;
     private BigDecimal costPrice;
-    private String baseUnit;
+    @Enumerated(EnumType.STRING)
+    private UnitType baseUnit;
     private boolean isActive;
 
     @OneToMany(mappedBy = "product")

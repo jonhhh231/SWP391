@@ -22,6 +22,6 @@ public class AdminController {
     public ResponseEntity<String> createEmployee(@RequestBody RegisterRequest request) {
         // Tận dụng lại hàm register logic cũ, chỉ khác người gọi là Admin
         String result = authService.register(request);
-        return ResponseEntity.ok("Admin đã cấp tài khoản thành công! Username: " + request.getUsername());
+        return ResponseEntity.ok("Admin đã cấp tài khoản thành công! Username: " + request.username());
     }
 }

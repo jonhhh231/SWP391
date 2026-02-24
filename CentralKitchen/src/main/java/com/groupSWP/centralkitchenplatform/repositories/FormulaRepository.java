@@ -5,9 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface FormulaRepository extends JpaRepository<Formula, Object> {
-
-
-    // Lấy BOM theo list productId
-    List<Formula> findByProductProductIdIn(List<String> productIds);
+@Repository
+public interface FormulaRepository extends JpaRepository<Formula, FormulaKey> {
+    void deleteByProduct_ProductId(String productId);
 }

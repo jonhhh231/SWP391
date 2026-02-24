@@ -1,18 +1,11 @@
 package com.groupSWP.centralkitchenplatform.dto.auth;
 
-import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser.SystemRole;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class RegisterRequest {
-    private String username;
-    private String password;
-    private String fullName;
-    private SystemRole role; // Nhận trực tiếp Enum (ADMIN, MANAGER...)
-}
+public record RegisterRequest(
+        String username,
+        String password,
+        String fullName,
+        SystemUser.SystemRole role,
+        String email // BẮT BUỘC THÊM DÒNG NÀY
+) {}

@@ -27,34 +27,25 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout() {
-        // Với JWT, client chỉ cần xóa token ở trình duyệt.
-        // Backend trả về JSON xác nhận.
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 
-    // API Cập nhật thông tin bản thân
     @PutMapping("/update-profile")
     public ResponseEntity<UserResponse> updateProfile(
             @RequestBody UpdateProfileRequest request,
             Principal principal
     ) {
-        // 1. Gọi Service để xử lý Logic (Vẫn trả về Entity SystemUser)
-        // principal.getName() trả về username từ Token
         SystemUser updatedUser = authService.updateProfile(principal.getName(), request);
 
-        // 2. --- QUAN TRỌNG: MAP TỪ ENTITY SANG DTO TẠI ĐÂY ---
-        // Bước này giúp cắt bỏ hoàn toàn các mối quan hệ rườm rà gây lỗi vòng lặp
         UserResponse response = UserResponse.builder()
                 .userId(updatedUser.getUserId())
                 .fullName(updatedUser.getFullName())
-                .role(updatedUser.getRole().name()) // Enum -> String
-                .username(principal.getName()) // Hoặc updatedUser.getAccount().getUsername()
+                .role(updatedUser.getRole().name())
+                .username(principal.getName())
                 .build();
 
-        // 3. Trả về DTO
         return ResponseEntity.ok(response);
     }
-
 
     @GetMapping("/check-me")
     public ResponseEntity<?> checkMe(Authentication authentication) {
@@ -69,6 +60,9 @@ public class AuthController {
 
         return ResponseEntity.ok(debugInfo);
     }
-}
 
-// TODO: [Feature] Implement Full CRUD (List, Delete, Reset Pass) for Admin usage later
+    @PostMapping("/verify-otp")
+    public ResponseEntity<AuthResponse> verifyOtp(@RequestBody OtpRequest request) {
+        return ResponseEntity.ok(authService.verifyOtp(request.getUsername(), request.getOtp()));
+    }
+}
