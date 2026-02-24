@@ -9,6 +9,5 @@ import java.util.List;
 
 @Repository
 public interface FormulaRepository extends JpaRepository<Formula, FormulaKey> {
-    List<Formula> findByProduct_ProductId(String productId);
     void deleteByProduct_ProductId(String productId);
 }

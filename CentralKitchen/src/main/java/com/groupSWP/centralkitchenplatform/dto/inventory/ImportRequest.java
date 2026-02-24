@@ -13,6 +13,7 @@ public class ImportRequest {
     @Data
     public static class ItemRequest {
         private String ingredientId;
+        private String unit;
         private BigDecimal quantity;
         private BigDecimal importPrice;
     }
