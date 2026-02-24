@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface FormulaRepository extends JpaRepository<Formula, FormulaKey> {
+    void deleteByProduct_ProductId(String productId);
 }
