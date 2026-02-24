@@ -8,6 +8,7 @@ import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.exception.NotFoundException;
 import com.groupSWP.centralkitchenplatform.repositories.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.IngredientRepository;
+import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,7 @@ public class FormulaService {
                     FormulaResponseDTO dto = new FormulaResponseDTO();
                     dto.setIngredientId(f.getIngredient().getIngredientId());
                     dto.setIngredientName(f.getIngredient().getName());
-                    dto.setUnit(f.getIngredient().getUnit());
+                    dto.setUnit(String.valueOf(f.getIngredient().getUnit()));
                     dto.setAmountNeeded(f.getAmountNeeded());
                     dto.setUnitCost(f.getIngredient().getUnitCost());
 
@@ -87,7 +88,6 @@ public class FormulaService {
 
         formulaRepository.saveAll(formulaList);
     }
-}
     // 👇 THÊM HÀM NÀY
     @Transactional
     public void updateFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
