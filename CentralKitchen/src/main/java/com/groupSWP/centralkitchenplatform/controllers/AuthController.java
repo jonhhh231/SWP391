@@ -19,6 +19,7 @@ import java.util.Map;
 public class AuthController {
     private final AuthService authService;
 
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.login(request));
