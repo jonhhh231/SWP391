@@ -1,3 +1,11 @@
 package com.groupSWP.centralkitchenplatform.dto.auth;
 
-public record AuthResponse(String token, String username, String role) {}
+import lombok.Builder;
+
+@Builder
+public record AuthResponse(
+        String token,
+        String username,
+        String role,
+        String message // CẦN THÊM DÒNG NÀY VÀO ĐÂY
+) {}

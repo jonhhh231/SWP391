@@ -40,6 +40,9 @@ public class SystemUser {
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
     private List<ImportTicket> createdTickets;
 
+    @Column(name = "email", unique = true)
+    private String email;
+
     // Định nghĩa Enum ngay bên trong hoặc tách file riêng tùy bạn
     public enum SystemRole {
         ADMIN,              // 1. Quản trị hệ thống

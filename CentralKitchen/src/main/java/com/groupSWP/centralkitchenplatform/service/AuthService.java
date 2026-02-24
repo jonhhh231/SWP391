@@ -1,165 +1,132 @@
 package com.groupSWP.centralkitchenplatform.service;
 
-import com.groupSWP.centralkitchenplatform.dto.auth.AuthRequest;
-import com.groupSWP.centralkitchenplatform.dto.auth.AuthResponse;
-import com.groupSWP.centralkitchenplatform.dto.auth.RegisterRequest; // DTO mới tạo
-import com.groupSWP.centralkitchenplatform.dto.auth.UpdateProfileRequest;
+import com.groupSWP.centralkitchenplatform.dto.auth.*;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
-import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser; // Entity Profile
+import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
-import com.groupSWP.centralkitchenplatform.repositories.SystemUserRepository; // Repository mới
+import com.groupSWP.centralkitchenplatform.repositories.SystemUserRepository;
 import com.groupSWP.centralkitchenplatform.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Import cho Transaction
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor // Tự động tạo Constructor cho các biến final (Dependency Injection)
+@RequiredArgsConstructor
 public class AuthService {
 
-    // Đổi tên 'repository' -> 'accountRepository' cho rõ nghĩa hơn nhé Sếp
     private final AccountRepository accountRepository;
-    private final SystemUserRepository systemUserRepository; // Inject thêm cái này để lưu Profile
+    private final SystemUserRepository systemUserRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthResponse login(AuthRequest request) {
-        // Tìm account theo username
-        Account account = accountRepository.findByUsername(request.username())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    private final OtpService otpService;
+    private final MailService mailService;
 
-        // So sánh mật khẩu (Bây giờ chắc chắn khớp 100% vì bước trước đã update rồi)
+    public AuthResponse login(AuthRequest request) {
+        Account account = accountRepository.findByUsername(request.username())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+
         if (!passwordEncoder.matches(request.password(), account.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sai mật khẩu!");
         }
 
-        // Nếu khớp -> Sinh Token trả về
-        String token = jwtService.generateToken(account);
-        return new AuthResponse(token, account.getUsername(), account.getRole());
+        SystemUser profile = account.getSystemUser();
+        // CẬP NHẬT: Thêm .isBlank() để chặn trường hợp email rỗng ""
+        if (profile == null || profile.getEmail() == null || profile.getEmail().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài khoản chưa cập nhật Email để nhận mã OTP!");
+        }
+
+        String otp = otpService.generateOtp(account.getUsername());
+        mailService.sendOtpMail(profile.getEmail(), otp);
+
+        return AuthResponse.builder()
+                .username(account.getUsername())
+                .message("OTP_REQUIRED")
+                .build();
     }
 
-    // =========================================================================
-    // 2. CHỨC NĂNG ĐĂNG KÝ (REGISTER) - Mới thêm vào
-    // =========================================================================
-    // @Transactional: Cực quan trọng! Đảm bảo "All or Nothing".
-    // Nếu tạo Account xong mà tạo Profile bị lỗi -> Nó sẽ tự hủy (Rollback) cái Account luôn.
+    public AuthResponse verifyOtp(String username, String otp) {
+        if (!otpService.validateOtp(username, otp)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mã OTP không chính xác hoặc đã hết hạn!");
+        }
+
+        Account account = accountRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        otpService.clearOtp(username);
+
+        String token = jwtService.generateToken(account);
+        return AuthResponse.builder()
+                .token(token)
+                .username(account.getUsername())
+                .role(account.getRole())
+                .message("Login Success")
+                .build();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public String register(RegisterRequest request) {
-
-        // BƯỚC 1: Kiểm tra xem Username đã tồn tại chưa
-        if (accountRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username này đã có người dùng rồi!");
+        if (accountRepository.findByUsername(request.username()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username này đã tồn tại!");
         }
 
-        // BƯỚC 2: Tạo Account (Để đăng nhập)
         Account account = new Account();
-        account.setUsername(request.getUsername());
-        // Lưu ý: Phải mã hóa mật khẩu trước khi lưu vào DB
-        account.setPassword(passwordEncoder.encode(request.getPassword()));
-        // Lưu role dạng String để JWT xử lý nhanh
-        account.setRole(request.getRole().name());
-
-        // Lưu Account vào DB trước -> Để lấy được ID (hoặc để Hibernate quản lý Persistence Context)
+        account.setUsername(request.username());
+        account.setPassword(passwordEncoder.encode(request.password()));
+        account.setRole(request.role().name());
         account = accountRepository.save(account);
 
-        // BƯỚC 3: Tạo SystemUser (Profile chi tiết nhân viên)
-        // Dùng Builder Pattern cho gọn code
         SystemUser userProfile = SystemUser.builder()
-                .userId(generateStaffId(request.getRole()))       // Tự động sinh mã NV
-                .fullName(request.getFullName()) // Lấy tên thật từ request
-                .role(request.getRole())         // Lấy Enum Role
-                .account(account)                // Quan trọng: Gắn Profile này vào Account vừa tạo ở trên
+                .userId(generateStaffId(request.role()))
+                .fullName(request.fullName())
+                .email(request.email())
+                .role(request.role())
+                .account(account)
                 .build();
 
-        // Lưu Profile vào DB
         systemUserRepository.save(userProfile);
-
-        return "Đăng ký thành công! Mã nhân viên của bạn là: " + userProfile.getUserId();
+        return "Đăng ký thành công! Mã nhân viên: " + userProfile.getUserId();
     }
 
-    // =========================================================================
-    // UTILS - Các hàm phụ trợ
-    // =========================================================================
-
-    // Hàm sinh mã nhân viên tự động
     private String generateStaffId(SystemUser.SystemRole role) {
-        // 1. Xác định Prefix (Mã chức vụ)
         String prefix = getPrefixByRole(role);
-
-        // 2. Tìm mã nhân viên lớn nhất hiện tại trong DB của Role này
         Optional<String> lastUserId = systemUserRepository.findLastUserIdByRole(role);
+        if (lastUserId.isEmpty()) return prefix + "00001";
 
-        // 3. Nếu chưa có ai -> Đây là người đầu tiên
-        if (lastUserId.isEmpty()) {
-            return prefix + "00001"; // Format 5 số
-        }
-
-        // 4. Nếu đã có -> Lấy số đuôi + 1
         String lastId = lastUserId.get();
-        // Cắt bỏ phần Prefix để lấy số (VD: "KIT00009" -> lấy "00009")
         String numberPart = lastId.substring(prefix.length());
-
         try {
             int number = Integer.parseInt(numberPart);
-            number++; // Tăng lên 1
-            // Format lại thành chuỗi 5 số (VD: 10 -> "00010")
-            return prefix + String.format("%05d", number);
-        } catch (NumberFormatException e) {
-            // Fallback nếu dữ liệu cũ bị lỗi format
+            return prefix + String.format("%05d", ++number);
+        } catch (Exception e) {
             return prefix + System.currentTimeMillis();
         }
     }
 
-    // Hàm phụ để map Enum sang String ngắn gọn
     private String getPrefixByRole(SystemUser.SystemRole role) {
-        if (role == null) return "UNK"; // Unknown (Phòng hờ lỗi null)
-
+        if (role == null) return "USR";
         return switch (role) {
-            // 1. Admin (Quản trị hệ thống) -> ADM
             case ADMIN -> "ADM";
-
-            // 2. Manager (Quản lý vận hành) -> MNG
             case MANAGER -> "MNG";
-
-            // 3. Supply Coordinator (Điều phối cung ứng) -> COR
-            // (Em đổi COD -> COR cho nó chuẩn tiếng Anh Coordinator hơn nha Sếp)
             case COORDINATOR -> "COR";
-
-            // 4. Central Kitchen Staff (Nhân viên bếp) -> KIT
             case KITCHEN_STAFF -> "KIT";
-
-            // 5. Franchise Store Staff (Nhân viên cửa hàng) -> STR
-            // (Đây là vai trò mới Sếp vừa thêm)
             case STORE_STAFF -> "STR";
-
-            // Trường hợp lạ (Fallback)
-            default -> "USR";
         };
     }
 
     @Transactional
     public SystemUser updateProfile(String currentUsername, UpdateProfileRequest request) {
-        // 1. Tìm Account đang đăng nhập
         Account account = accountRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-
-        // 2. Lấy Profile đi kèm
         SystemUser profile = account.getSystemUser();
-        if (profile == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
-        }
 
-        // 3. Cập nhật thông tin (Chỉ update nếu có gửi lên)
-        if (request.getFullName() != null && !request.getFullName().isBlank()) {
-            profile.setFullName(request.getFullName());
-        }
-
-        // Nếu sau này Sếp có thêm field SĐT hay Email thì if tiếp ở đây...
+        if (request.getFullName() != null) profile.setFullName(request.getFullName());
+        if (request.getEmail() != null) profile.setEmail(request.getEmail());
 
         return systemUserRepository.save(profile);
     }
