@@ -4,6 +4,7 @@ import com.groupSWP.centralkitchenplatform.dto.inventory.ImportRequest;
 import com.groupSWP.centralkitchenplatform.dto.inventory.ImportTicketResponse;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
+import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportTicket;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +26,8 @@ public class InventoryService {
     private final ImportTicketRepository ticketRepository;
     private final IngredientRepository ingredientRepository;
     private final AccountRepository accountRepository;
+    // BỔ SUNG: Tiêm trái tim quy đổi đơn vị vào đây
+    private final UnitConversionRepository conversionRepository;
 
     @Transactional
     public ImportTicketResponse importIngredients(ImportRequest request, String username) {
@@ -55,7 +59,6 @@ public class InventoryService {
 
         // --- 4. XỬ LÝ CHI TIẾT VÀ CẬP NHẬT KHO ---
         for (ImportRequest.ItemRequest itemReq : request.getItems()) {
-            // Kiểm tra số lượng nhập phải > 0
             if (itemReq.getQuantity() == null || itemReq.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("Số lượng nhập của nguyên liệu ID " + itemReq.getIngredientId() + " phải lớn hơn 0!");
             }
@@ -63,28 +66,50 @@ public class InventoryService {
             Ingredient ingredient = ingredientRepository.findById(itemReq.getIngredientId())
                     .orElseThrow(() -> new RuntimeException("Nguyên liệu không tồn tại: " + itemReq.getIngredientId()));
 
-            // Tạo dòng chi tiết (Detail)
+            // === BƯỚC THẦN THÁNH: LẤY HỆ SỐ QUY ĐỔI ===
+            BigDecimal conversionFactor = BigDecimal.ONE;
+
+            if (itemReq.getUnit() != null && !itemReq.getUnit().trim().equalsIgnoreCase(ingredient.getUnit().name())) {
+
+                // 1. Ép kiểu cái chữ String (VD: "THUNG") thành Enum UnitType chuẩn của Sếp
+                UnitType targetUnit;
+                try {
+                    targetUnit = UnitType.valueOf(itemReq.getUnit().trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Đơn vị tính không hợp lệ: " + itemReq.getUnit());
+                }
+
+                // 2. Dùng đúng cái hàm có sẵn trong Repository của Sếp! (Truyền Object Ingredient và Enum)
+                var conversion = conversionRepository.findByIngredientAndUnit(
+                        ingredient, targetUnit
+                ).orElseThrow(() -> new RuntimeException("Chưa cài đặt luật quy đổi cho đơn vị: " + itemReq.getUnit()));
+
+                conversionFactor = conversion.getConversionFactor();
+            }
+
+            // === TÍNH TOÁN QUY ĐỔI VỀ BASE UNIT (Cho Tồn kho) ===
+            // 1. Số lượng thực tế = Số lượng nhập * Hệ số
+            BigDecimal baseQuantity = itemReq.getQuantity().multiply(conversionFactor);
+            // 2. Giá vốn thực tế = Giá nhập 1 đơn vị / Hệ số (Làm tròn 2 chữ số thập phân)
+            BigDecimal baseUnitCost = itemReq.getImportPrice().divide(conversionFactor, 2, RoundingMode.HALF_UP);
+
+            // --- LƯU SỔ KẾ TOÁN (Giữ nguyên con số giấy tờ gửi lên) ---
             ImportItem importItem = ImportItem.builder()
                     .importTicket(ticket)
                     .ingredient(ingredient)
-                    .quantity(itemReq.getQuantity())
-                    .importPrice(itemReq.getImportPrice())
+                    .quantity(itemReq.getQuantity())      // Giữ nguyên VD: 5 Thùng
+                    .importPrice(itemReq.getImportPrice()) // Giữ nguyên VD: 1.000.000đ
                     .build();
-
             importItems.add(importItem);
 
-            // Tính toán tổng tiền
             BigDecimal lineTotal = itemReq.getImportPrice().multiply(itemReq.getQuantity());
             totalAmount = totalAmount.add(lineTotal);
 
-            // Cập nhật tồn kho thực tế
+            // --- CẬP NHẬT KHO VẬT LÝ (Dùng con số đã quy đổi) ---
             BigDecimal currentStock = (ingredient.getKitchenStock() == null) ? BigDecimal.ZERO : ingredient.getKitchenStock();
-            ingredient.setKitchenStock(currentStock.add(itemReq.getQuantity()));
+            ingredient.setKitchenStock(currentStock.add(baseQuantity)); // Cộng đúng VD: 100 KG
+            ingredient.setUnitCost(baseUnitCost);                       // Set đúng VD: 50.000đ/KG
 
-            // Cập nhật giá vốn mới nhất
-            ingredient.setUnitCost(itemReq.getImportPrice());
-
-            // Lưu lại thông tin nguyên liệu
             ingredientRepository.save(ingredient);
         }
 
@@ -97,6 +122,7 @@ public class InventoryService {
     }
 
     private ImportTicketResponse mapToResponse(ImportTicket ticket) {
+        // ... (Giữ nguyên phần Map Response của Sếp) ...
         List<ImportTicketResponse.ImportItemResponse> itemResponses = ticket.getImportItems().stream()
                 .map(item -> ImportTicketResponse.ImportItemResponse.builder()
                         .ingredientName(item.getIngredient().getName())
