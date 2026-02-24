@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.service;
 
+import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
@@ -174,5 +175,26 @@ public class OrderService {
                 .totalAmount(savedOrder.getTotalAmount())
                 .message("Tạo đơn hàng KHẨN CẤP thành công! Đã cộng thêm 100k phí giao gấp.")
                 .build();
+    }
+
+    // =========================================================================
+    // HÀM XEM LỊCH SỬ ĐƠN HÀNG
+    // =========================================================================
+    public List<OrderHistoryResponse> getOrderHistory(String storeId) {
+
+        // 1. Nhờ bọn bốc vác (Repository) lôi hết đơn của Cửa hàng này ra, xếp mới nhất lên đầu
+        List<Order> orders = orderRepository.findByStore_StoreIdOrderByCreatedAtDesc(storeId);
+
+        // 2. Ép nó vào cái khuôn DTO để trả về cho Frontend (Dùng Java 8 Stream siêu mượt)
+        return orders.stream()
+                .map(order -> OrderHistoryResponse.builder()
+                        .orderId(order.getOrderId())
+                        .orderType(order.getOrderType().name())
+                        .status(order.getStatus().name())
+                        .totalAmount(order.getTotalAmount())
+                        // Vì Order kế thừa BaseEntity nên Sếp lấy getCreatedAt() thoải mái nhé
+                        .createdAt(order.getCreatedAt())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
     }
 }
