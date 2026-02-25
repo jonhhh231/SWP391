@@ -256,4 +256,41 @@ public class OrderService {
         // 4. Lưu lại vào DB
         orderRepository.save(order);
     }
+
+    // =========================================================================
+    // HÀM TỔNG HỢP ĐƠN HÀNG CHO BẾP TRUNG TÂM (AGGREGATION)
+    // =========================================================================
+    public java.util.List<com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> getPendingProductionAggregation() {
+
+        // 1. Lùa tất cả các đơn hàng đang chờ (NEW) ra sân
+        java.util.List<com.groupSWP.centralkitchenplatform.entities.logistic.Order> pendingOrders =
+                orderRepository.findByStatus(com.groupSWP.centralkitchenplatform.entities.logistic.Order.OrderStatus.NEW);
+
+        // 2. Dùng Map để gom nhóm và cộng dồn số lượng theo ID Món Ăn
+        java.util.Map<String, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> aggregationMap = new java.util.HashMap<>();
+
+        for (com.groupSWP.centralkitchenplatform.entities.logistic.Order order : pendingOrders) {
+            for (com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem item : order.getOrderItems()) {
+                String productId = item.getProduct().getProductId();
+                String productName = item.getProduct().getProductName();
+                int quantity = item.getQuantity();
+
+                if (aggregationMap.containsKey(productId)) {
+                    // Nếu món này đã có trong danh sách -> Lôi ra cộng dồn số lượng
+                    com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse existing = aggregationMap.get(productId);
+                    existing.setTotalQuantity(existing.getTotalQuantity() + quantity);
+                } else {
+                    // Nếu là món mới thấy lần đầu -> Ghi vào danh sách
+                    aggregationMap.put(productId, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse.builder()
+                            .productId(productId)
+                            .productName(productName)
+                            .totalQuantity(quantity)
+                            .build());
+                }
+            }
+        }
+
+        // 3. Đóng gói danh sách trả về cho Bếp trưởng
+        return new java.util.ArrayList<>(aggregationMap.values());
+    }
 }
