@@ -61,4 +61,27 @@ public class KitchenController {
 
         return ResponseEntity.ok(response);
     }
+
+    // API: POST /api/kitchen/aggregation/confirm
+    // Mục đích: Bếp trưởng bấm chốt sổ -> Gom đơn -> Trừ kho -> Đổi trạng thái đơn hàng
+    @PostMapping("/aggregation/confirm")
+    public ResponseEntity<String> confirmProduction() {
+
+        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        // --- 2. KIỂM TRA QUYỀN (Vẫn gắt như cũ) ---
+        if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
+                && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền chốt nấu!");
+        }
+
+        // --- 3. BÓP CÒ CHỐT NẤU ---
+        orderService.confirmProductionAndAggregateOrders();
+
+        return ResponseEntity.ok("Đã chốt nấu thành công! Toàn bộ đơn hàng đã chuyển sang trạng thái AGGREGATED và đã trừ kho nguyên liệu!");
+    }
 }
