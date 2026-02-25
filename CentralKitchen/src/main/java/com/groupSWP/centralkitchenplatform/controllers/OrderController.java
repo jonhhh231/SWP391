@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.controllers;
 
+import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
@@ -100,5 +101,39 @@ public class OrderController {
         // --- 3. GỌI SERVICE TRẢ VỀ DANH SÁCH ---
         List<OrderHistoryResponse> history = orderService.getOrderHistory(targetStoreId);
         return ResponseEntity.ok(history);
+    }
+
+    // API: GET /api/orders/{orderId}
+    @GetMapping("/{orderId}")
+    public ResponseEntity<OrderDetailResponse> getOrderDetail(@PathVariable String orderId) {
+
+        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        // --- 2. GỌI SERVICE MOI RUỘT ĐƠN HÀNG TRƯỚC ---
+        // (Phải lấy ra để biết cái đơn này thuộc về storeId nào)
+        OrderDetailResponse response = orderService.getOrderDetail(orderId);
+
+        // --- 3. XỬ LÝ LOGIC PHÂN QUYỀN (CHỐNG NHÌN TRỘM) ---
+        if (currentRole.equals("STORE_MANAGER") || currentRole.equals("ROLE_STORE_MANAGER")) {
+
+            String loggedInStoreId = authentication.getName();
+
+            // Nếu ID Cửa hàng đang login KHÁC với ID Cửa hàng sở hữu đơn hàng -> Đá văng!
+            if (!response.getStoreId().equals(loggedInStoreId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem chi tiết đơn hàng của cửa hàng khác!");
+            }
+
+        }
+        else if (!currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý vận hành hoặc Quản lý cửa hàng mới có quyền xem chi tiết đơn hàng!");
+        }
+        // Nếu là MANAGER -> Cho qua thoải mái, soi đơn nào cũng được!
+
+        // --- 4. TRẢ VỀ KẾT QUẢ CHO FRONTEND ---
+        return ResponseEntity.ok(response);
     }
 }
