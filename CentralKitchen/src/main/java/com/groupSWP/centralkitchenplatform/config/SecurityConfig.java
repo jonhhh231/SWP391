@@ -55,6 +55,10 @@ public class SecurityConfig {
 
                         // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
                         .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
+
+                        // DEV ONLY: mở Manage Recipes để test Postman không cần JWT
+                        .requestMatchers("/api/recipes/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
