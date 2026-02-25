@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.service;
 
+import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
@@ -196,5 +197,63 @@ public class OrderService {
                         .createdAt(order.getCreatedAt())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    // =========================================================================
+    // HÀM XEM CHI TIẾT 1 ĐƠN HÀNG
+    // =========================================================================
+    public OrderDetailResponse getOrderDetail(String orderId) {
+
+        // 1. Nhờ kho bốc đúng cái đơn hàng đó ra
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + orderId));
+
+        // 2. Chuyển đổi danh sách món ăn (Moi ruột)
+        List<OrderDetailResponse.OrderItemDto> itemDtos = order.getOrderItems().stream()
+                .map(item -> OrderDetailResponse.OrderItemDto.builder()
+                        .productId(item.getProduct().getProductId())
+                        .productName(item.getProduct().getProductName())
+                        .quantity(item.getQuantity())
+                        .price(item.getPriceAtOrder())
+                        .lineTotal(item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity())))
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        // 3. Đúc tất cả vào cái khuôn to bự để trả về cho Frontend
+        return OrderDetailResponse.builder()
+                .orderId(order.getOrderId())
+                .storeId(order.getStore().getStoreId()) // Lấy ID của cửa hàng đặt đơn
+                .orderType(order.getOrderType().name())
+                .status(order.getStatus().name())
+                .deliveryWindow(order.getDeliveryWindow() != null ? order.getDeliveryWindow().name() : null)
+                .note(order.getNote())
+                .totalAmount(order.getTotalAmount())
+                .surcharge(order.getSurcharge())
+                .createdAt(order.getCreatedAt())
+                .items(itemDtos)
+                .build();
+    }
+
+    // =========================================================================
+    // HÀM HỦY ĐƠN HÀNG (CANCEL ORDER)
+    // =========================================================================
+    @Transactional
+    public void cancelOrder(String orderId) {
+
+        // 1. Lôi cổ cái đơn hàng đó ra
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + orderId));
+
+        // 2. Kiểm tra trạng thái: Đã sang PROCESSING (hoặc khác NEW) thì cấm hủy!
+        if (!order.getStatus().name().equals("NEW")) {
+            throw new IllegalStateException("Không thể hủy! Đơn hàng đang ở trạng thái: " + order.getStatus().name() + ". Bếp đã tiếp nhận hoặc đang giao!");
+        }
+
+        // 3. Cập nhật trạng thái thành CANCELLED (Hủy)
+        // LƯU Ý: Chỗ này Sếp thay 'OrderStatus.CANCELLED' bằng đúng cái tên Enum mà Sếp đang dùng nhé (ví dụ CANCELED, DA_HUY...)
+        order.setStatus(Order.OrderStatus.CANCELLED);
+
+        // 4. Lưu lại vào DB
+        orderRepository.save(order);
     }
 }
