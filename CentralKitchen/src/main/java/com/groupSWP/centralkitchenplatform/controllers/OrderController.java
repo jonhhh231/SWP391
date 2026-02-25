@@ -136,4 +136,38 @@ public class OrderController {
         // --- 4. TRẢ VỀ KẾT QUẢ CHO FRONTEND ---
         return ResponseEntity.ok(response);
     }
+
+    // API: PUT /api/orders/{orderId}/cancel
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<String> cancelOrder(@PathVariable String orderId) {
+
+        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        // --- 2. GỌI SERVICE LẤY THÔNG TIN ĐƠN HÀNG ĐỂ CHECK QUYỀN ---
+        OrderDetailResponse orderDetail = orderService.getOrderDetail(orderId);
+
+        // --- 3. XỬ LÝ LOGIC PHÂN QUYỀN (CHỐNG HỦY TRỘM) ---
+        if (currentRole.equals("STORE_MANAGER") || currentRole.equals("ROLE_STORE_MANAGER")) {
+
+            String loggedInStoreId = authentication.getName();
+
+            // Nếu ID Cửa hàng đang login KHÁC với ID Cửa hàng sở hữu đơn hàng -> Đá văng!
+            if (!orderDetail.getStoreId().equals(loggedInStoreId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền hủy đơn hàng của cửa hàng khác!");
+            }
+
+        }
+        else if (!currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý vận hành hoặc Quản lý cửa hàng mới có quyền hủy đơn!");
+        }
+        // Nếu là MANAGER -> Cho qua thoải mái, hủy đơn nào cũng được!
+
+        // --- 4. GỌI SERVICE XỬ LÝ HỦY ĐƠN ---
+        orderService.cancelOrder(orderId);
+        return ResponseEntity.ok("Đã hủy đơn hàng " + orderId + " thành công!");
+    }
 }

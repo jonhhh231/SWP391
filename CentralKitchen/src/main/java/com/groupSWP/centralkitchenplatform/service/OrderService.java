@@ -233,4 +233,27 @@ public class OrderService {
                 .items(itemDtos)
                 .build();
     }
+
+    // =========================================================================
+    // HÀM HỦY ĐƠN HÀNG (CANCEL ORDER)
+    // =========================================================================
+    @Transactional
+    public void cancelOrder(String orderId) {
+
+        // 1. Lôi cổ cái đơn hàng đó ra
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + orderId));
+
+        // 2. Kiểm tra trạng thái: Đã sang PROCESSING (hoặc khác NEW) thì cấm hủy!
+        if (!order.getStatus().name().equals("NEW")) {
+            throw new IllegalStateException("Không thể hủy! Đơn hàng đang ở trạng thái: " + order.getStatus().name() + ". Bếp đã tiếp nhận hoặc đang giao!");
+        }
+
+        // 3. Cập nhật trạng thái thành CANCELLED (Hủy)
+        // LƯU Ý: Chỗ này Sếp thay 'OrderStatus.CANCELLED' bằng đúng cái tên Enum mà Sếp đang dùng nhé (ví dụ CANCELED, DA_HUY...)
+        order.setStatus(Order.OrderStatus.CANCELLED);
+
+        // 4. Lưu lại vào DB
+        orderRepository.save(order);
+    }
 }
