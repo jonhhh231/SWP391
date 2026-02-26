@@ -67,10 +67,10 @@ public class ProductionService {
         run.setRunId("RUN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         run.setProduct(product);
         run.setPlannedQty(request.getQuantity());
-        run.setActualQty(request.getQuantity()); // Tạm thời giả định nấu thành công 100%
+        run.setActualQty(BigDecimal.ZERO); // Mới nhận đơn đẩy xuống, chưa ra lò được con gà nào nên thực tế = 0
         run.setWasteQty(BigDecimal.ZERO);
         run.setProductionDate(LocalDateTime.now());
-        run.setStatus(ProductionRun.ProductionStatus.COMPLETED); // Đã trừ kho xong -> Hoàn thành
+        run.setStatus(ProductionRun.ProductionStatus.PLANNED); // Chuyển trạng thái thành "Đã lên kế hoạch" (Đang chờ bếp xào nấu)
 
         // BatchCode có thể gen theo ngày: BATCH-20240202
         run.setBatchCode("BATCH-" + System.currentTimeMillis());
