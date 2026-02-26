@@ -55,6 +55,10 @@ public class SecurityConfig {
 
                         // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
                         .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
+
+                        // Manage Recipes (BOM): chỉ ADMIN/MANAGER được quản lý công thức
+                        .requestMatchers("/api/recipes/**").hasAnyRole("ADMIN", "MANAGER")
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -1,4 +1,5 @@
 package com.groupSWP.centralkitchenplatform.entities.common;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
 import lombok.Getter;
 
@@ -21,4 +22,11 @@ public enum UnitType {
 
     private final String label;
     UnitType(String label) { this.label = label; }
+
+    @JsonCreator
+    public static UnitType from(String value) {
+        if (value == null) return null;
+        return UnitType.valueOf(value.trim().toUpperCase());
+    }
+
 }
