@@ -14,4 +14,5 @@ public class ProductResponse {
     private BigDecimal sellingPrice;
     private String baseUnit;
     private boolean isActive;
+    private String imageUrl;
 }
