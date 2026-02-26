@@ -114,15 +114,8 @@ public class AuthService {
             case ADMIN -> "ADM";
             case MANAGER -> "MNG";
             case COORDINATOR -> "COR";
-
-            // 4. Central Kitchen Staff (Nhân viên bếp) -> KIT
             case KITCHEN_MANAGER -> "KIT";
-
-            // 5. Franchise Store Staff (Nhân viên cửa hàng) -> STR
-            // (Đây là vai trò mới Sếp vừa thêm)
             case STORE_MANAGER -> "STR";
-
-            // Trường hợp lạ (Fallback)
             default -> "USR";
         };
     }
@@ -137,5 +130,49 @@ public class AuthService {
         if (request.getEmail() != null) profile.setEmail(request.getEmail());
 
         return systemUserRepository.save(profile);
+    }
+
+    // ==========================================
+    // CÁC HÀM QUÊN MẬT KHẨU (ĐÃ ĐƯỢC CHUẨN HÓA)
+    // ==========================================
+
+    // 1. Quên mật khẩu: Kiểm tra email -> Tạo OTP -> Gửi mail
+    public void forgotPassword(String email) {
+        // Sử dụng systemUserRepository thay vì userRepository
+        SystemUser profile = systemUserRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email không tồn tại trong hệ thống!"));
+
+        // Tạo OTP lưu vào RAM với key là email
+        String otp = otpService.generateOtp(email);
+
+        // Gọi hàm của MailService hiện tại bạn đang có
+        mailService.sendOtpMail(email, otp);
+    }
+
+    // 2. Đặt lại mật khẩu: Kiểm tra OTP -> Đổi mật khẩu -> Xóa OTP
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(String email, String otp, String newPassword) {
+        boolean isValid = otpService.validateOtp(email, otp);
+
+        if (!isValid) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mã OTP không chính xác hoặc đã hết hạn!");
+        }
+
+        // Tìm UserProfile theo email
+        SystemUser profile = systemUserRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email không tồn tại!"));
+
+        // Lấy Account liên kết với Profile này để đổi mật khẩu
+        Account account = profile.getAccount();
+        if (account == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Dữ liệu tài khoản bị lỗi, không tìm thấy Account!");
+        }
+
+        // Đổi mật khẩu trên bảng Account và lưu lại
+        account.setPassword(passwordEncoder.encode(newPassword));
+        accountRepository.save(account);
+
+        // Xóa OTP khỏi bộ nhớ để tránh bị dùng lại
+        otpService.clearOtp(email);
     }
 }

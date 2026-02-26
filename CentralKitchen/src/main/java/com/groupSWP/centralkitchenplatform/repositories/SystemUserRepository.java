@@ -16,4 +16,5 @@ public interface SystemUserRepository extends JpaRepository<SystemUser, String> 
     // Logic: Lọc theo Role -> Sắp xếp giảm dần -> Lấy thằng đầu tiên
     @Query("SELECT s.userId FROM SystemUser s WHERE s.role = :role ORDER BY s.userId DESC LIMIT 1")
     Optional<String> findLastUserIdByRole(@Param("role") SystemRole role);
+    Optional<SystemUser> findByEmail(String email);
 }
