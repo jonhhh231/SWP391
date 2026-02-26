@@ -37,20 +37,4 @@ public class AdminController {
     public ResponseEntity<List<AccountResponse>> getAllAccounts() {
         return ResponseEntity.ok(accountService.getAccountsExcludingAdmin());
     }
-
-    // 2. API: Xem chi tiết Class - CHỈ ADMIN
-    @PreAuthorize("hasAuthority('ADMIN')") // Phụ thuộc vào cách bạn config GrantedAuthority trong Security
-    @GetMapping("/classes/{classId}")
-    public ResponseEntity<?> getClassDetail(@PathVariable Long classId) {
-        // TODO: Gọi ClassService để lấy chi tiết Class
-        return ResponseEntity.ok("Dữ liệu chi tiết của Class " + classId);
-    }
-
-    // 3. API: Xem chi tiết Package - CHỈ ADMIN
-    @PreAuthorize("hasAuthority('ADMIN')")
-    @GetMapping("/packages/{packageId}")
-    public ResponseEntity<?> getPackageDetail(@PathVariable Long packageId) {
-        // TODO: Gọi PackageService để lấy chi tiết Package
-        return ResponseEntity.ok("Dữ liệu chi tiết của Package " + packageId);
-    }
 }
