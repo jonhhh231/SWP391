@@ -30,6 +30,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
+    private final ProductionService productionService;
 
     @Transactional
     public OrderResponse createStandardOrder(OrderRequest request) {
@@ -255,5 +256,85 @@ public class OrderService {
 
         // 4. Lưu lại vào DB
         orderRepository.save(order);
+    }
+
+    // =========================================================================
+    // HÀM TỔNG HỢP ĐƠN HÀNG CHO BẾP TRUNG TÂM (AGGREGATION)
+    // =========================================================================
+    public java.util.List<com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> getPendingProductionAggregation() {
+
+        // 1. Lùa tất cả các đơn hàng đang chờ (NEW) ra sân
+        java.util.List<com.groupSWP.centralkitchenplatform.entities.logistic.Order> pendingOrders =
+                orderRepository.findByStatus(com.groupSWP.centralkitchenplatform.entities.logistic.Order.OrderStatus.NEW);
+
+        // 2. Dùng Map để gom nhóm và cộng dồn số lượng theo ID Món Ăn
+        java.util.Map<String, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> aggregationMap = new java.util.HashMap<>();
+
+        for (com.groupSWP.centralkitchenplatform.entities.logistic.Order order : pendingOrders) {
+            for (com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem item : order.getOrderItems()) {
+                String productId = item.getProduct().getProductId();
+                String productName = item.getProduct().getProductName();
+                int quantity = item.getQuantity();
+
+                if (aggregationMap.containsKey(productId)) {
+                    // Nếu món này đã có trong danh sách -> Lôi ra cộng dồn số lượng
+                    com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse existing = aggregationMap.get(productId);
+                    existing.setTotalQuantity(existing.getTotalQuantity() + quantity);
+                } else {
+                    // Nếu là món mới thấy lần đầu -> Ghi vào danh sách
+                    aggregationMap.put(productId, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse.builder()
+                            .productId(productId)
+                            .productName(productName)
+                            .totalQuantity(quantity)
+                            .build());
+                }
+            }
+        }
+
+        // 3. Đóng gói danh sách trả về cho Bếp trưởng
+        return new java.util.ArrayList<>(aggregationMap.values());
+    }
+
+    // =========================================================================
+    // HÀM CHỐT NẤU (TỰ ĐỘNG GOM ĐƠN + GỌI HÀM TRỪ KHO CỦA ĐẠT + ĐỔI TRẠNG THÁI)
+    // =========================================================================
+    @Transactional
+    public void confirmProductionAndAggregateOrders() {
+
+        // 1. Lùa tất cả đơn NEW ra
+        java.util.List<com.groupSWP.centralkitchenplatform.entities.logistic.Order> pendingOrders =
+                orderRepository.findByStatus(com.groupSWP.centralkitchenplatform.entities.logistic.Order.OrderStatus.NEW);
+
+        if (pendingOrders.isEmpty()) {
+            throw new RuntimeException("Không có đơn hàng mới nào để chốt nấu!");
+        }
+
+        // 2. Gom nhóm số lượng y như hàm GET lúc nãy
+        java.util.Map<String, Integer> productQuantities = new java.util.HashMap<>();
+        for (com.groupSWP.centralkitchenplatform.entities.logistic.Order order : pendingOrders) {
+            for (com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem item : order.getOrderItems()) {
+                String productId = item.getProduct().getProductId();
+                productQuantities.put(productId, productQuantities.getOrDefault(productId, 0) + item.getQuantity());
+            }
+        }
+
+        // 3. Vứt từng nhóm món ăn vào "Máy xay thịt" (Hàm tạo ProductionRun của Đạt)
+        for (java.util.Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
+            com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest request = new com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest();
+            request.setProductId(entry.getKey());
+            // Ép kiểu sang BigDecimal vì hàm của Đạt yêu cầu thế
+            request.setQuantity(new java.math.BigDecimal(entry.getValue()));
+
+            // BÙM! Lệnh này sẽ chạy trừ kho và tạo Batch Code!
+            productionService.createProductionRun(request);
+        }
+
+        // 4. Đổi trạng thái TẤT CẢ các đơn hàng sang AGGREGATED (Đã gom)
+        for (com.groupSWP.centralkitchenplatform.entities.logistic.Order order : pendingOrders) {
+            order.setStatus(com.groupSWP.centralkitchenplatform.entities.logistic.Order.OrderStatus.AGGREGATED);
+        }
+
+        // Lưu lại một lượt là xong phim!
+        orderRepository.saveAll(pendingOrders);
     }
 }

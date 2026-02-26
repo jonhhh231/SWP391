@@ -14,6 +14,9 @@ import java.util.List;
 public class Ingredient {
     @Id
     private String ingredientId;
+    // [VŨ KHÍ MỚI] THÊM 2 DÒNG NÀY VÀO ĐỂ BẬT KHIÊN CHỐNG CHẠM DỮ LIỆU NHÉ
+    @Version
+    private Long version;
     private String name;
     private BigDecimal kitchenStock;
     // [2] SỬA DÒNG NÀY (Cũ là String -> Mới là UnitType + @Enumerated)
