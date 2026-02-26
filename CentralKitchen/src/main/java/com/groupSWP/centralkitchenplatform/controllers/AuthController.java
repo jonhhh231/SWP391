@@ -64,4 +64,17 @@ public class AuthController {
     public ResponseEntity<AuthResponse> verifyOtp(@RequestBody OtpRequest request) {
         return ResponseEntity.ok(authService.verifyOtp(request.getUsername(), request.getOtp()));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.email());
+        return ResponseEntity.ok("Mã OTP đã được gửi đến email của bạn.");
+    }
+
+    // API 2: Nhập mã OTP và Mật khẩu mới (Nhận JSON)
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.email(), request.otp(), request.newPassword());
+        return ResponseEntity.ok("Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.");
+    }
 }
