@@ -84,4 +84,27 @@ public class KitchenController {
 
         return ResponseEntity.ok("Đã chốt nấu thành công! Toàn bộ đơn hàng đã chuyển sang trạng thái AGGREGATED và đã trừ kho nguyên liệu!");
     }
+
+    // =====================================================================
+    // API: GET /api/kitchen/productions/active
+    // Mục đích: Xem danh sách các mẻ đang chờ nấu hoặc đang nấu
+    // =====================================================================
+    @GetMapping("/productions/active")
+    public ResponseEntity<List<ProductionResponse>> getActiveProductions() {
+
+        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        // --- 2. KIỂM TRA QUYỀN (Bảo mật: Chỉ Bếp và Manager được xem) ---
+        if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
+                && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền xem danh sách mẻ nấu!");
+        }
+
+        // --- 3. GỌI SERVICE LẤY DANH SÁCH ---
+        return ResponseEntity.ok(productionService.getActiveProductionRuns());
+    }
 }
