@@ -5,7 +5,9 @@ import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionResponse;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
+import com.groupSWP.centralkitchenplatform.repositories.ImportItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductRepository;
 import com.groupSWP.centralkitchenplatform.repositories.ProductionRunRepository;
@@ -27,6 +29,7 @@ public class ProductionService {
     private final ProductionRunRepository productionRunRepository;
     private final ProductRepository productRepository;
     private final IngredientRepository ingredientRepository;
+    private final ImportItemRepository importItemRepository;
 
     @Transactional
     public ProductionResponse createProductionRun(ProductionRequest request) {
@@ -60,9 +63,9 @@ public class ProductionService {
                         ", Hiện có: " + currentStock);
             }
 
-            // Trừ kho và cập nhật
-            ingredient.setKitchenStock(currentStock.subtract(totalNeeded));
-            ingredientRepository.save(ingredient);
+            // [VŨ KHÍ MỚI] GỌI CỖ MÁY FIFO RA XỬ LÝ TRỪ TỪNG LÔ HÀNG!
+            // Hàm này sẽ tự động trừ lô cũ trước, lô mới sau, và cập nhật luôn kitchenStock
+            deductIngredientWithFIFO(ingredient, totalNeeded);
         }
 
         // 4. Tạo Lệnh Sản Xuất (ProductionRun)
@@ -113,5 +116,48 @@ public class ProductionService {
                 .productionDate(run.getProductionDate())
                 .build()
         ).collect(Collectors.toList());
+    }
+
+    // =========================================================================
+    // HÀM TRỪ KHO NÂNG CAO THEO CHIẾN LƯỢC FIFO (NHẬP TRƯỚC - XUẤT TRƯỚC)
+    // =========================================================================
+    private void deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded) {
+
+        BigDecimal remainingToDeduct = quantityNeeded; // Cục nợ cần trừ
+
+        // 1. Lùa các lô hàng của nguyên liệu này (ID cũ lên trước, lô còn hàng > 0)
+        List<ImportItem> availableBatches = importItemRepository
+                .findByIngredientAndQuantityGreaterThanOrderByIdAsc(ingredient, BigDecimal.ZERO);
+
+        // 2. Vòng lặp vắt kiệt từng lô
+        for (ImportItem batch : availableBatches) {
+
+            // Nếu đã hết nợ thì bẻ cua thoát vòng lặp ngay
+            if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
+
+            BigDecimal batchQty = batch.getQuantity();
+
+            if (batchQty.compareTo(remainingToDeduct) >= 0) {
+                // KỊCH BẢN A: Lô to, đủ gánh hết nợ
+                batch.setQuantity(batchQty.subtract(remainingToDeduct));
+                importItemRepository.save(batch);
+                remainingToDeduct = BigDecimal.ZERO;
+            } else {
+                // KỊCH BẢN B: Lô nhỏ, vắt cạn rồi qua lô sau tìm tiếp
+                batch.setQuantity(BigDecimal.ZERO);
+                importItemRepository.save(batch);
+                remainingToDeduct = remainingToDeduct.subtract(batchQty);
+            }
+        }
+
+        // 3. Quét sạch kho vẫn thiếu -> Quăng lỗi
+        if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("LỖI NGHIÊM TRỌNG: Tồn kho các lô không đủ để trừ. Còn thiếu: "
+                    + remainingToDeduct + " cho nguyên liệu: " + ingredient.getName());
+        }
+
+        // 4. Cập nhật tổng tồn kho (Kích hoạt bảo vệ Optimistic Locking)
+        ingredient.setKitchenStock(ingredient.getKitchenStock().subtract(quantityNeeded));
+        ingredientRepository.save(ingredient);
     }
 }
