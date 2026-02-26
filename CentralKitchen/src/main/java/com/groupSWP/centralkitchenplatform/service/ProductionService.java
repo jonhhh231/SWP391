@@ -15,7 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -85,5 +88,30 @@ public class ProductionService {
                 .status(savedRun.getStatus().name())
                 .productionDate(savedRun.getProductionDate())
                 .build();
+    }
+
+    // =========================================================================
+    // HÀM LẤY DANH SÁCH CÁC MẺ ĐANG TRÊN LÒ (PLANNED, COOKING)
+    // =========================================================================
+    public List<ProductionResponse> getActiveProductionRuns() {
+
+        // 1. Chỉ định lấy những mẻ chưa xong (Chờ nấu hoặc Đang nấu)
+        List<ProductionRun.ProductionStatus> activeStatuses = Arrays.asList(
+                ProductionRun.ProductionStatus.PLANNED,
+                ProductionRun.ProductionStatus.COOKING
+        );
+
+        // 2. Gọi DB lùa ra danh sách
+        List<ProductionRun> activeRuns = productionRunRepository.findByStatusInOrderByProductionDateDesc(activeStatuses);
+
+        // 3. Đóng gói trả về DTO cho mượt
+        return activeRuns.stream().map(run -> ProductionResponse.builder()
+                .runId(run.getRunId())
+                .productName(run.getProduct().getProductName())
+                .plannedQty(run.getPlannedQty())
+                .status(run.getStatus().name())
+                .productionDate(run.getProductionDate())
+                .build()
+        ).collect(Collectors.toList());
     }
 }
