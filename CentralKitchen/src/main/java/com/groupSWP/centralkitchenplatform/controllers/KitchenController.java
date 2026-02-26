@@ -2,7 +2,11 @@ package com.groupSWP.centralkitchenplatform.controllers;
 
 import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest;
 import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionResponse;
+import com.groupSWP.centralkitchenplatform.dto.kitchen.WastageRequest;
+import com.groupSWP.centralkitchenplatform.dto.kitchen.WastageResponse;
 import com.groupSWP.centralkitchenplatform.service.ProductionService;
+import com.groupSWP.centralkitchenplatform.service.WastageService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,5 +34,14 @@ public class KitchenController {
     @PostMapping("/cook")
     public ResponseEntity<ProductionResponse> cookProduct(@RequestBody ProductionRequest request) {
         return ResponseEntity.ok(productionService.createProductionRun(request));
+    }
+
+    private final WastageService wastageService;
+
+    @PostMapping("/wastage")
+    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<WastageResponse> recordWastage(
+            @Valid @RequestBody WastageRequest request) {
+        return ResponseEntity.ok(wastageService.recordWastage(request));
     }
 }
