@@ -15,7 +15,7 @@ public class LogisticsController {
 
     private final RouteAllocationService routeAllocationService;
 
-    @PreAuthorize("hasRole('SUPPLY_COORDINATOR') or hasRole('MANAGER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('MANAGER') or hasRole('ADMIN')")
     @PostMapping("/allocate-routes")
     public ResponseEntity<RouteAllocationResponse> allocateRoutes(
             @RequestBody(required = false) AllocateRoutesRequest req

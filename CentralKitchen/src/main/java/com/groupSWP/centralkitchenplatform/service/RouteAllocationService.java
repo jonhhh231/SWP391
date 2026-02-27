@@ -107,7 +107,7 @@ public class RouteAllocationService {
 
                 Shipment shipment = new Shipment();
                 shipment.setShipmentId(UUID.randomUUID().toString());
-                shipment.setDeliveryDate(today.plusDays(1).atTime(8, 0)); // standard: sáng ngày mai
+                shipment.setDeliveryDate(today.atTime(22, 0)); // standard: chốt đơn 14h, giao 22h đêm nay // standard: sáng ngày mai
                 shipment.setStatus(Shipment.ShipmentStatus.NEW);
                 shipment.setShipmentType(Shipment.ShipmentType.MAIN_ROUTE);
 
