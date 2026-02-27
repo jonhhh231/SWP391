@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.controllers;
 
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
+import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.service.CartService;
@@ -56,6 +57,24 @@ public class CartController {
             return ResponseEntity.ok(createdOrder);
         } catch (RuntimeException e) {
             log.error("Lỗi khi chốt đơn: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 3. API XEM GIỎ HÀNG
+    // =======================================================
+    @GetMapping
+    public ResponseEntity<?> getCart(Principal principal) {
+        try {
+            String username = principal.getName();
+            log.info("User {} đang xem giỏ hàng", username);
+
+            CartResponse response = cartService.getCart(username);
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi xem giỏ hàng: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

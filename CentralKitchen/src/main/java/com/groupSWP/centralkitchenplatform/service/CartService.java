@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
+import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
@@ -94,6 +95,49 @@ public class CartService {
 
         cart.setLastUpdated(LocalDateTime.now());
         cartRepository.save(cart);
+    }
+
+    // =======================================================
+    // 3. XEM GIỎ HÀNG (VIEW CART)
+    // =======================================================
+    public CartResponse getCart(String username) {
+        // 1. Dùng Helper lấy Store chuẩn xác từ Username
+        Store store = getStoreByUsername(username);
+
+        // 2. Tìm giỏ hàng (nếu ông này chưa từng mua gì thì nó tự đẻ ra 1 cái giỏ rỗng)
+        Cart cart = getOrCreateCart(store);
+
+        // 3. Lôi hết đồ trong giỏ ra
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
+
+        List<CartResponse.CartItemDto> itemDtos = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        // 4. Lặp qua từng món để tính tiền
+        for (CartItem item : cartItems) {
+            Product product = item.getProduct();
+
+            // Tính thành tiền = Giá bán * Số lượng
+            BigDecimal subTotal = product.getSellingPrice().multiply(new BigDecimal(item.getQuantity()));
+            totalAmount = totalAmount.add(subTotal);
+
+            // Gói gọn vào DTO để trả về cho Frontend
+            itemDtos.add(CartResponse.CartItemDto.builder()
+                    .productId(product.getProductId())
+                    .productName(product.getProductName())
+                    .quantity(item.getQuantity())
+                    .unitPrice(product.getSellingPrice())
+                    .subTotal(subTotal)
+                    .build());
+        }
+
+        // 5. Gom tất cả lại trả về
+        return CartResponse.builder()
+                .cartId(cart.getCartId())
+                .storeId(store.getStoreId())
+                .items(itemDtos)
+                .totalAmount(totalAmount)
+                .build();
     }
 
     // =======================================================
