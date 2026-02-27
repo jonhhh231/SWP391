@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
+import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
@@ -97,6 +98,49 @@ public class CartService {
     }
 
     // =======================================================
+    // 3. XEM GIỎ HÀNG (VIEW CART)
+    // =======================================================
+    public CartResponse getCart(String username) {
+        // 1. Dùng Helper lấy Store chuẩn xác từ Username
+        Store store = getStoreByUsername(username);
+
+        // 2. Tìm giỏ hàng (nếu ông này chưa từng mua gì thì nó tự đẻ ra 1 cái giỏ rỗng)
+        Cart cart = getOrCreateCart(store);
+
+        // 3. Lôi hết đồ trong giỏ ra
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
+
+        List<CartResponse.CartItemDto> itemDtos = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        // 4. Lặp qua từng món để tính tiền
+        for (CartItem item : cartItems) {
+            Product product = item.getProduct();
+
+            // Tính thành tiền = Giá bán * Số lượng
+            BigDecimal subTotal = product.getSellingPrice().multiply(new BigDecimal(item.getQuantity()));
+            totalAmount = totalAmount.add(subTotal);
+
+            // Gói gọn vào DTO để trả về cho Frontend
+            itemDtos.add(CartResponse.CartItemDto.builder()
+                    .productId(product.getProductId())
+                    .productName(product.getProductName())
+                    .quantity(item.getQuantity())
+                    .unitPrice(product.getSellingPrice())
+                    .subTotal(subTotal)
+                    .build());
+        }
+
+        // 5. Gom tất cả lại trả về
+        return CartResponse.builder()
+                .cartId(cart.getCartId())
+                .storeId(store.getStoreId())
+                .items(itemDtos)
+                .totalAmount(totalAmount)
+                .build();
+    }
+
+    // =======================================================
     // 4. CHỐT ĐƠN (CHECKOUT)
     // =======================================================
     @Transactional
@@ -185,5 +229,50 @@ public class CartService {
         return configRepository.findByConfigKey(key)
                 .map(config -> LocalTime.parse(config.getConfigValue()))
                 .orElse(LocalTime.parse(defaultTime));
+    }
+
+    // =======================================================
+    // 5. CẬP NHẬT SỐ LƯỢNG MÓN TRONG GIỎ (SỬA SAI)
+    // =======================================================
+    @Transactional
+    public void updateCartItem(String username, String productId, Integer newQuantity) {
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
+
+        // Tìm cái món đó trong giỏ
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
+        // Lập trình phòng thủ: Nếu user nhập số lượng <= 0, mình tự động hiểu là XÓA luôn món đó
+        if (newQuantity <= 0) {
+            cartItemRepository.delete(cartItem);
+        } else {
+            cartItem.setQuantity(newQuantity); // Set lại số lượng mới (không cộng dồn nữa)
+            cartItemRepository.save(cartItem);
+        }
+
+        // Cập nhật lại giờ biến động của Giỏ hàng
+        cart.setLastUpdated(LocalDateTime.now());
+        cartRepository.save(cart);
+    }
+
+    // =======================================================
+    // 6. XÓA HẲN MÓN KHỎI GIỎ HÀNG (ĐÁ VĂNG)
+    // =======================================================
+    @Transactional
+    public void removeCartItem(String username, String productId) {
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
+
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
+        // Đá văng khỏi DB
+        cartItemRepository.delete(cartItem);
+
+        cart.setLastUpdated(LocalDateTime.now());
+        cartRepository.save(cart);
     }
 }

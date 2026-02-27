@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.controllers;
 
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
+import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.service.CartService;
@@ -56,6 +57,64 @@ public class CartController {
             return ResponseEntity.ok(createdOrder);
         } catch (RuntimeException e) {
             log.error("Lỗi khi chốt đơn: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 3. API XEM GIỎ HÀNG
+    // =======================================================
+    @GetMapping
+    public ResponseEntity<?> getCart(Principal principal) {
+        try {
+            String username = principal.getName();
+            log.info("User {} đang xem giỏ hàng", username);
+
+            CartResponse response = cartService.getCart(username);
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi xem giỏ hàng: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 4. API CẬP NHẬT SỐ LƯỢNG MÓN
+    // =======================================================
+    @PutMapping("/update")
+    public ResponseEntity<?> updateCartItem(
+            Principal principal,
+            @RequestBody AddToCartRequest request) { // Xài ké DTO này cho tiện
+        try {
+            String username = principal.getName();
+            log.info("User {} sửa số lượng món {} thành {}", username, request.getProductId(), request.getQuantity());
+
+            cartService.updateCartItem(username, request.getProductId(), request.getQuantity());
+
+            return ResponseEntity.ok("Đã cập nhật số lượng thành công!");
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi cập nhật giỏ hàng: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 5. API XÓA MÓN KHỎI GIỎ HÀNG
+    // =======================================================
+    @DeleteMapping("/remove/{productId}")
+    public ResponseEntity<?> removeCartItem(
+            Principal principal,
+            @PathVariable String productId) {
+        try {
+            String username = principal.getName();
+            log.info("User {} xóa món {} khỏi giỏ hàng", username, productId);
+
+            cartService.removeCartItem(username, productId);
+
+            return ResponseEntity.ok("Đã xóa sản phẩm khỏi giỏ hàng!");
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi xóa món: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
