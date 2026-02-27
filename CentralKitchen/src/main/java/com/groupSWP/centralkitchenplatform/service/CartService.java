@@ -94,20 +94,20 @@ public class CartService {
     // =======================================================
     @Transactional
     public Order checkoutCart(String storeId, CheckoutRequest request) {
-        // 4.1. Kéo config từ Database lên (Nếu rỗng thì xài giờ mặc định)
+        // 4.1. Kéo config từ Database lên
         LocalTime startTime = parseConfigTime("ORDER_START_TIME", "08:00");
         LocalTime cutoffUrgent = parseConfigTime("CUTOFF_URGENT", "10:30");
         LocalTime cutoffStandard = parseConfigTime("CUTOFF_STANDARD", "14:00");
 
         LocalTime now = LocalTime.now();
 
-        // 4.2. 🔴 RÀO CHẮN THỜI GIAN (TIME BARRIER) 🔴
+        // 4.2. 🔴 RÀO CHẮN THỜI GIAN
         if (now.isBefore(startTime)) {
             throw new RuntimeException("Hệ thống đặt hàng chưa mở cửa. Vui lòng quay lại vào " + startTime);
         }
 
         if (request.getOrderType() == Order.OrderType.URGENT && now.isAfter(cutoffUrgent)) {
-            throw new RuntimeException("Đã quá giờ (" + cutoffUrgent + ") đặt đơn GẤP (URGENT). Bếp không kịp chuẩn bị, vui lòng đặt đơn THƯỜNG!");
+            throw new RuntimeException("Đã quá giờ (" + cutoffUrgent + ") đặt đơn GẤP. Bếp không kịp chuẩn bị, vui lòng đặt đơn THƯỜNG!");
         }
 
         if (request.getOrderType() == Order.OrderType.STANDARD && now.isAfter(cutoffStandard)) {
@@ -116,14 +116,63 @@ public class CartService {
 
         // 4.3. Lấy giỏ hàng ra xử lý
         Cart cart = cartRepository.findByStore_StoreId(storeId)
-                .orElseThrow(() -> new RuntimeException("Giỏ hàng trống!"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giỏ hàng!"));
 
-        // (Giả sử Sếp có hàm lấy CartItems từ Cart, hoặc dùng Query)
-        // Vì trong Entity Cart chưa map OneToMany tới CartItem, mình query thẳng luôn:
-        // List<CartItem> items = cartItemRepository.findByCart_CartId(cart.getCartId());
-        // -> *Sếp nhớ bổ sung list CartItem vào Entity Cart hoặc viết Query trong repo nhé*
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Giỏ hàng đang trống, không thể chốt đơn!");
+        }
 
-        throw new RuntimeException("Rào chắn thời gian đã OK! Sếp báo em để ráp code chuyển Cart -> Order nhé!");
+        // 4.4. Tạo Đơn hàng mới (Order)
+        Order newOrder = new Order();
+        newOrder.setOrderId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        newOrder.setStore(cart.getStore());
+        newOrder.setStatus(Order.OrderStatus.NEW);
+        newOrder.setOrderType(request.getOrderType());
+        newOrder.setNote(request.getNote());
+
+        // Phụ thu (nếu là đơn gấp) - Sếp có thể lôi từ SystemConfig ra, ở đây em fix cứng 50k ví dụ
+        if (request.getOrderType() == Order.OrderType.URGENT) {
+            newOrder.setSurcharge(new BigDecimal("50000"));
+        } else {
+            newOrder.setSurcharge(BigDecimal.ZERO);
+        }
+
+        Order savedOrder = orderRepository.save(newOrder);
+
+        // 4.5. Chuyển ruột Giỏ Hàng (CartItem) sang Chi Tiết Đơn (OrderItem)
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+
+        for (CartItem cItem : cartItems) {
+            Product product = cItem.getProduct();
+
+            OrderItem oItem = new OrderItem();
+            oItem.setId(new OrderItemKey(savedOrder.getOrderId(), product.getProductId()));
+            oItem.setOrder(savedOrder);
+            oItem.setProduct(product);
+            oItem.setQuantity(cItem.getQuantity());
+            oItem.setPriceAtOrder(product.getSellingPrice()); // Lưu giá tại thời điểm mua
+
+            orderItems.add(oItem);
+
+            // Tính tiền = (giá * số lượng)
+            BigDecimal lineTotal = product.getSellingPrice().multiply(new BigDecimal(cItem.getQuantity()));
+            totalAmount = totalAmount.add(lineTotal);
+        }
+
+        // Lưu list OrderItems vào DB
+        orderItemRepository.saveAll(orderItems);
+
+        // Cập nhật tổng tiền cho Order (cộng thêm phụ thu nếu có)
+        savedOrder.setTotalAmount(totalAmount.add(savedOrder.getSurcharge()));
+        orderRepository.save(savedOrder);
+
+        // 4.6. Dọn dẹp giỏ hàng (Mua xong thì giỏ phải trống)
+        cartItemRepository.deleteByCart_CartId(cart.getCartId());
+
+        log.info("Cửa hàng {} đã chốt đơn thành công! Mã đơn: {}", storeId, savedOrder.getOrderId());
+        return savedOrder;
     }
 
     // Hàm phụ hỗ trợ chuyển String ("14:00") từ DB thành LocalTime
