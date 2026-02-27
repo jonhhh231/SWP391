@@ -230,4 +230,49 @@ public class CartService {
                 .map(config -> LocalTime.parse(config.getConfigValue()))
                 .orElse(LocalTime.parse(defaultTime));
     }
+
+    // =======================================================
+    // 5. CẬP NHẬT SỐ LƯỢNG MÓN TRONG GIỎ (SỬA SAI)
+    // =======================================================
+    @Transactional
+    public void updateCartItem(String username, String productId, Integer newQuantity) {
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
+
+        // Tìm cái món đó trong giỏ
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
+        // Lập trình phòng thủ: Nếu user nhập số lượng <= 0, mình tự động hiểu là XÓA luôn món đó
+        if (newQuantity <= 0) {
+            cartItemRepository.delete(cartItem);
+        } else {
+            cartItem.setQuantity(newQuantity); // Set lại số lượng mới (không cộng dồn nữa)
+            cartItemRepository.save(cartItem);
+        }
+
+        // Cập nhật lại giờ biến động của Giỏ hàng
+        cart.setLastUpdated(LocalDateTime.now());
+        cartRepository.save(cart);
+    }
+
+    // =======================================================
+    // 6. XÓA HẲN MÓN KHỎI GIỎ HÀNG (ĐÁ VĂNG)
+    // =======================================================
+    @Transactional
+    public void removeCartItem(String username, String productId) {
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
+
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
+        // Đá văng khỏi DB
+        cartItemRepository.delete(cartItem);
+
+        cart.setLastUpdated(LocalDateTime.now());
+        cartRepository.save(cart);
+    }
 }
