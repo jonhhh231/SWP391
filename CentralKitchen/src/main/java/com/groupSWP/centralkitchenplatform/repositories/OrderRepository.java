@@ -12,4 +12,5 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     // LƯU Ý: Nếu khóa chính của Store Sếp đặt là "id" thì đổi thành findByStore_Id
     List<Order> findByStore_StoreIdOrderByCreatedAtDesc(String storeId);
     List<Order> findByStatus(Order.OrderStatus status);
+    boolean existsByShipment_ShipmentIdAndStatusNot(String shipmentId, Order.OrderStatus status);
 }
