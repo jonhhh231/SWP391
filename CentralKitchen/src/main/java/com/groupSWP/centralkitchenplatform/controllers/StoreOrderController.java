@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
+import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
 
 import java.security.Principal;
 import java.util.List;
@@ -79,6 +81,48 @@ public class StoreOrderController {
 
         } catch (RuntimeException e) {
             log.error("Lỗi khi xem chi tiết đơn {}: {}", orderId, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 3. API TẠO ĐƠN HÀNG TIÊU CHUẨN (STANDARD)
+    // =======================================================
+    @PostMapping("/standard")
+    public ResponseEntity<?> createStandardOrder(Principal principal, @RequestBody OrderRequest request) {
+        try {
+            // 1. Dùng bảo bối moi mã chuẩn "ST002" từ DB dựa vào Token
+            String realStoreId = getStoreIdFromPrincipal(principal);
+
+            // 2. Ép mã chuẩn này vào request (Mặc kệ Frontend gửi mã gì lên, mình tự chốt mã của mình cho an toàn)
+            request.setStoreId(realStoreId);
+
+            log.info("Cửa hàng {} đang tạo đơn hàng TIÊU CHUẨN", realStoreId);
+
+            // 3. Gọi Service
+            OrderResponse response = orderService.createStandardOrder(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi tạo đơn Standard: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // =======================================================
+    // 4. API TẠO ĐƠN HÀNG KHẨN CẤP (URGENT)
+    // =======================================================
+    @PostMapping("/urgent")
+    public ResponseEntity<?> createUrgentOrder(Principal principal, @RequestBody OrderRequest request) {
+        try {
+            String realStoreId = getStoreIdFromPrincipal(principal);
+            request.setStoreId(realStoreId); // Ghi đè mã chuẩn
+
+            log.info("Cửa hàng {} đang tạo đơn hàng KHẨN CẤP", realStoreId);
+
+            OrderResponse response = orderService.createUrgentOrder(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("Lỗi khi tạo đơn Urgent: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
