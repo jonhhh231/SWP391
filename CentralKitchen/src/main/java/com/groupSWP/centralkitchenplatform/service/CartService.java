@@ -1,13 +1,12 @@
 package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
-import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.entities.cart.Cart;
 import com.groupSWP.centralkitchenplatform.entities.cart.CartItem;
 import com.groupSWP.centralkitchenplatform.entities.cart.CartItemKey;
-import com.groupSWP.centralkitchenplatform.entities.config.SystemConfig;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey;
@@ -33,21 +32,34 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
-    private final StoreRepository storeRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SystemConfigRepository configRepository;
 
+    // 🛡️ VŨ KHÍ MỚI: Dùng để check tài khoản
+    private final AccountRepository accountRepository;
+
+    // =======================================================
+    // HÀM HELPER: TÌM CỬA HÀNG TỪ USERNAME ĐĂNG NHẬP
+    // =======================================================
+    private Store getStoreByUsername(String username) {
+        Account account = accountRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại trong hệ thống!"));
+
+        Store store = account.getStore();
+        if (store == null) {
+            throw new RuntimeException("Tài khoản này chưa được cấp quyền quản lý Cửa hàng nào!");
+        }
+        return store;
+    }
+
     // =======================================================
     // 1. LẤY HOẶC TẠO GIỎ HÀNG CHO CỬA HÀNG
     // =======================================================
-    private Cart getOrCreateCart(String storeId) {
-        return cartRepository.findByStore_StoreId(storeId).orElseGet(() -> {
-            Store store = storeRepository.findById(storeId)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy Store ID: " + storeId));
-
+    private Cart getOrCreateCart(Store store) {
+        return cartRepository.findByStore_StoreId(store.getStoreId()).orElseGet(() -> {
             Cart newCart = Cart.builder()
-                    .cartId("CART-" + storeId)
+                    .cartId("CART-" + store.getStoreId())
                     .store(store)
                     .lastUpdated(LocalDateTime.now())
                     .build();
@@ -59,8 +71,10 @@ public class CartService {
     // 2. THÊM MÓN VÀO GIỎ HÀNG
     // =======================================================
     @Transactional
-    public void addToCart(String storeId, AddToCartRequest request) {
-        Cart cart = getOrCreateCart(storeId);
+    public void addToCart(String username, AddToCartRequest request) {
+        Store store = getStoreByUsername(username); // Xác thực Store trước
+        Cart cart = getOrCreateCart(store);
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
@@ -75,7 +89,6 @@ public class CartService {
                         .build()
         );
 
-        // Cộng dồn số lượng
         cartItem.setQuantity(cartItem.getQuantity() + request.getQuantity());
         cartItemRepository.save(cartItem);
 
@@ -84,16 +97,12 @@ public class CartService {
     }
 
     // =======================================================
-    // 3. XEM GIỎ HÀNG
-    // =======================================================
-    // (Lát nữa rảnh Sếp code thêm hàm lấy danh sách items trả về CartResponse sau nhé,
-    // ưu tiên làm xong luồng Checkout dưới đây trước).
-
-    // =======================================================
-    // 4. CHỐT ĐƠN (CHECKOUT) - NƠI RÀO CHẮN THỜI GIAN HOẠT ĐỘNG!
+    // 4. CHỐT ĐƠN (CHECKOUT)
     // =======================================================
     @Transactional
-    public Order checkoutCart(String storeId, CheckoutRequest request) {
+    public Order checkoutCart(String username, CheckoutRequest request) {
+        Store store = getStoreByUsername(username); // Xác thực Store
+
         // 4.1. Kéo config từ Database lên
         LocalTime startTime = parseConfigTime("ORDER_START_TIME", "08:00");
         LocalTime cutoffUrgent = parseConfigTime("CUTOFF_URGENT", "10:30");
@@ -115,7 +124,7 @@ public class CartService {
         }
 
         // 4.3. Lấy giỏ hàng ra xử lý
-        Cart cart = cartRepository.findByStore_StoreId(storeId)
+        Cart cart = cartRepository.findByStore_StoreId(store.getStoreId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giỏ hàng!"));
 
         List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
@@ -126,12 +135,12 @@ public class CartService {
         // 4.4. Tạo Đơn hàng mới (Order)
         Order newOrder = new Order();
         newOrder.setOrderId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-        newOrder.setStore(cart.getStore());
+        newOrder.setStore(store);
         newOrder.setStatus(Order.OrderStatus.NEW);
         newOrder.setOrderType(request.getOrderType());
         newOrder.setNote(request.getNote());
 
-        // Phụ thu (nếu là đơn gấp) - Sếp có thể lôi từ SystemConfig ra, ở đây em fix cứng 50k ví dụ
+        // Phụ thu URGENT
         if (request.getOrderType() == Order.OrderType.URGENT) {
             newOrder.setSurcharge(new BigDecimal("50000"));
         } else {
@@ -140,7 +149,7 @@ public class CartService {
 
         Order savedOrder = orderRepository.save(newOrder);
 
-        // 4.5. Chuyển ruột Giỏ Hàng (CartItem) sang Chi Tiết Đơn (OrderItem)
+        // 4.5. Chuyển CartItem -> OrderItem
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
@@ -152,30 +161,26 @@ public class CartService {
             oItem.setOrder(savedOrder);
             oItem.setProduct(product);
             oItem.setQuantity(cItem.getQuantity());
-            oItem.setPriceAtOrder(product.getSellingPrice()); // Lưu giá tại thời điểm mua
+            oItem.setPriceAtOrder(product.getSellingPrice());
 
             orderItems.add(oItem);
 
-            // Tính tiền = (giá * số lượng)
             BigDecimal lineTotal = product.getSellingPrice().multiply(new BigDecimal(cItem.getQuantity()));
             totalAmount = totalAmount.add(lineTotal);
         }
 
-        // Lưu list OrderItems vào DB
         orderItemRepository.saveAll(orderItems);
 
-        // Cập nhật tổng tiền cho Order (cộng thêm phụ thu nếu có)
         savedOrder.setTotalAmount(totalAmount.add(savedOrder.getSurcharge()));
         orderRepository.save(savedOrder);
 
-        // 4.6. Dọn dẹp giỏ hàng (Mua xong thì giỏ phải trống)
+        // 4.6. Dọn dẹp giỏ hàng
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
 
-        log.info("Cửa hàng {} đã chốt đơn thành công! Mã đơn: {}", storeId, savedOrder.getOrderId());
+        log.info("Cửa hàng {} đã chốt đơn thành công! Mã đơn: {}", store.getStoreId(), savedOrder.getOrderId());
         return savedOrder;
     }
 
-    // Hàm phụ hỗ trợ chuyển String ("14:00") từ DB thành LocalTime
     private LocalTime parseConfigTime(String key, String defaultTime) {
         return configRepository.findByConfigKey(key)
                 .map(config -> LocalTime.parse(config.getConfigValue()))
