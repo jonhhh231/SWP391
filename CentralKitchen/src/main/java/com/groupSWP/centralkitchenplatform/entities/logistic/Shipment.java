@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.logistic;
 
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,7 +14,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Shipment {
+public class Shipment extends BaseEntity {
     @Id
     private String shipmentId;
     private LocalDateTime deliveryDate;
@@ -45,4 +46,5 @@ public class Shipment {
         STANDARD,      // Đơn giao hàng bình thường
         REPLACEMENT
     }
+    private LocalDateTime resolvedAt;
 }

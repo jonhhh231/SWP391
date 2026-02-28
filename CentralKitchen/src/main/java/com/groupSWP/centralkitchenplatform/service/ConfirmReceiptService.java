@@ -96,7 +96,7 @@ public class ConfirmReceiptService {
                 Shipment shipment = shipmentRepository.findById(shipmentId)
                         .orElseThrow(() -> new RuntimeException("Không tìm thấy shipment: " + shipmentId));
 
-                shipment.setStatus(Shipment.ShipmentStatus.COMPLETED);
+                shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
                 shipmentRepository.save(shipment);
                 shipmentCompleted = true;
             }
