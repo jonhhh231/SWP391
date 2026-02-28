@@ -69,8 +69,8 @@ public class RouteAllocationService {
             Shipment shipment = new Shipment();
             shipment.setShipmentId(UUID.randomUUID().toString());
             shipment.setDeliveryDate(today.atTime(14, 0)); // urgent: giao chiều trong ngày (bạn chỉnh giờ tùy nghiệp vụ)
-            shipment.setStatus(Shipment.ShipmentStatus.NEW);
-            shipment.setShipmentType(Shipment.ShipmentType.EXPRESS_ROUTE);
+            shipment.setStatus(Shipment.ShipmentStatus.PENDING);
+            shipment.setShipmentType(Shipment.ShipmentType.STANDARD);
 
             // FIX: persist shipment trước + flush để đảm bảo nó là "persistent"
             Shipment savedShipment = shipmentRepository.saveAndFlush(shipment);
@@ -108,8 +108,8 @@ public class RouteAllocationService {
                 Shipment shipment = new Shipment();
                 shipment.setShipmentId(UUID.randomUUID().toString());
                 shipment.setDeliveryDate(today.atTime(22, 0)); // standard: chốt đơn 14h, giao 22h đêm nay // standard: sáng ngày mai
-                shipment.setStatus(Shipment.ShipmentStatus.NEW);
-                shipment.setShipmentType(Shipment.ShipmentType.MAIN_ROUTE);
+                shipment.setStatus(Shipment.ShipmentStatus.PENDING);
+                shipment.setShipmentType(Shipment.ShipmentType.STANDARD);
 
                 // FIX: persist shipment trước + flush
                 Shipment savedShipment = shipmentRepository.saveAndFlush(shipment);
