@@ -37,4 +37,16 @@ public class AdminController {
     public ResponseEntity<List<AccountResponse>> getAllAccounts() {
         return ResponseEntity.ok(accountService.getAccountsExcludingAdmin());
     }
+
+    // API 2: Lấy danh sách account ĐANG HOẠT ĐỘNG (isActive = true)
+    @GetMapping("/list-accounts/active")
+    public ResponseEntity<List<AccountResponse>> getActiveAccounts() {
+        return ResponseEntity.ok(accountService.getAccountsByStatus(true));
+    }
+
+    // API 3: Lấy danh sách account BỊ KHÓA / VÔ HIỆU HÓA (isActive = false)
+    @GetMapping("/list-accounts/inactive")
+    public ResponseEntity<List<AccountResponse>> getInactiveAccounts() {
+        return ResponseEntity.ok(accountService.getAccountsByStatus(false));
+    }
 }

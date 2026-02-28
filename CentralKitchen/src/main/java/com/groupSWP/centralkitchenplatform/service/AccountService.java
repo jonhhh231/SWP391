@@ -19,23 +19,29 @@ public class AccountService {
 
     public List<AccountResponse> getAccountsExcludingAdmin() {
         List<Account> accounts = accountRepository.findAllExcludingAdmin();
+        return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
 
-        return accounts.stream().map(account -> {
-            AccountResponse dto = new AccountResponse();
-            dto.setAccountId(account.getAccountId());
-            dto.setUsername(account.getUsername());
-            dto.setRole(account.getRole());
-            dto.setActive(account.isActive());
+    // HÀM MỚI: Lấy danh sách theo trạng thái (Active / Inactive)
+    public List<AccountResponse> getAccountsByStatus(boolean isActive) {
+        List<Account> accounts = accountRepository.findByIsActiveExcludingAdmin(isActive);
+        return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
 
-            // Lấy thông tin chi tiết từ SystemUser nếu có
-            SystemUser systemUser = account.getSystemUser();
-            if (systemUser != null) {
-                dto.setUserId(systemUser.getUserId());
-                dto.setFullName(systemUser.getFullName());
-                dto.setEmail(systemUser.getEmail());
-            }
+    // Hàm Helper để map Entity sang DTO (giúp code gọn gàng, không bị lặp)
+    private AccountResponse mapToResponse(Account account) {
+        AccountResponse dto = new AccountResponse();
+        dto.setAccountId(account.getAccountId());
+        dto.setUsername(account.getUsername());
+        dto.setRole(account.getRole());
+        dto.setActive(account.isActive()); // Trường này sẽ cho biết là true hay false
 
-            return dto;
-        }).collect(Collectors.toList());
+        SystemUser systemUser = account.getSystemUser();
+        if (systemUser != null) {
+            dto.setUserId(systemUser.getUserId());
+            dto.setFullName(systemUser.getFullName());
+            dto.setEmail(systemUser.getEmail());
+        }
+        return dto;
     }
 }
