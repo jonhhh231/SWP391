@@ -3,12 +3,16 @@ package com.groupSWP.centralkitchenplatform.entities.logistic;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "shipments")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Shipment {
     @Id
     private String shipmentId;
@@ -29,6 +33,16 @@ public class Shipment {
     @OneToMany(mappedBy = "shipment")
     private List<Order> orders;
 
-    public enum ShipmentStatus { NEW, LOADING, DELIVERING, COMPLETED, CANCELLED }
-    public enum ShipmentType { MAIN_ROUTE, EXPRESS_ROUTE }
+    public enum ShipmentStatus {
+        PENDING,       // Chờ xử lý
+        SHIPPING,      // Đang giao
+        DELIVERED,     // Đã giao đủ
+        ISSUE_REPORTED,// Đã giao nhưng có báo cáo thiếu/sai hàng
+        RESOLVED       // Đã xử lý xong sự cố (đã lên đơn bù)
+    }
+
+    public enum ShipmentType {
+        STANDARD,      // Đơn giao hàng bình thường
+        REPLACEMENT
+    }
 }
