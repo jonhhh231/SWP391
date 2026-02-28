@@ -11,8 +11,8 @@ import java.util.List;
 @Repository
 public interface ImportItemRepository extends JpaRepository<ImportItem, Long> {
 
-    // TÌM CÁC LÔ CÒN HÀNG (quantity > 0), SẮP XẾP TỪ CŨ ĐẾN MỚI (Id Ascending)
-    List<ImportItem> findByIngredientAndQuantityGreaterThanOrderByIdAsc(
+    // 🔥 UPDATE V2.2: TÌM CÁC LÔ CÒN HÀNG (remainingQuantity > 0), SẮP XẾP TỪ CŨ ĐẾN MỚI
+    List<ImportItem> findByIngredientAndRemainingQuantityGreaterThanOrderByIdAsc(
             Ingredient ingredient,
             BigDecimal minQty
     );

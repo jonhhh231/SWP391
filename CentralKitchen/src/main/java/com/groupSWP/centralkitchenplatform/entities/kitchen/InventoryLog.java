@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
+import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -14,19 +15,26 @@ public class InventoryLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long importItemId; // Lô hàng nào bị trừ?
+    // 🔥 UPDATE: Trỏ cứng về Lô hàng bị trừ (Thay vì Long importItemId)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "import_item_id", nullable = false)
+    private ImportItem importItem;
 
-    @Column(nullable = false)
-    private String ingredientId; // Nguyên liệu gì?
+    // 🔥 UPDATE: Trỏ cứng về Nguyên liệu (Thay vì String ingredientId)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
+
+    // 🔥 UPDATE: Trỏ cứng về Mẻ nấu (Thay vì String referenceCode)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "run_id")
+    private ProductionRun productionRun;
 
     @Column(nullable = false)
     private BigDecimal quantityDeducted; // Bị trừ bao nhiêu?
 
-    private String referenceCode; // Mã mẻ nấu (Ví dụ: RUN-1234) để truy xuất nguồn gốc
-
-    private String note; // Lý do trừ (Ví dụ: "Trừ kho tự động theo nguyên tắc FIFO")
+    private String note;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt; // Trừ lúc nào?
+    private LocalDateTime createdAt;
 }

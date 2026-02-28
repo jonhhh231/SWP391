@@ -1,6 +1,5 @@
 package com.groupSWP.centralkitchenplatform.entities.procurement;
 
-
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,6 +17,10 @@ public class ImportItem {
     @Column(nullable = false)
     private BigDecimal quantity;
 
+    // 🔥 NEW: Số lượng còn lại để chạy vòng lặp FIFO
+    @Column(nullable = false)
+    private BigDecimal remainingQuantity;
+
     @Column(nullable = false)
     private BigDecimal importPrice;
 
@@ -26,7 +29,6 @@ public class ImportItem {
     private ImportTicket importTicket;
 
     @ManyToOne(fetch = FetchType.LAZY)
-
     @JoinColumn(name = "ingredient_id")
     private Ingredient ingredient;
 }
