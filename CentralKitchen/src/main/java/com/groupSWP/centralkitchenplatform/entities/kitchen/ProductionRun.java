@@ -1,11 +1,11 @@
 package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
-
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -18,8 +18,16 @@ public class ProductionRun extends BaseEntity {
     private BigDecimal plannedQty;
     private BigDecimal actualQty;
     private BigDecimal wasteQty;
+
+    // 🔥 NEW: Tổng chi phí nguyên liệu thực tế (Giá vốn)
+    private BigDecimal totalCostAtProduction;
+
     private LocalDateTime productionDate;
     private String batchCode;
+
+    // Bổ sung cho khớp với thiết kế DBML
+    private LocalDate expiryDate;
+    private String note;
 
     @Enumerated(EnumType.STRING)
     private ProductionStatus status;
