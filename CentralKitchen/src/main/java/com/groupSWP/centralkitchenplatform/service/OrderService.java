@@ -105,11 +105,25 @@ public class OrderService {
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
 
+        // --- 📦 6. MAPPING TRẢ VỀ (FIX LỖI NULL TẠI ĐÂY) ---
         return OrderResponse.builder()
                 .orderId(savedOrder.getOrderId())
                 .status(savedOrder.getStatus().name())
                 .totalAmount(savedOrder.getTotalAmount())
                 .message(isUrgent ? "Tạo đơn KHẨN CẤP thành công (+100k phí)!" : "Tạo đơn TIÊU CHUẨN thành công!")
+                .storeId(savedOrder.getStore().getStoreId())
+                .orderType(savedOrder.getOrderType())
+                .note(savedOrder.getNote())
+                .surcharge(savedOrder.getSurcharge())
+                .items(savedOrder.getOrderItems().stream().map(item ->
+                        OrderResponse.OrderItemDto.builder()
+                                .productId(item.getProduct().getProductId())
+                                .productName(item.getProduct().getProductName()) // Lấy tên thật từ Product
+                                .quantity(item.getQuantity())
+                                .priceAtOrder(item.getPriceAtOrder())
+                                .subTotal(item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity())))
+                                .build()
+                ).collect(Collectors.toList()))
                 .build();
     }
 
