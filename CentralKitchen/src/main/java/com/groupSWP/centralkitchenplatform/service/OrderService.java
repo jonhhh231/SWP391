@@ -41,13 +41,29 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(OrderRequest request, boolean isUrgent) {
 
-        // --- ⚙️ 1. CẤU HÌNH ERP (Sau này có thể lôi từ bảng SystemConfig lên) ---
-        LocalTime CUT_OFF_TIME = LocalTime.of(10, 0); // 10:00 AM sáng chốt đơn thường
-        BigDecimal URGENT_SURCHARGE = new BigDecimal("100000"); // 100k phụ phí gấp
+        // --- 🛡️ 0. BẢO VỆ: CHỐNG ĐƠN HÀNG RỖNG ---
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new RuntimeException("Giỏ hàng đang trống! Sếp vui lòng chọn ít nhất 1 món trước khi chốt đơn nhé!");
+        }
 
-        // --- 🛑 2. RÀO CHẮN THỜI GIAN (CUT-OFF TIME) ---
-        if (!isUrgent && LocalTime.now().isAfter(CUT_OFF_TIME)) {
-            throw new RuntimeException("Đã qua giờ chốt sổ (" + CUT_OFF_TIME + "). Vui lòng chuyển sang đặt Khẩn Cấp (URGENT)!");
+        // --- ⚙️ 1. CẤU HÌNH ERP CHUẨN ---
+        LocalTime now = LocalTime.now();
+        LocalTime OPEN_TIME = LocalTime.of(8, 0);
+        LocalTime URGENT_CUTOFF = LocalTime.of(10, 0);   // Gấp chốt 10h30
+        LocalTime STANDARD_CUTOFF = LocalTime.of(13, 0); // Thường chốt 13h00
+        BigDecimal URGENT_SURCHARGE = new BigDecimal("100000"); // 100k phụ phí
+
+        // --- 🛑 2. RÀO CHẮN THỜI GIAN ---
+        if (now.isBefore(OPEN_TIME)) {
+            throw new RuntimeException("Hệ thống chưa mở cửa (8:00 AM mới nhận đơn nha Sếp)!");
+        }
+
+        if (isUrgent && now.isAfter(URGENT_CUTOFF)) {
+            throw new RuntimeException("Đã quá 10:30 AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
+        }
+
+        if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) {
+            throw new RuntimeException("Đã quá 13:00 PM, vui lòng chờ mai đặt đơn THƯỜNG Sếp nhé!");
         }
 
         Store store = storeRepository.findById(request.getStoreId())
@@ -56,7 +72,10 @@ public class OrderService {
         Order order = new Order();
         order.setStore(store);
         order.setStatus(Order.OrderStatus.NEW);
-        order.setDeliveryWindow(Order.DeliveryWindow.valueOf(request.getDeliveryWindow().toUpperCase()));
+
+        String deliveryWin = request.getDeliveryWindow() != null ? request.getDeliveryWindow().toUpperCase() : "MORNING";
+        order.setDeliveryWindow(Order.DeliveryWindow.valueOf(deliveryWin));
+
         order.setNote(request.getNote());
 
         // --- 💰 3. PHÂN LOẠI & TÍNH PHỤ PHÍ ---
@@ -98,14 +117,12 @@ public class OrderService {
             orderItems.add(orderItem);
         }
 
-        // ĐÃ XÓA RÀO CHẮN ĐỊNH MỨC TIỀN Ở ĐÂY THEO LỆNH CỦA SẾP! 🚀
-
         // --- 💾 5. LƯU DATABASE ---
         order.setTotalAmount(totalAmount.add(surcharge));
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
 
-        // --- 📦 6. MAPPING TRẢ VỀ (FIX LỖI NULL TẠI ĐÂY) ---
+        // --- 📦 6. MAPPING TRẢ VỀ ---
         return OrderResponse.builder()
                 .orderId(savedOrder.getOrderId())
                 .status(savedOrder.getStatus().name())
@@ -118,7 +135,7 @@ public class OrderService {
                 .items(savedOrder.getOrderItems().stream().map(item ->
                         OrderResponse.OrderItemDto.builder()
                                 .productId(item.getProduct().getProductId())
-                                .productName(item.getProduct().getProductName()) // Lấy tên thật từ Product
+                                .productName(item.getProduct().getProductName())
                                 .quantity(item.getQuantity())
                                 .priceAtOrder(item.getPriceAtOrder())
                                 .subTotal(item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity())))
