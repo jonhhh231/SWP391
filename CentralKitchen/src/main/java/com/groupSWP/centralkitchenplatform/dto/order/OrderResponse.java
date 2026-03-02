@@ -5,24 +5,25 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
 @Builder
 public class OrderResponse {
-    // --- 4 TRƯỜNG CŨ CỦA SẾP (Giữ nguyên) ---
     private String orderId;
     private String status;
     private BigDecimal totalAmount;
     private String message;
-
-    // --- BƠM THÊM CÁC TRƯỜNG MỚI CHO LỊCH SỬ ĐƠN ---
     private String storeId;
     private Order.OrderType orderType;
     private String note;
     private BigDecimal surcharge;
 
-    // Danh sách các món trong đơn hàng này
+    // --- 🚚 CẶP BÀI TRÙNG THÔNG BÁO LỊCH GIAO HÀNG ---
+    private LocalDate deliveryDate;
+    private Order.DeliveryWindow deliveryWindow;
+
     private List<OrderItemDto> items;
 
     @Data

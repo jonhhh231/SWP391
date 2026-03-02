@@ -49,7 +49,7 @@ public class OrderService {
         // --- ⚙️ 1. CẤU HÌNH ERP CHUẨN ---
         LocalTime now = LocalTime.now();
         LocalTime OPEN_TIME = LocalTime.of(8, 0);
-        LocalTime URGENT_CUTOFF = LocalTime.of(10, 0);   // Gấp chốt 10h30
+        LocalTime URGENT_CUTOFF = LocalTime.of(10, 30);   // Đã FIX: Gấp chốt 10h30
         LocalTime STANDARD_CUTOFF = LocalTime.of(13, 0); // Thường chốt 13h00
         BigDecimal URGENT_SURCHARGE = new BigDecimal("100000"); // 100k phụ phí
 
@@ -73,8 +73,16 @@ public class OrderService {
         order.setStore(store);
         order.setStatus(Order.OrderStatus.NEW);
 
-        String deliveryWin = request.getDeliveryWindow() != null ? request.getDeliveryWindow().toUpperCase() : "MORNING";
-        order.setDeliveryWindow(Order.DeliveryWindow.valueOf(deliveryWin));
+        // --- 🚚 TỰ ĐỘNG XẾP LỊCH GIAO HÀNG  ---
+        if (isUrgent) {
+            // Đơn GẤP: Ép vô ca Chiều (AFTERNOON) và giao luôn HÔM NAY
+            order.setDeliveryWindow(Order.DeliveryWindow.AFTERNOON);
+            order.setDeliveryDate(LocalDate.now());
+        } else {
+            // Đơn THƯỜNG: Ép vô ca Sáng (MORNING) và giao vào SÁNG MAI
+            order.setDeliveryWindow(Order.DeliveryWindow.MORNING);
+            order.setDeliveryDate(LocalDate.now().plusDays(1));
+        }
 
         order.setNote(request.getNote());
 
@@ -132,6 +140,8 @@ public class OrderService {
                 .orderType(savedOrder.getOrderType())
                 .note(savedOrder.getNote())
                 .surcharge(savedOrder.getSurcharge())
+                .deliveryDate(savedOrder.getDeliveryDate())         // Hiển thị ngày giao
+                .deliveryWindow(savedOrder.getDeliveryWindow())     // Hiển thị ca giao
                 .items(savedOrder.getOrderItems().stream().map(item ->
                         OrderResponse.OrderItemDto.builder()
                                 .productId(item.getProduct().getProductId())
@@ -185,6 +195,7 @@ public class OrderService {
                 .storeId(order.getStore().getStoreId())
                 .orderType(order.getOrderType().name())
                 .status(order.getStatus().name())
+                .deliveryDate(order.getDeliveryDate()) // ĐÃ FIX: Map thêm ngày giao vào chi tiết đơn
                 .deliveryWindow(order.getDeliveryWindow() != null ? order.getDeliveryWindow().name() : null)
                 .note(order.getNote())
                 .totalAmount(order.getTotalAmount())
