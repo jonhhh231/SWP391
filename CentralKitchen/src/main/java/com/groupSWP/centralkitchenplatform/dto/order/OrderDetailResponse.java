@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,22 +15,25 @@ public class OrderDetailResponse {
     private String storeId;
     private String orderType;
     private String status;
+
+    // --- 🚚 LỊCH GIAO HÀNG ---
+    private LocalDate deliveryDate;
     private String deliveryWindow;
+
     private String note;
     private BigDecimal totalAmount;
-    private BigDecimal surcharge; // Tiền phạt khẩn cấp (nếu có)
+    private BigDecimal surcharge;
     private LocalDateTime createdAt;
 
-    // Danh sách các món ăn bên trong đơn hàng
     private List<OrderItemDto> items;
 
     @Data
     @Builder
     public static class OrderItemDto {
         private String productId;
-        private String productName; // Tên món để Cửa hàng dễ đọc
+        private String productName;
         private Integer quantity;
-        private BigDecimal price;   // Giá lúc đặt
-        private BigDecimal lineTotal; // Tổng tiền của món này (price * quantity)
+        private BigDecimal price;
+        private BigDecimal lineTotal;
     }
 }

@@ -91,20 +91,17 @@ public class StoreOrderController {
     @PostMapping("/standard")
     public ResponseEntity<?> createStandardOrder(Principal principal, @RequestBody OrderRequest request) {
         try {
-            // 1. Dùng bảo bối moi mã chuẩn "ST002" từ DB dựa vào Token
             String realStoreId = getStoreIdFromPrincipal(principal);
-
-            // 2. Ép mã chuẩn này vào request (Mặc kệ Frontend gửi mã gì lên, mình tự chốt mã của mình cho an toàn)
             request.setStoreId(realStoreId);
 
-            log.info("Cửa hàng {} đang tạo đơn hàng TIÊU CHUẨN", realStoreId);
+            log.info("Cửa hàng {} bóp cò đơn STANDARD", realStoreId);
 
-            // 3. Gọi Service
-            OrderResponse response = orderService.createStandardOrder(request);
+            // Gọi hàm gộp All-in-one
+            OrderResponse response = orderService.createOrder(request, false);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            log.error("Lỗi khi tạo đơn Standard: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+            log.error("🔥 Lỗi tạo đơn Standard: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 
@@ -115,15 +112,16 @@ public class StoreOrderController {
     public ResponseEntity<?> createUrgentOrder(Principal principal, @RequestBody OrderRequest request) {
         try {
             String realStoreId = getStoreIdFromPrincipal(principal);
-            request.setStoreId(realStoreId); // Ghi đè mã chuẩn
+            request.setStoreId(realStoreId);
 
-            log.info("Cửa hàng {} đang tạo đơn hàng KHẨN CẤP", realStoreId);
+            log.info("Cửa hàng {} bóp cò đơn URGENT", realStoreId);
 
-            OrderResponse response = orderService.createUrgentOrder(request);
+            // Gọi hàm gộp All-in-one với flag isUrgent = true
+            OrderResponse response = orderService.createOrder(request, true);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            log.error("Lỗi khi tạo đơn Urgent: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+            log.error("🔥 Lỗi tạo đơn Urgent: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 }

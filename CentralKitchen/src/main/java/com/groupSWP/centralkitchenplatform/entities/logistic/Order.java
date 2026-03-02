@@ -28,6 +28,9 @@ public class Order extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private DeliveryWindow deliveryWindow;
 
+    @Column(name = "delivery_date")
+    private java.time.LocalDate deliveryDate;
+
     private BigDecimal surcharge;
 
     @ManyToOne(fetch = FetchType.LAZY)
