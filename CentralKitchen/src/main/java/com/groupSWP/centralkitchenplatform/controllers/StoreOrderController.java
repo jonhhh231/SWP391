@@ -99,8 +99,8 @@ public class StoreOrderController {
 
             log.info("Cửa hàng {} đang tạo đơn hàng TIÊU CHUẨN", realStoreId);
 
-            // 3. Gọi Service
-            OrderResponse response = orderService.createStandardOrder(request);
+            // 3. Gọi Service GỘP MỚI (isUrgent = false)
+            OrderResponse response = orderService.createOrder(request, false);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Lỗi khi tạo đơn Standard: {}", e.getMessage());
@@ -119,7 +119,8 @@ public class StoreOrderController {
 
             log.info("Cửa hàng {} đang tạo đơn hàng KHẨN CẤP", realStoreId);
 
-            OrderResponse response = orderService.createUrgentOrder(request);
+            // Gọi Service GỘP MỚI (isUrgent = true)
+            OrderResponse response = orderService.createOrder(request, true);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Lỗi khi tạo đơn Urgent: {}", e.getMessage());
