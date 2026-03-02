@@ -3,6 +3,7 @@ package com.groupSWP.centralkitchenplatform.config;
 import com.groupSWP.centralkitchenplatform.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.*;
+import org.springframework.http.HttpMethod; // DÒNG NÀY MỚI THÊM: Để phân biệt GET, POST, PUT, DELETE
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -41,23 +42,32 @@ public class SecurityConfig {
                         // Manager quản lý chung nên thường vào được các api quản lý
                         .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
 
+                        // Manager và Admin quản lý toàn bộ đơn hàng
+                        .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        // Manage Recipes (BOM): chỉ ADMIN/MANAGER được quản lý công thức
+                        .requestMatchers("/api/recipes/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        // 🔒 BẢO VỆ DỮ LIỆU CỐT LÕI: Gom gọn chặn Cửa hàng tự ý Thêm/Sửa/Xóa
+                        .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+
                         // --- 3. SUPPLY COORDINATOR (Điều phối) ---
                         // API liên quan đến vận chuyển, nhập hàng
                         .requestMatchers("/api/logistics/**", "/api/shipments/**").hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
 
                         // --- 4. CENTRAL KITCHEN STAFF (Bếp) ---
-                        // API xem công thức, cập nhật trạng thái nấu
-                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        // API xem công thức, cập nhật trạng thái nấu, nhập kho (inventory)
+                        .requestMatchers("/api/kitchen/**", "/api/inventory/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
                         // --- 5. FRANCHISE STORE STAFF (Cửa hàng) ---
                         // API đặt hàng, xem lịch sử đơn hàng của cửa hàng
                         .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
 
-                        // API dùng chung (Ví dụ: Xem danh sách món ăn để đặt)
-                        .requestMatchers("/api/products/**").authenticated() // Ai đăng nhập rồi cũng xem được SP
-
-                        // Manage Recipes (BOM): chỉ ADMIN/MANAGER được quản lý công thức
-                        .requestMatchers("/api/recipes/**").hasAnyRole("ADMIN", "MANAGER")
+                        // --- 6. API DÙNG CHUNG (Chỉ được XEM) ---
+                        // Bất kỳ ai đăng nhập rồi cũng xem được danh sách Món, Danh mục, Nguyên liệu
+                        .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/ingredients/**").authenticated()
 
                         .anyRequest().authenticated()
                 )

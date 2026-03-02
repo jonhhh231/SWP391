@@ -4,134 +4,76 @@ import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
-import com.groupSWP.centralkitchenplatform.entities.auth.Account;
-import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
 import com.groupSWP.centralkitchenplatform.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 public class OrderController {
 
     private final OrderService orderService;
-    private final AccountRepository accountRepository; // Bơm vào để "móc" dữ liệu thực
 
     // =======================================================
-    // HÀM HELPER: CHUYỂN USERNAME TOKEN -> STORE_ID THẬT
+    // 1. MANAGER TẠO ĐƠN GIÚP CỬA HÀNG (Cần truyền storeId)
     // =======================================================
-    private String getActualStoreId(String username) {
-        Account account = accountRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại trong hệ thống!"));
-
-        if (account.getStore() == null) {
-            throw new RuntimeException("Tài khoản này chưa được gán cho bất kỳ Cửa hàng nào!");
-        }
-        return account.getStore().getStoreId(); // Đây mới là ID chuẩn để Hibernate query
-    }
-
     @PostMapping("/standard")
     public ResponseEntity<OrderResponse> createStandardOrder(@RequestBody OrderRequest request) {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
-        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
-
-        if (currentRole.contains("STORE_MANAGER")) {
-            // FIX TẠI ĐÂY: Lấy ID thật từ DB
-            String realStoreId = getActualStoreId(authentication.getName());
-            request.setStoreId(realStoreId);
+        if (request.getStoreId() == null || request.getStoreId().isEmpty()) {
+            throw new IllegalArgumentException("Manager/Admin khi tạo đơn hộ phải chỉ định rõ mã cửa hàng (storeId)!");
         }
-        else if (!currentRole.contains("MANAGER")) {
-            throw new org.springframework.security.access.AccessDeniedException("Quyền hạn không đủ!");
-        }
+        log.info("Manager/Admin đang tạo đơn STANDARD cho cửa hàng {}", request.getStoreId());
 
-        OrderResponse response = orderService.createOrder(request, false);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(orderService.createOrder(request, false));
     }
 
     @PostMapping("/urgent")
     public ResponseEntity<OrderResponse> createUrgentOrder(@RequestBody OrderRequest request) {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
-        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
-
-        if (currentRole.contains("STORE_MANAGER")) {
-            // FIX TẠI ĐÂY: Lấy ID thật từ DB
-            String realStoreId = getActualStoreId(authentication.getName());
-            request.setStoreId(realStoreId);
+        if (request.getStoreId() == null || request.getStoreId().isEmpty()) {
+            throw new IllegalArgumentException("Manager/Admin khi tạo đơn hộ phải chỉ định rõ mã cửa hàng (storeId)!");
         }
-        else if (!currentRole.contains("MANAGER")) {
-            throw new org.springframework.security.access.AccessDeniedException("Quyền hạn không đủ!");
-        }
+        log.info("Manager/Admin đang tạo đơn URGENT cho cửa hàng {}", request.getStoreId());
 
-        OrderResponse response = orderService.createOrder(request, true);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(orderService.createOrder(request, true));
     }
 
+    // =======================================================
+    // 2. MANAGER XEM LỊCH SỬ ĐƠN (Của 1 tiệm cụ thể)
+    // =======================================================
     @GetMapping("/history")
     public ResponseEntity<List<OrderHistoryResponse>> getOrderHistory(
-            @RequestParam(required = false) String storeId) {
+            @RequestParam(required = true) String storeId) {
+        // Lưu ý BA: @RequestParam(required = true) sẽ tự động ném lỗi HTTP 400 nếu Manager quên truyền storeId
+        log.info("Manager/Admin đang xem lịch sử đơn của cửa hàng {}", storeId);
 
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
-        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
-        String targetStoreId = storeId;
-
-        if (currentRole.contains("STORE_MANAGER")) {
-            // FIX TẠI ĐÂY
-            targetStoreId = getActualStoreId(authentication.getName());
-        }
-        else if (currentRole.contains("MANAGER")) {
-            if (targetStoreId == null || targetStoreId.trim().isEmpty()) {
-                throw new IllegalArgumentException("Quản lý vui lòng truyền storeId!");
-            }
-        }
-
-        List<OrderHistoryResponse> history = orderService.getOrderHistory(targetStoreId);
-        return ResponseEntity.ok(history);
+        return ResponseEntity.ok(orderService.getOrderHistory(storeId));
     }
 
+    // =======================================================
+    // 3. MANAGER XEM CHI TIẾT BẤT KỲ ĐƠN NÀO
+    // =======================================================
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderDetailResponse> getOrderDetail(@PathVariable String orderId) {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        log.info("Manager/Admin đang xem chi tiết đơn hàng {}", orderId);
 
-        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
-        OrderDetailResponse response = orderService.getOrderDetail(orderId);
-
-        if (currentRole.contains("STORE_MANAGER")) {
-            // FIX TẠI ĐÂY: So sánh Store ID thật
-            String loggedInStoreId = getActualStoreId(authentication.getName());
-            if (!response.getStoreId().equals(loggedInStoreId)) {
-                throw new org.springframework.security.access.AccessDeniedException("Bạn không thể xem đơn của hàng xóm!");
-            }
-        }
-
-        return ResponseEntity.ok(response);
+        // Cứ thế mà lấy, không bị vướng rào cản "hàng xóm" như bên Cửa hàng
+        return ResponseEntity.ok(orderService.getOrderDetail(orderId));
     }
 
+    // =======================================================
+    // 4. MANAGER HỦY BẤT KỲ ĐƠN NÀO (NẾU CÒN MỚI)
+    // =======================================================
     @PutMapping("/{orderId}/cancel")
     public ResponseEntity<String> cancelOrder(@PathVariable String orderId) {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
-        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
-        OrderDetailResponse orderDetail = orderService.getOrderDetail(orderId);
-
-        if (currentRole.contains("STORE_MANAGER")) {
-            // FIX TẠI ĐÂY
-            String loggedInStoreId = getActualStoreId(authentication.getName());
-            if (!orderDetail.getStoreId().equals(loggedInStoreId)) {
-                throw new org.springframework.security.access.AccessDeniedException("Không được hủy đơn người khác!");
-            }
-        }
+        log.info("Manager/Admin đang thực hiện hủy đơn hàng {}", orderId);
 
         orderService.cancelOrder(orderId);
         return ResponseEntity.ok("Đã hủy đơn hàng " + orderId + " thành công!");
