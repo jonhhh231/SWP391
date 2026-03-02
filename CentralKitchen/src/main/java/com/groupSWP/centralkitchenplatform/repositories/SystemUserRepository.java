@@ -17,5 +17,5 @@ public interface SystemUserRepository extends JpaRepository<SystemUser, String> 
     @Query("SELECT s.userId FROM SystemUser s WHERE s.role = :role ORDER BY s.userId DESC LIMIT 1")
     Optional<String> findLastUserIdByRole(@Param("role") SystemRole role);
     Optional<SystemUser> findByEmail(String email);
-    Optional<SystemUser> findByUsername(String username);
+    Optional<SystemUser> findByAccount_Username(String username); ;// cái này đang làm task 3
 }

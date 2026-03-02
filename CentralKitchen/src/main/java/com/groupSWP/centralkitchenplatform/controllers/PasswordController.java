@@ -19,7 +19,7 @@ public class PasswordController {
 
     @PutMapping("/change-password")
     public ResponseEntity<String> changePassword(
-            Principal principal,
+            Principal principal, //Thẻ Căn Cước
             @RequestBody ChangePasswordRequest request) {
 
         // Lấy username từ Token người đang đăng nhập
