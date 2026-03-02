@@ -3,7 +3,7 @@ package com.groupSWP.centralkitchenplatform.controllers;
 import com.groupSWP.centralkitchenplatform.dto.cart.AddToCartRequest;
 import com.groupSWP.centralkitchenplatform.dto.cart.CartResponse;
 import com.groupSWP.centralkitchenplatform.dto.cart.CheckoutRequest;
-import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
+import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse; // Thêm dòng này để gọi đúng kiểu trả về
 import com.groupSWP.centralkitchenplatform.service.CartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ public class CartController {
             Principal principal,
             @RequestBody AddToCartRequest request) {
         try {
-            String username = principal.getName(); // Lấy từ Token (VD: "store_q1")
+            String username = principal.getName(); // Lấy từ Token (VD: "ST_002")
             log.info("User {} đang thêm {} món {} vào giỏ hàng", username, request.getQuantity(), request.getProductId());
 
             cartService.addToCart(username, request);
@@ -41,7 +41,7 @@ public class CartController {
     }
 
     // =======================================================
-    // 2. API CHỐT ĐƠN (CHECKOUT)
+    // 2. API CHỐT ĐƠN (CHECKOUT TỪ GIỎ NHÁP)
     // =======================================================
     @PostMapping("/checkout")
     public ResponseEntity<?> checkout(
@@ -51,8 +51,8 @@ public class CartController {
             String username = principal.getName();
             log.info("User {} yêu cầu chốt đơn loại {}", username, request.getOrderType());
 
-            // Gọi Service - Nếu lố giờ Cut-off nó sẽ tự văng Exception, Controller bắt được sẽ ném ra 400 Bad Request
-            Order createdOrder = cartService.checkoutCart(username, request);
+            // FIX ĐỎ Ở ĐÂY: Hứng kết quả bằng OrderResponse thay vì Order thô
+            OrderResponse createdOrder = cartService.checkoutCart(username, request);
 
             return ResponseEntity.ok(createdOrder);
         } catch (RuntimeException e) {
@@ -85,7 +85,7 @@ public class CartController {
     @PutMapping("/update")
     public ResponseEntity<?> updateCartItem(
             Principal principal,
-            @RequestBody AddToCartRequest request) { // Xài ké DTO này cho tiện
+            @RequestBody AddToCartRequest request) {
         try {
             String username = principal.getName();
             log.info("User {} sửa số lượng món {} thành {}", username, request.getProductId(), request.getQuantity());
