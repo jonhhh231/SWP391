@@ -34,7 +34,6 @@ public class OrderService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final ProductionService productionService;
-    private final CartService cartService;
     private final SystemConfigService systemConfigService; // Đã tiêm vũ khí Cache
 
     // =========================================================================
