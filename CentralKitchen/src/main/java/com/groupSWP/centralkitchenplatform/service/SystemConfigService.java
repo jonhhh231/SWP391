@@ -63,4 +63,31 @@ public class SystemConfigService {
     public void clearCache(String configKey) {
         log.info("Đã quét sạch Cache của config: {}. Lần gọi tới sẽ tự chọc lại DB!", configKey);
     }
+
+    // ==========================================
+    // 4. HÀM CHO ADMIN QUẢN LÝ (CRUD)
+    // ==========================================
+
+    // Xem toàn bộ cấu hình
+    public java.util.List<SystemConfig> getAllConfigs() {
+        return systemConfigRepository.findAll();
+    }
+
+    // Cập nhật cấu hình & Tự động quét sạch Cache cũ
+    @CacheEvict(value = "systemConfigs", key = "#configKey")
+    public SystemConfig updateConfig(String configKey, String newValue, String description, com.groupSWP.centralkitchenplatform.entities.auth.SystemUser updatedBy) {
+        SystemConfig config = systemConfigRepository.findByConfigKey(configKey)
+                .orElse(new SystemConfig());
+
+        config.setConfigKey(configKey);
+        config.setConfigValue(newValue);
+        if (description != null) {
+            config.setDescription(description);
+        }
+        // Gắn thông tin người sửa (Nếu cần)
+        config.setUpdatedBy(updatedBy);
+
+        log.info("Đã lưu cấu hình {} = {} vào DB và Xóa Cache thành công!", configKey, newValue);
+        return systemConfigRepository.save(config);
+    }
 }
