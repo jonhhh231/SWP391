@@ -2,46 +2,36 @@ package com.groupSWP.centralkitchenplatform.controllers.store;
 
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileResponse;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileUpdateRequest;
+import com.groupSWP.centralkitchenplatform.dto.store.StoreStatusRequest;
 import com.groupSWP.centralkitchenplatform.service.store.StoreSettingsService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 
 @RestController
-@RequestMapping("/api/store/settings/profile")
+@RequestMapping("/api/store/settings")
+@RequiredArgsConstructor
 public class StoreSettingsController {
 
     private final StoreSettingsService storeSettingsService;
 
-    public StoreSettingsController(StoreSettingsService storeSettingsService) {
-        this.storeSettingsService = storeSettingsService;
-    }
-
-    // API: Xem thông tin cửa hàng (Store Profile)
-    @GetMapping
+    @GetMapping("/profile")
     public ResponseEntity<StoreProfileResponse> getStoreProfile(Principal principal) {
-        // Lấy username từ token của người dùng đang đăng nhập (Principal)
-        String username = principal.getName();
-
-        // Gọi service lấy thông tin trả về
-        StoreProfileResponse profile = storeSettingsService.getProfileByUsername(username);
-
-        return ResponseEntity.ok(profile);
+        return ResponseEntity.ok(storeSettingsService.getProfileByUsername(principal.getName()));
     }
 
-    // API: Cập nhật thông tin cửa hàng (Store Profile)
-    @PutMapping
-    public ResponseEntity<String> updateStoreProfile(
-            Principal principal,
-            @RequestBody StoreProfileUpdateRequest request) {
+    @PutMapping("/profile")
+    public ResponseEntity<String> updateStoreProfile(Principal principal, @RequestBody StoreProfileUpdateRequest request) {
+        storeSettingsService.updateProfileByUsername(principal.getName(), request);
+        return ResponseEntity.ok("Cập nhật thông tin thành công!");
+    }
 
-        // Lấy username từ token
-        String username = principal.getName();
-
-        // Gọi service cập nhật thông tin (chỉ cập nhật name, address, phone)
-        storeSettingsService.updateProfileByUsername(username, request);
-
-        return ResponseEntity.ok("Cập nhật thông tin cửa hàng thành công!");
+    @PutMapping("/status")
+    public ResponseEntity<String> updateStatus(Principal principal, @RequestBody StoreStatusRequest request) {
+        storeSettingsService.updateStatus(principal.getName(), request.getIsActive());
+        String statusMsg = request.getIsActive() ? "MỞ CỬA" : "ĐÓNG CỬA";
+        return ResponseEntity.ok("Trạng thái hiện tại: " + statusMsg);
     }
 }

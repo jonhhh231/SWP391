@@ -2,6 +2,7 @@ package com.groupSWP.centralkitchenplatform.service.store;
 
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileResponse;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileUpdateRequest;
+import com.groupSWP.centralkitchenplatform.dto.store.StoreStatusRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +39,9 @@ public class StoreSettingsService {
     }
 
     @Transactional
-    public void updateStatus(String username, boolean isActive) {
+    public void updateStatus(String username, Boolean isActive) { // Đổi StoreStatusRequest thành Boolean
         Store store = storeRepository.findByAccount_Username(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng cho user: " + username));
 
         store.setActive(isActive);
         storeRepository.save(store);
