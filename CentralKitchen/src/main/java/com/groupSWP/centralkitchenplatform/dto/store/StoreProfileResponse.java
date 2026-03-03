@@ -13,4 +13,5 @@ public class StoreProfileResponse {
     private String name;
     private String address;
     private String phone;
+    private boolean isActive;
 }

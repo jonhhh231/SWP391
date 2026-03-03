@@ -2,7 +2,7 @@ package com.groupSWP.centralkitchenplatform.service;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.ChangePasswordRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
-import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
+import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 

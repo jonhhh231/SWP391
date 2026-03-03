@@ -1,7 +1,7 @@
 package com.groupSWP.centralkitchenplatform.security;
 
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
-import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
+import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,7 +16,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
