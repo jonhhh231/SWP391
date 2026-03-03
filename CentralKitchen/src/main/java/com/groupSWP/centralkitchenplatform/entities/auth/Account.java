@@ -26,6 +26,9 @@ public class Account {
     @JsonIgnore
     private SystemUser systemUser;
 
+    @Column(name = "active_token", length = 512) // Token JWT thường khá dài
+    private String activeToken;
+
     @Column(name = "is_active")
     private boolean isActive = true;
 

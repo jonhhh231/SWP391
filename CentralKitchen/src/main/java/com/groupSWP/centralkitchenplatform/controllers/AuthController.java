@@ -25,8 +25,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
-        return ResponseEntity.ok(Map.of("message", "Logout successful"));
+    public ResponseEntity<Map<String, String>> logout(Principal principal) {
+        // Principal chứa username của người đang gọi API này (đã qua Filter)
+        if (principal != null) {
+            authService.logout(principal.getName());
+        }
+        return ResponseEntity.ok(Map.of("message", "Đăng xuất thành công"));
     }
 
     @PutMapping("/update-profile")
@@ -44,20 +48,6 @@ public class AuthController {
                 .build();
 
         return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/check-me")
-    public ResponseEntity<?> checkMe(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Chưa xác thực (Authentication is null)");
-        }
-
-        Map<String, Object> debugInfo = new HashMap<>();
-        debugInfo.put("username", authentication.getName());
-        debugInfo.put("authorities", authentication.getAuthorities());
-        debugInfo.put("isAuthenticated", authentication.isAuthenticated());
-
-        return ResponseEntity.ok(debugInfo);
     }
 
     @PostMapping("/verify-otp")

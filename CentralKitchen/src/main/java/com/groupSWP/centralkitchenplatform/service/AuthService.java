@@ -61,6 +61,10 @@ public class AuthService {
         otpService.clearOtp(username);
 
         String token = jwtService.generateToken(account);
+        // 2. LƯU TOKEN VÀO DATABASE (Đè token cũ nếu có)
+        account.setActiveToken(token);
+        accountRepository.save(account);
+
         return AuthResponse.builder()
                 .token(token)
                 .username(account.getUsername())
@@ -174,5 +178,13 @@ public class AuthService {
 
         // Xóa OTP khỏi bộ nhớ để tránh bị dùng lại
         otpService.clearOtp(email);
+    }
+
+    @Transactional
+    public void logout(String username) {
+        accountRepository.findByUsername(username).ifPresent(account -> {
+            account.setActiveToken(null);
+            accountRepository.save(account);
+        });
     }
 }
