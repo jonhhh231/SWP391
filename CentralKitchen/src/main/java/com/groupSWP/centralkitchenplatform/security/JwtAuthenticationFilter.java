@@ -1,5 +1,7 @@
 package com.groupSWP.centralkitchenplatform.security;
 
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
+import com.groupSWP.centralkitchenplatform.repositories.AccountRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,7 +22,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-
+    private final AccountRepository accountRepository;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -44,6 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 2. Kiểm tra username và trạng thái Authentication hiện tại
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                Account account = accountRepository.findByUsername(username).orElse(null);
+                if (account == null || !jwt.equals(account.getActiveToken())) {
+                    // Nếu không khớp -> Bị đăng nhập ở máy khác -> Trả về lỗi 401
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\": \"Tài khoản của bạn đã được đăng nhập ở một thiết bị khác. Vui lòng đăng nhập lại!\"}");
+                    return; // Dừng luồng xử lý ngay lập tức
+                }
+
 
                 // 3. Kiểm tra xem role có bị null không trước khi tạo Authority
                 System.out.println("Username tu token: " + username);
