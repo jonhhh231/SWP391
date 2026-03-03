@@ -34,6 +34,8 @@ public class OrderService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final ProductionService productionService;
+    private final CartService cartService;
+    private final SystemConfigService systemConfigService; // Đã tiêm vũ khí Cache
 
     // =========================================================================
     // HÀM TẠO ĐƠN TRỰC TIẾP "ALL IN ONE" (TÍCH HỢP RÀO CHẮN ERP)
@@ -46,24 +48,24 @@ public class OrderService {
             throw new RuntimeException("Giỏ hàng đang trống! Sếp vui lòng chọn ít nhất 1 món trước khi chốt đơn nhé!");
         }
 
-        // --- ⚙️ 1. CẤU HÌNH ERP CHUẨN ---
+        // --- ⚙️ 1. CẤU HÌNH ERP ĐỘNG (LẤY TỪ CACHE RAM) ---
         LocalTime now = LocalTime.now();
-        LocalTime OPEN_TIME = LocalTime.of(8, 0);
-        LocalTime URGENT_CUTOFF = LocalTime.of(10, 30);   // Đã FIX: Gấp chốt 10h30
-        LocalTime STANDARD_CUTOFF = LocalTime.of(13, 0); // Thường chốt 13h00
-        BigDecimal URGENT_SURCHARGE = new BigDecimal("100000"); // 100k phụ phí
+        LocalTime OPEN_TIME = systemConfigService.getLocalTimeConfig("OPEN_TIME", "08:00");
+        LocalTime URGENT_CUTOFF = systemConfigService.getLocalTimeConfig("URGENT_CUTOFF_TIME", "10:30");
+        LocalTime STANDARD_CUTOFF = systemConfigService.getLocalTimeConfig("STANDARD_CUTOFF_TIME", "13:00");
+        BigDecimal URGENT_SURCHARGE = systemConfigService.getBigDecimalConfig("URGENT_SURCHARGE", "100000");
 
-        // --- 🛑 2. RÀO CHẮN THỜI GIAN ---
+        // --- 🛑 2. RÀO CHẮN THỜI GIAN (ĐÃ CẬP NHẬT THÔNG BÁO ĐỘNG) ---
         if (now.isBefore(OPEN_TIME)) {
-            throw new RuntimeException("Hệ thống chưa mở cửa (8:00 AM mới nhận đơn nha Sếp)!");
+            throw new RuntimeException("Hệ thống chưa mở cửa (" + OPEN_TIME + " mới nhận đơn nha)!");
         }
 
         if (isUrgent && now.isAfter(URGENT_CUTOFF)) {
-            throw new RuntimeException("Đã quá 10:30 AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
+            throw new RuntimeException("Đã quá " + URGENT_CUTOFF + ", Bếp ngưng nhận đơn GẤP rồi ạ!");
         }
 
         if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) {
-            throw new RuntimeException("Đã quá 13:00 PM, vui lòng chờ mai đặt đơn THƯỜNG Sếp nhé!");
+            throw new RuntimeException("Đã quá " + STANDARD_CUTOFF + ", vui lòng chờ mai đặt đơn THƯỜNG nhé!");
         }
 
         Store store = storeRepository.findById(request.getStoreId())
@@ -91,7 +93,7 @@ public class OrderService {
         String prefix = "STD";
         if (isUrgent) {
             order.setOrderType(Order.OrderType.URGENT);
-            surcharge = URGENT_SURCHARGE;
+            surcharge = URGENT_SURCHARGE; // Tiền móc từ Cache ra xài
             prefix = "URG";
         } else {
             order.setOrderType(Order.OrderType.STANDARD);
@@ -135,7 +137,7 @@ public class OrderService {
                 .orderId(savedOrder.getOrderId())
                 .status(savedOrder.getStatus().name())
                 .totalAmount(savedOrder.getTotalAmount())
-                .message(isUrgent ? "Tạo đơn KHẨN CẤP thành công (+100k phí)!" : "Tạo đơn TIÊU CHUẨN thành công!")
+                .message(isUrgent ? "Tạo đơn KHẨN CẤP thành công (+" + URGENT_SURCHARGE + "đ phí)!" : "Tạo đơn TIÊU CHUẨN thành công!")
                 .storeId(savedOrder.getStore().getStoreId())
                 .orderType(savedOrder.getOrderType())
                 .note(savedOrder.getNote())

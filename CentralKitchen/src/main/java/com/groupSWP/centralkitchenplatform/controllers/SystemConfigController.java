@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map; // MỚI THÊM ĐỂ DÙNG MAP
+import java.util.stream.Collectors; // MỚI THÊM ĐỂ LỌC DATA
 
 @RestController
 @RequestMapping("/api/manager/configs")
@@ -21,13 +23,31 @@ public class SystemConfigController {
     private final SystemConfigService systemConfigService;
     private final SystemUserRepository systemUserRepository; // Để móc thông tin người đang login
 
-    // 1. Xem danh sách toàn bộ System Config
+    // 1. Xem danh sách toàn bộ System Config (Dành cho Admin)
     @GetMapping
     public ResponseEntity<List<SystemConfig>> getAllConfigs() {
         return ResponseEntity.ok(systemConfigService.getAllConfigs());
     }
 
-    // 2. Cập nhật System Config (Ví dụ: Đổi giá trị URGENT_SURCHARGE)
+    // ========================================================
+    // 🌟 2. MỚI THÊM: API CHO FRONTEND LẤY DẠNG MAP {KEY: VALUE}
+    // Trả về ví dụ: { "URGENT_SURCHARGE": "100000", "STANDARD_CUTOFF_TIME": "13:00" }
+    // ========================================================
+    @GetMapping("/map")
+    public ResponseEntity<Map<String, String>> getAllConfigsAsMap() {
+        List<SystemConfig> configs = systemConfigService.getAllConfigs();
+
+        // Dùng Stream API để biến List thành Map siêu mượt
+        Map<String, String> configMap = configs.stream()
+                .collect(Collectors.toMap(
+                        SystemConfig::getConfigKey,
+                        SystemConfig::getConfigValue
+                ));
+
+        return ResponseEntity.ok(configMap);
+    }
+
+    // 3. Cập nhật System Config (Ví dụ: Đổi giá trị URGENT_SURCHARGE)
     @PutMapping("/{configKey}")
     public ResponseEntity<SystemConfig> updateConfig(
             @PathVariable String configKey,
