@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.logistic;
 
+import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -15,7 +16,9 @@ public class ShipmentDetail {
     @JoinColumn(name = "shipment_id")
     private Shipment shipment;
 
-    private Long productId; // ID của món ăn hoặc nguyên liệu
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id") // DB sẽ lưu String productId
+    private Product product; // ID của món ăn hoặc nguyên liệu
     private String productName;
 
     private int expectedQuantity; // Số lượng xuất kho đi (Bếp gửi đi 10)

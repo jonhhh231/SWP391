@@ -2,24 +2,25 @@ package com.groupSWP.centralkitchenplatform.service.inventory;
 
 import com.groupSWP.centralkitchenplatform.dto.logistics.ReportShipmentRequest;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
-// import com.groupSWP.centralkitchenplatform.entities.logistic.Order; // Bỏ comment nếu bạn đã có class Order
+import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentRepository;
+import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentDetailRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
-    // Cần có OrderRepository ở đây để xử lý chi tiết Order, tạm thời tôi thu gọn logic
+    private final ShipmentDetailRepository shipmentDetailRepository;
 
-    // BƯỚC 1: Báo cáo thực nhận
-    // LƯU Ý: ID truyền vào giờ là String
     @Transactional
     public String reportIssue(String shipmentId, ReportShipmentRequest request) {
         Shipment shipment = shipmentRepository.findById(shipmentId)
@@ -27,53 +28,68 @@ public class ShipmentService {
 
         boolean hasIssue = false;
 
-        // Quét các Order bị báo lỗi trong chuyến xe
-        for (ReportShipmentRequest.OrderReport report : request.getReportedOrders()) {
-            if (report.isMissing()) {
+        // Cập nhật số lượng thực nhận từ báo cáo của Cửa hàng
+        for (ReportShipmentRequest.ItemReport report : request.getReportedItems()) {
+            ShipmentDetail detail = shipment.getShipmentDetails().stream()
+                    .filter(d -> d.getProduct().getProductId().equals(report.getProductId()))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Sản phẩm " + report.getProductId() + " không có trong chuyến hàng này!"));
+
+            detail.setReceivedQuantity(report.getReceivedQuantity());
+            detail.setIssueNote(report.getNote());
+
+            if (detail.getMissingQuantity() > 0) {
                 hasIssue = true;
-                // TODO: Gọi OrderRepository để cập nhật trạng thái của Order bị lỗi này
             }
         }
 
-        // Cập nhật trạng thái Shipment. Chú ý cách gọi Enum lồng nhau: Shipment.ShipmentStatus
-        if (hasIssue) {
-            shipment.setStatus(Shipment.ShipmentStatus.ISSUE_REPORTED);
-        } else {
-            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
-        }
-
+        shipment.setStatus(hasIssue ? Shipment.ShipmentStatus.ISSUE_REPORTED : Shipment.ShipmentStatus.DELIVERED);
         shipmentRepository.save(shipment);
-        return hasIssue ? "Đã ghi nhận có đơn hàng bị thiếu. Chờ điều phối xử lý!" : "Chuyến hàng hoàn tất trọn vẹn!";
+
+        return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Chờ điều phối xử lý!" : "Chuyến hàng hoàn tất trọn vẹn!";
     }
 
-    // BƯỚC 2: Điều phối viên tạo đơn BÙ
     @Transactional
     public String createReplacementShipment(String originalShipmentId) {
         Shipment originalShipment = shipmentRepository.findById(originalShipmentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến hàng gốc!"));
 
         if (originalShipment.getStatus() != Shipment.ShipmentStatus.ISSUE_REPORTED) {
-            throw new RuntimeException("Chuyến hàng này không có báo cáo thiếu/lỗi!");
+            throw new RuntimeException("Chuyến hàng này không có báo cáo thiếu/lỗi để bù!");
         }
 
-        // Tạo Đơn hàng mới bằng Constructor thường (vì Entity của bạn không có @Builder)
-        Shipment replacementShipment = new Shipment();
+        // Tạo chuyến hàng Bù
+        Shipment replacementShipment = Shipment.builder()
+                .shipmentId(originalShipmentId + "-REP-" + System.currentTimeMillis() % 1000)
+                .shipmentType(Shipment.ShipmentType.REPLACEMENT)
+                .status(Shipment.ShipmentStatus.PENDING)
+                .coordinator(originalShipment.getCoordinator())
+                .shipmentDetails(new ArrayList<>())
+                .build();
 
-        // Tạo ID mới cho đơn bù (Ví dụ: ID gốc thêm chữ -REP)
-        replacementShipment.setShipmentId(originalShipmentId + "-REP");
+        // Lọc món bị thiếu để nhét vào chuyến Bù
+        for (ShipmentDetail oldDetail : originalShipment.getShipmentDetails()) {
+            int missingQty = oldDetail.getMissingQuantity();
+            if (missingQty > 0) {
+                ShipmentDetail newDetail = ShipmentDetail.builder()
+                        .shipment(replacementShipment)
+                        .product(oldDetail.getProduct())
+                        .productName(oldDetail.getProductName())
+                        .expectedQuantity(missingQty) // Số lượng giao bù = số lượng bị thiếu
+                        .receivedQuantity(0)
+                        .issueNote("Giao bù cho chuyến: " + originalShipmentId)
+                        .build();
+                replacementShipment.getShipmentDetails().add(newDetail);
+            }
+        }
 
-        replacementShipment.setShipmentType(Shipment.ShipmentType.REPLACEMENT);
-        replacementShipment.setStatus(Shipment.ShipmentStatus.PENDING);
-        replacementShipment.setCoordinator(originalShipment.getCoordinator());
-        replacementShipment.setOrders(new ArrayList<>());
+        if (replacementShipment.getShipmentDetails().isEmpty()) {
+            throw new RuntimeException("Không tìm thấy sản phẩm nào bị thiếu để tạo chuyến bù!");
+        }
 
-        // TODO: Viết logic lấy ra các Order bị thiếu từ đơn cũ nhét vào đơn mới ở đây
-
-        // Cập nhật đơn gốc
         originalShipment.setStatus(Shipment.ShipmentStatus.RESOLVED);
         originalShipment.setResolvedAt(LocalDateTime.now());
 
-        // Lưu Database
         shipmentRepository.save(originalShipment);
         shipmentRepository.save(replacementShipment);
 
