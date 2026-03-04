@@ -13,6 +13,7 @@ import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import com.groupSWP.centralkitchenplatform.service.inventory.ProductionService;
+import com.groupSWP.centralkitchenplatform.service.system.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,36 +36,37 @@ public class OrderService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final ProductionService productionService;
+    private final SystemConfigService systemConfigService;
 
     // =========================================================================
-    // HÀM TẠO ĐƠN TRỰC TIẾP "ALL IN ONE" (TÍCH HỢP RÀO CHẮN ERP)
+    // HÀM TẠO ĐƠN TRỰC TIẾP "ALL IN ONE" (TÍCH HỢP RÀO CHẮN ERP ĐỘNG)
     // =========================================================================
     @Transactional
     public OrderResponse createOrder(OrderRequest request, boolean isUrgent) {
 
         // --- 🛡️ 0. BẢO VỆ: CHỐNG ĐƠN HÀNG RỖNG ---
         if (request.getItems() == null || request.getItems().isEmpty()) {
-            throw new RuntimeException("Giỏ hàng đang trống! Sếp vui lòng chọn ít nhất 1 món trước khi chốt đơn nhé!");
+            throw new RuntimeException("Giỏ hàng đang trống! Vui lòng chọn ít nhất 1 món trước khi chốt đơn!");
         }
 
-        // --- ⚙️ 1. CẤU HÌNH ERP CHUẨN ---
+        // --- ⚙️ 1. LẤY CẤU HÌNH TỪ HỆ THỐNG (CACHE) CHUẨN ---
         LocalTime now = LocalTime.now();
-        LocalTime OPEN_TIME = LocalTime.of(8, 0);
-        LocalTime URGENT_CUTOFF = LocalTime.of(10, 30);   // Đã FIX: Gấp chốt 10h30
-        LocalTime STANDARD_CUTOFF = LocalTime.of(13, 0); // Thường chốt 13h00
-        BigDecimal URGENT_SURCHARGE = new BigDecimal("100000"); // 100k phụ phí
+        LocalTime OPEN_TIME = systemConfigService.getLocalTimeConfig("OPEN_TIME", "08:00");
+        LocalTime URGENT_CUTOFF = systemConfigService.getLocalTimeConfig("URGENT_CUTOFF_TIME", "10:30");
+        LocalTime STANDARD_CUTOFF = systemConfigService.getLocalTimeConfig("STANDARD_CUTOFF_TIME", "13:00");
+        BigDecimal URGENT_SURCHARGE = systemConfigService.getBigDecimalConfig("URGENT_SURCHARGE", "100000");
 
         // --- 🛑 2. RÀO CHẮN THỜI GIAN ---
         if (now.isBefore(OPEN_TIME)) {
-            throw new RuntimeException("Hệ thống chưa mở cửa (8:00 AM mới nhận đơn nha Sếp)!");
+            throw new RuntimeException("Hệ thống chưa mở cửa (" + OPEN_TIME + " AM mới nhận đơn nha)!");
         }
 
         if (isUrgent && now.isAfter(URGENT_CUTOFF)) {
-            throw new RuntimeException("Đã quá 10:30 AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
+            throw new RuntimeException("Đã quá " + URGENT_CUTOFF + " AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
         }
 
         if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) {
-            throw new RuntimeException("Đã quá 13:00 PM, vui lòng chờ mai đặt đơn THƯỜNG Sếp nhé!");
+            throw new RuntimeException("Đã quá " + STANDARD_CUTOFF + " PM, vui lòng chờ mai đặt đơn THƯỜNG nhé!");
         }
 
         Store store = storeRepository.findById(request.getStoreId())
@@ -92,7 +94,7 @@ public class OrderService {
         String prefix = "STD";
         if (isUrgent) {
             order.setOrderType(Order.OrderType.URGENT);
-            surcharge = URGENT_SURCHARGE;
+            surcharge = URGENT_SURCHARGE; // 🌟 Lấy phí từ Cache DB
             prefix = "URG";
         } else {
             order.setOrderType(Order.OrderType.STANDARD);
@@ -136,13 +138,13 @@ public class OrderService {
                 .orderId(savedOrder.getOrderId())
                 .status(savedOrder.getStatus().name())
                 .totalAmount(savedOrder.getTotalAmount())
-                .message(isUrgent ? "Tạo đơn KHẨN CẤP thành công (+100k phí)!" : "Tạo đơn TIÊU CHUẨN thành công!")
+                .message(isUrgent ? "Tạo đơn KHẨN CẤP thành công (+ " + URGENT_SURCHARGE + " VNĐ phí)!" : "Tạo đơn TIÊU CHUẨN thành công!")
                 .storeId(savedOrder.getStore().getStoreId())
                 .orderType(savedOrder.getOrderType())
                 .note(savedOrder.getNote())
                 .surcharge(savedOrder.getSurcharge())
-                .deliveryDate(savedOrder.getDeliveryDate())         // Hiển thị ngày giao
-                .deliveryWindow(savedOrder.getDeliveryWindow())     // Hiển thị ca giao
+                .deliveryDate(savedOrder.getDeliveryDate())
+                .deliveryWindow(savedOrder.getDeliveryWindow())
                 .items(savedOrder.getOrderItems().stream().map(item ->
                         OrderResponse.OrderItemDto.builder()
                                 .productId(item.getProduct().getProductId())
@@ -196,7 +198,7 @@ public class OrderService {
                 .storeId(order.getStore().getStoreId())
                 .orderType(order.getOrderType().name())
                 .status(order.getStatus().name())
-                .deliveryDate(order.getDeliveryDate()) // ĐÃ FIX: Map thêm ngày giao vào chi tiết đơn
+                .deliveryDate(order.getDeliveryDate())
                 .deliveryWindow(order.getDeliveryWindow() != null ? order.getDeliveryWindow().name() : null)
                 .note(order.getNote())
                 .totalAmount(order.getTotalAmount())
