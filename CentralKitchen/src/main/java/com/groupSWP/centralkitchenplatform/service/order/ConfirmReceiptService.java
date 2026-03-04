@@ -6,7 +6,6 @@ import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.product.Stock;
 import com.groupSWP.centralkitchenplatform.entities.product.StockKey;
-import com.groupSWP.centralkitchenplatform.repositories.order.OrderItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.StockRepository;
@@ -15,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -23,95 +22,92 @@ import java.util.List;
 public class ConfirmReceiptService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final StockRepository stockRepository;
     private final ShipmentRepository shipmentRepository;
 
     @Transactional
     public ConfirmReceiptResponse confirmReceipt(String orderId, boolean updateStock, String note) {
-
+        // 1. Tìm đơn hàng
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderId));
 
         Order.OrderStatus oldStatus = order.getStatus();
 
-        // Idempotent: DONE rồi thì thôi (tránh cộng kho 2 lần)
+        // 2. Kiểm tra Idempotent (Đã hoàn thành thì không làm gì thêm)
         if (oldStatus == Order.OrderStatus.DONE) {
-            log.info("ConfirmReceipt already confirmed order={} note={}", orderId, note);
-            return ConfirmReceiptResponse.builder()
-                    .orderId(orderId)
-                    .oldStatus(oldStatus.name())
-                    .newStatus(oldStatus.name())
-                    .stockUpdated(false)
-                    .shipmentCompleted(false)
-                    .message("Đơn đã được xác nhận trước đó")
-                    .build();
+            log.info("Order {} already confirmed", orderId);
+            return buildResponse(order, false, false, "Đơn đã được xác nhận trước đó");
         }
 
-        // Chỉ cho confirm khi đang giao
+        // 3. Chỉ cho phép xác nhận khi đang SHIPPING
         if (oldStatus != Order.OrderStatus.SHIPPING) {
-            throw new RuntimeException("Chỉ có thể xác nhận khi đơn đang SHIPPING");
+            throw new RuntimeException("Chỉ có thể xác nhận khi đơn đang SHIPPING. Trạng thái hiện tại: " + oldStatus);
         }
 
-        // 1) Update order -> DONE
+        // 4. Cập nhật Order -> DONE
         order.setStatus(Order.OrderStatus.DONE);
         orderRepository.save(order);
 
-        // 2) Optional: cộng kho
+        // 5. Cập nhật Stock (Nếu updateStock = true)
         boolean stockUpdated = false;
-        if (updateStock) {
-            // CẦN: orderItemRepository có method findByOrder_OrderId(String)
-            List<OrderItem> items = orderItemRepository.findByOrder_OrderId(orderId);
-
-            for (OrderItem item : items) {
+        if (updateStock && order.getOrderItems() != null) {
+            for (OrderItem item : order.getOrderItems()) {
                 String storeId = order.getStore().getStoreId();
                 String productId = item.getProduct().getProductId();
-
                 StockKey key = new StockKey(storeId, productId);
 
+                // Khởi tạo Stock mới nếu chưa có hoặc lấy từ DB
                 Stock stock = stockRepository.findById(key).orElseGet(() -> {
                     Stock s = new Stock();
                     s.setId(key);
                     s.setQuantity(0);
+                    s.setStore(order.getStore());   // Gán store từ order
+                    s.setProduct(item.getProduct()); // Gán product từ item
                     return s;
                 });
 
                 stock.setQuantity(stock.getQuantity() + item.getQuantity());
+                stock.setLastUpdated(LocalDateTime.now());
                 stockRepository.save(stock);
             }
             stockUpdated = true;
         }
 
-        // 3) Optional: hoàn tất shipment nếu mọi order trong shipment DONE
-        boolean shipmentCompleted = false;
-        if (order.getShipment() != null) {
-            String shipmentId = order.getShipment().getShipmentId();
+        // 6. Cập nhật Shipment (Nếu tất cả các đơn trong shipment đều đã DONE)
+        boolean shipmentCompleted = updateShipmentStatusIfAllOrdersDone(order);
 
-            boolean stillHasNotDone =
-                    orderRepository.existsByShipment_ShipmentIdAndStatusNot(shipmentId, Order.OrderStatus.DONE);
+        log.info("ConfirmReceipt success: order={}, stockUpdated={}, shipmentCompleted={}",
+                orderId, stockUpdated, shipmentCompleted);
 
-            if (!stillHasNotDone) {
-                // ⚠️ Nếu ShipmentRepository của bạn là <Shipment, UUID> thì sẽ lỗi.
-                //    Bạn cần ShipmentRepository extends JpaRepository<Shipment, String>
-                Shipment shipment = shipmentRepository.findById(shipmentId)
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy shipment: " + shipmentId));
+        return buildResponse(order, stockUpdated, shipmentCompleted, "Xác nhận nhập kho thành công");
+    }
 
-                shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
-                shipmentRepository.save(shipment);
-                shipmentCompleted = true;
-            }
+    private boolean updateShipmentStatusIfAllOrdersDone(Order order) {
+        if (order.getShipment() == null) return false;
+
+        String shipmentId = order.getShipment().getShipmentId();
+
+        // Kiểm tra xem còn đơn nào trong cùng Shipment mà chưa DONE không
+        boolean stillHasNotDone = orderRepository.existsByShipment_ShipmentIdAndStatusNot(
+                shipmentId, Order.OrderStatus.DONE);
+
+        if (!stillHasNotDone) {
+            Shipment shipment = order.getShipment();
+            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
+            shipmentRepository.save(shipment);
+            return true;
         }
+        return false;
+    }
 
-        log.info("ConfirmReceipt order={} old={} new={} stockUpdated={} shipmentCompleted={} note={}",
-                orderId, oldStatus, Order.OrderStatus.DONE, stockUpdated, shipmentCompleted, note);
-
+    private ConfirmReceiptResponse buildResponse(Order order, boolean stock, boolean ship, String msg) {
         return ConfirmReceiptResponse.builder()
-                .orderId(orderId)
-                .oldStatus(oldStatus.name())
-                .newStatus(Order.OrderStatus.DONE.name())
-                .stockUpdated(stockUpdated)
-                .shipmentCompleted(shipmentCompleted)
-                .message("Xác nhận nhập kho thành công")
+                .orderId(order.getOrderId())
+                .oldStatus(order.getStatus().name()) // Lưu ý: lúc này status đã là DONE nếu thành công
+                .newStatus(order.getStatus().name())
+                .stockUpdated(stock)
+                .shipmentCompleted(ship)
+                .message(msg)
                 .build();
     }
 }
