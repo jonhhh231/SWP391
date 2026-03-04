@@ -1,8 +1,8 @@
-package com.groupSWP.centralkitchenplatform.repositories.logistic;
-
-import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-@Repository
-public interface ShipmentDetailRepository extends JpaRepository<ShipmentDetail, Long> {}
+//package com.groupSWP.centralkitchenplatform.repositories.logistic;
+//
+//import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
+//import org.springframework.data.jpa.repository.JpaRepository;
+//import org.springframework.stereotype.Repository;
+//
+//@Repository
+//public interface ShipmentDetailRepository extends JpaRepository<ShipmentDetail, Long> {}

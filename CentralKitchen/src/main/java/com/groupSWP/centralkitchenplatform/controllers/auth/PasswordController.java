@@ -1,4 +1,4 @@
-package com.groupSWP.centralkitchenplatform.controllers;
+package com.groupSWP.centralkitchenplatform.controllers.auth;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.ChangePasswordRequest;
 import com.groupSWP.centralkitchenplatform.service.PasswordService;
