@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -14,6 +15,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Shipment extends BaseEntity {
     @Id
     private String shipmentId;
@@ -33,6 +35,10 @@ public class Shipment extends BaseEntity {
 
     @OneToMany(mappedBy = "shipment")
     private List<Order> orders;
+
+    @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default// Thêm cái này nếu dùng @Builder để tránh list bị null
+    private List<ShipmentDetail> shipmentDetails = new ArrayList<>();
 
     public enum ShipmentStatus {
         PENDING,       // Chờ xử lý
