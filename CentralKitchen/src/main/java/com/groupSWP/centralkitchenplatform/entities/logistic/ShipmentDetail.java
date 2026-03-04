@@ -15,7 +15,7 @@ public class ShipmentDetail {
     @JoinColumn(name = "shipment_id")
     private Shipment shipment;
 
-    private Long productId; // ID của món ăn hoặc nguyên liệu
+    private String productId; // ID của món ăn hoặc nguyên liệu
     private String productName;
 
     private int expectedQuantity; // Số lượng xuất kho đi (Bếp gửi đi 10)

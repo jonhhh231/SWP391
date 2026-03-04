@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
@@ -16,5 +17,6 @@ public class SystemConfig extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by")
+    @JsonIgnore
     private SystemUser updatedBy;
 }
