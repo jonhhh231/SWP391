@@ -3,7 +3,10 @@ package com.groupSWP.centralkitchenplatform.service.inventory;
 import com.groupSWP.centralkitchenplatform.dto.logistics.AllocateRoutesRequest;
 import com.groupSWP.centralkitchenplatform.dto.logistics.RouteAllocationResponse;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
+import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
+import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
+import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentDetailRepository;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,21 +23,16 @@ public class RouteAllocationService {
 
     private final OrderRepository orderRepository;
     private final ShipmentRepository shipmentRepository;
+    // [THÊM MỚI 1]
+    private final ShipmentDetailRepository shipmentDetailRepository;
 
     @Transactional
     public RouteAllocationResponse allocate(AllocateRoutesRequest req) {
         LocalDate today = LocalDate.now();
 
-        int maxOrdersPerTrip = (req != null && req.getMaxOrdersPerTrip() != null)
-                ? req.getMaxOrdersPerTrip()
-                : 10;
+        int maxOrdersPerTrip = (req != null && req.getMaxOrdersPerTrip() != null) ? req.getMaxOrdersPerTrip() : 10;
+        int maxUrgentPerTrip = (req != null && req.getMaxUrgentPerTrip() != null) ? req.getMaxUrgentPerTrip() : 2;
 
-        int maxUrgentPerTrip = (req != null && req.getMaxUrgentPerTrip() != null)
-                ? req.getMaxUrgentPerTrip()
-                : 2;
-
-        // IMPORTANT: Order entity của bạn không có deliveryDate, nên deliveryDate trong request hiện chưa dùng.
-        // Đang lọc theo status + shipment is null (đúng với schema hiện tại).
         List<Order> candidates = orderRepository.findByStatusAndShipmentIsNull(Order.OrderStatus.AGGREGATED);
 
         List<Order> urgent = candidates.stream()
@@ -59,7 +57,6 @@ public class RouteAllocationService {
 
     private int allocateUrgent(List<Order> urgentOrders, int maxUrgentPerTrip, LocalDate today) {
         if (urgentOrders.isEmpty()) return 0;
-
         int tripsCreated = 0;
 
         for (int i = 0; i < urgentOrders.size(); i += maxUrgentPerTrip) {
@@ -67,21 +64,46 @@ public class RouteAllocationService {
 
             Shipment shipment = new Shipment();
             shipment.setShipmentId(UUID.randomUUID().toString());
-            shipment.setDeliveryDate(today.atTime(14, 0)); // urgent: giao chiều trong ngày (bạn chỉnh giờ tùy nghiệp vụ)
+            shipment.setDeliveryDate(today.atTime(14, 0));
             shipment.setStatus(Shipment.ShipmentStatus.PENDING);
-            shipment.setShipmentType(Shipment.ShipmentType.STANDARD);
+            shipment.setShipmentType(Shipment.ShipmentType.STANDARD); // Có thể đổi thành URGENT nếu Entity bạn có
 
-            // FIX: persist shipment trước + flush để đảm bảo nó là "persistent"
             Shipment savedShipment = shipmentRepository.saveAndFlush(shipment);
+
+            // [THÊM MỚI 2] Tạo Phiếu xuất kho tổng cho chuyến xe này
+            Map<String, ShipmentDetail> detailMap = new HashMap<>();
 
             for (Order o : batch) {
                 o.setShipment(savedShipment);
-                o.setStatus(Order.OrderStatus.SHIPPING);
+                o.setStatus(Order.OrderStatus.SHIPPING); // Hoặc ALLOCATED
+
+                // [THÊM MỚI 3] Lặp qua các món ăn trong đơn để cộng dồn
+                if (o.getOrderItems() != null) {
+                    for (OrderItem item : o.getOrderItems()) {
+                        String productId = item.getProduct().getProductId();
+
+                        // Nếu món này chưa có trên xe -> Tạo dòng mới. Có rồi -> Lấy ra cộng dồn.
+                        ShipmentDetail detail = detailMap.getOrDefault(productId, ShipmentDetail.builder()
+                                .shipment(savedShipment)
+                                .product(item.getProduct())
+                                .productName(item.getProduct().getProductName())
+                                .expectedQuantity(0)
+                                .receivedQuantity(0)
+                                .build());
+
+                        // Cộng dồn số lượng
+                        detail.setExpectedQuantity(detail.getExpectedQuantity() + item.getQuantity());
+                        detailMap.put(productId, detail);
+                    }
+                }
             }
 
-            // FIX: save orders + flush
             orderRepository.saveAll(batch);
-            orderRepository.flush();
+
+            // [THÊM MỚI 4] Lưu toàn bộ chi tiết xuất kho xuống DB
+            if (!detailMap.isEmpty()) {
+                shipmentDetailRepository.saveAll(detailMap.values());
+            }
 
             tripsCreated++;
         }
@@ -93,10 +115,7 @@ public class RouteAllocationService {
         if (standardOrders.isEmpty()) return 0;
 
         Map<String, List<Order>> grouped = standardOrders.stream()
-                .collect(Collectors.groupingBy(o -> {
-                    if (o.getStore() == null) return "UNKNOWN";
-                    return safeStoreKey(o);
-                }));
+                .collect(Collectors.groupingBy(o -> safeStoreKey(o)));
 
         int tripsCreated = 0;
 
@@ -106,21 +125,44 @@ public class RouteAllocationService {
 
                 Shipment shipment = new Shipment();
                 shipment.setShipmentId(UUID.randomUUID().toString());
-                shipment.setDeliveryDate(today.atTime(22, 0)); // standard: chốt đơn 14h, giao 22h đêm nay // standard: sáng ngày mai
+                shipment.setDeliveryDate(today.atTime(22, 0));
                 shipment.setStatus(Shipment.ShipmentStatus.PENDING);
                 shipment.setShipmentType(Shipment.ShipmentType.STANDARD);
 
-                // FIX: persist shipment trước + flush
                 Shipment savedShipment = shipmentRepository.saveAndFlush(shipment);
+
+                // [THÊM MỚI 2] Tạo Phiếu xuất kho tổng cho chuyến xe
+                Map<String, ShipmentDetail> detailMap = new HashMap<>();
 
                 for (Order o : batch) {
                     o.setShipment(savedShipment);
                     o.setStatus(Order.OrderStatus.SHIPPING);
+
+                    // [THÊM MỚI 3] Cộng dồn món ăn
+                    if (o.getOrderItems() != null) {
+                        for (OrderItem item : o.getOrderItems()) {
+                            String productId = item.getProduct().getProductId();
+
+                            ShipmentDetail detail = detailMap.getOrDefault(productId, ShipmentDetail.builder()
+                                    .shipment(savedShipment)
+                                    .product(item.getProduct())
+                                    .productName(item.getProduct().getProductName())
+                                    .expectedQuantity(0)
+                                    .receivedQuantity(0)
+                                    .build());
+
+                            detail.setExpectedQuantity(detail.getExpectedQuantity() + item.getQuantity());
+                            detailMap.put(productId, detail);
+                        }
+                    }
                 }
 
-                // FIX: save orders + flush
                 orderRepository.saveAll(batch);
-                orderRepository.flush();
+
+                // [THÊM MỚI 4] Lưu chi tiết xuất kho
+                if (!detailMap.isEmpty()) {
+                    shipmentDetailRepository.saveAll(detailMap.values());
+                }
 
                 tripsCreated++;
             }
@@ -129,12 +171,10 @@ public class RouteAllocationService {
         return tripsCreated;
     }
 
+    // [THÊM MỚI 5] Sửa lại hàm an toàn, bỏ Reflection
     private String safeStoreKey(Order o) {
-        // Bạn đang dùng findByStore_StoreId... => Store có getStoreId() là hợp lý.
-        try {
-            return (String) o.getStore().getClass().getMethod("getStoreId").invoke(o.getStore());
-        } catch (Exception e) {
-            return "STORE";
-        }
+        return (o.getStore() != null && o.getStore().getStoreId() != null)
+                ? o.getStore().getStoreId()
+                : "UNKNOWN_STORE";
     }
 }
