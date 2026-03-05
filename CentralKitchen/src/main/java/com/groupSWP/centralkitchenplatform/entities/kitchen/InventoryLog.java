@@ -17,7 +17,7 @@ public class InventoryLog {
 
     // 🔥 UPDATE: Trỏ cứng về Lô hàng bị trừ (Thay vì Long importItemId)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "import_item_id", nullable = false)
+    @JoinColumn(name = "import_item_id")
     private ImportItem importItem;
 
     // 🔥 UPDATE: Trỏ cứng về Nguyên liệu (Thay vì String ingredientId)
@@ -37,4 +37,7 @@ public class InventoryLog {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "reference_code")
+    private String referenceCode;
 }
