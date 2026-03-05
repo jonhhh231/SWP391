@@ -31,7 +31,7 @@ public class ConfirmReceiptService {
     public ConfirmReceiptResponse confirmReceipt(String orderId, boolean updateStock, String note) {
 
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng: " + orderId));
 
         Order.OrderStatus oldStatus = order.getStatus();
 
@@ -50,7 +50,7 @@ public class ConfirmReceiptService {
 
         // Chỉ cho confirm khi đang giao
         if (oldStatus != Order.OrderStatus.SHIPPING) {
-            throw new RuntimeException("Chỉ có thể xác nhận khi đơn đang SHIPPING");
+            throw new IllegalArgumentException("Chỉ có thể xác nhận khi đơn đang SHIPPING. Trạng thái hiện tại: " + oldStatus.name());
         }
 
         // 1) Update order -> DONE
@@ -97,7 +97,7 @@ public class ConfirmReceiptService {
                 // ⚠️ Nếu ShipmentRepository của bạn là <Shipment, UUID> thì sẽ lỗi.
                 //    Bạn cần ShipmentRepository extends JpaRepository<Shipment, String>
                 Shipment shipment = shipmentRepository.findById(shipmentId)
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy shipment: " + shipmentId));
+                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy shipment: " + shipmentId));
 
                 shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
                 shipmentRepository.save(shipment);
