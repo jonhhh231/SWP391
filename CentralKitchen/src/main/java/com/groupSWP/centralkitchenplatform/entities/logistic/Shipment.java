@@ -41,6 +41,8 @@ public class Shipment extends BaseEntity {
     private List<ShipmentDetail> shipmentDetails = new ArrayList<>();
 
     public enum ShipmentStatus {
+
+        NEW,           // Bắt buộc thêm: Để đọc được data chữ 'NEW' dưới Database không bị văng lỗi
         PENDING,       // Chờ xử lý
         SHIPPING,      // Đang giao
         DELIVERED,     // Đã giao đủ
@@ -50,7 +52,9 @@ public class Shipment extends BaseEntity {
 
     public enum ShipmentType {
         STANDARD,      // Đơn giao hàng bình thường
-        REPLACEMENT
+        REPLACEMENT,   // Đơn bù
+        MAIN_ROUTE,
+        EXPRESS_ROUTE
     }
     private LocalDateTime resolvedAt;
 }

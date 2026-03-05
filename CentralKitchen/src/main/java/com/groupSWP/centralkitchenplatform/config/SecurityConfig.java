@@ -35,6 +35,7 @@ public class SecurityConfig {
                         // --- 1. CÔNG KHAI ---
                         .requestMatchers("/api/auth/**").permitAll()
 
+
                         // --- 2. ADMIN & MANAGER (Sếp to) ---
                         // Admin đi đâu cũng được
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

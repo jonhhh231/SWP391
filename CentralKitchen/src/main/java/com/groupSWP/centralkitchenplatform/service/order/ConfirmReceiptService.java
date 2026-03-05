@@ -29,23 +29,26 @@ public class ConfirmReceiptService {
     public ConfirmReceiptResponse confirmReceipt(String orderId, boolean updateStock, String note) {
         // 1. Tìm đơn hàng
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng: " + orderId)); // Sửa thành IllegalArgumentException
 
         Order.OrderStatus oldStatus = order.getStatus();
 
         // 2. Kiểm tra Idempotent (Đã hoàn thành thì không làm gì thêm)
         if (oldStatus == Order.OrderStatus.DONE) {
             log.info("Order {} already confirmed", orderId);
-            return buildResponse(order, false, false, "Đơn đã được xác nhận trước đó");
+            return buildResponse(order, oldStatus.name(), false, false, "Đơn đã được xác nhận trước đó");
         }
 
         // 3. Chỉ cho phép xác nhận khi đang SHIPPING
         if (oldStatus != Order.OrderStatus.SHIPPING) {
-            throw new RuntimeException("Chỉ có thể xác nhận khi đơn đang SHIPPING. Trạng thái hiện tại: " + oldStatus);
+            throw new IllegalArgumentException("Chỉ có thể xác nhận khi đơn đang SHIPPING. Trạng thái hiện tại: " + oldStatus);
         }
 
-        // 4. Cập nhật Order -> DONE
+        // 4. Cập nhật Order -> DONE và lưu Ghi chú
         order.setStatus(Order.OrderStatus.DONE);
+        if (note != null && !note.trim().isEmpty()) {
+            order.setNote(note); // Vớt lại cái ghi chú FE gửi lên
+        }
         orderRepository.save(order);
 
         // 5. Cập nhật Stock (Nếu updateStock = true)
@@ -60,12 +63,13 @@ public class ConfirmReceiptService {
                 Stock stock = stockRepository.findById(key).orElseGet(() -> {
                     Stock s = new Stock();
                     s.setId(key);
-                    s.setQuantity(0);
-                    s.setStore(order.getStore());   // Gán store từ order
-                    s.setProduct(item.getProduct()); // Gán product từ item
+                    s.setQuantity(0); // Nếu DB dùng BigDecimal thì nhớ đổi thành BigDecimal.ZERO nhé
+                    s.setStore(order.getStore());
+                    s.setProduct(item.getProduct());
                     return s;
                 });
 
+                // Chú ý: Cứ giả định Quantity của bạn là Integer, nếu là BigDecimal thì dùng .add()
                 stock.setQuantity(stock.getQuantity() + item.getQuantity());
                 stock.setLastUpdated(LocalDateTime.now());
                 stockRepository.save(stock);
@@ -79,7 +83,8 @@ public class ConfirmReceiptService {
         log.info("ConfirmReceipt success: order={}, stockUpdated={}, shipmentCompleted={}",
                 orderId, stockUpdated, shipmentCompleted);
 
-        return buildResponse(order, stockUpdated, shipmentCompleted, "Xác nhận nhập kho thành công");
+        // 7. Truyền đúng oldStatus.name() vào để FE hiển thị chuẩn
+        return buildResponse(order, oldStatus.name(), stockUpdated, shipmentCompleted, "Xác nhận nhập kho thành công");
     }
 
     private boolean updateShipmentStatusIfAllOrdersDone(Order order) {
@@ -93,18 +98,19 @@ public class ConfirmReceiptService {
 
         if (!stillHasNotDone) {
             Shipment shipment = order.getShipment();
-            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
+            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED); // Giả định có enum DELIVERED
             shipmentRepository.save(shipment);
             return true;
         }
         return false;
     }
 
-    private ConfirmReceiptResponse buildResponse(Order order, boolean stock, boolean ship, String msg) {
+    // Sửa lại hàm này để nhận biến oldStatusString
+    private ConfirmReceiptResponse buildResponse(Order order, String oldStatusString, boolean stock, boolean ship, String msg) {
         return ConfirmReceiptResponse.builder()
                 .orderId(order.getOrderId())
-                .oldStatus(order.getStatus().name()) // Lưu ý: lúc này status đã là DONE nếu thành công
-                .newStatus(order.getStatus().name())
+                .oldStatus(oldStatusString) // Đã sửa lỗi hiển thị sai
+                .newStatus(order.getStatus().name()) // Lúc này sẽ là DONE
                 .stockUpdated(stock)
                 .shipmentCompleted(ship)
                 .message(msg)
