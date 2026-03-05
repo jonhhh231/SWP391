@@ -13,6 +13,7 @@ import com.groupSWP.centralkitchenplatform.entities.cart.CartItemKey;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
+import com.groupSWP.centralkitchenplatform.repositories.order.CartItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.order.CartRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,127 +33,184 @@ import java.util.stream.Collectors;
 public class CartService {
 
     private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final AccountRepository accountRepository;
+
+    // 🛡️ Bơm OrderService vào để "ký gửi" việc tạo đơn
     private final OrderService orderService;
 
-    // Helper: Tìm Store từ username
-    private Store getStore(String username) {
-        return accountRepository.findByUsername(username)
-                .map(Account::getStore)
-                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại hoặc chưa gán Cửa hàng!"));
+    // =======================================================
+    // HÀM HELPER: TÌM CỬA HÀNG TỪ USERNAME ĐĂNG NHẬP
+    // =======================================================
+    private Store getStoreByUsername(String username) {
+        Account account = accountRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại trong hệ thống!"));
+
+        Store store = account.getStore();
+        if (store == null) {
+            throw new RuntimeException("Tài khoản này chưa được cấp quyền quản lý Cửa hàng nào!");
+        }
+        return store;
     }
 
-    // Helper: Lấy hoặc tạo Cart
+    // =======================================================
+    // 1. LẤY HOẶC TẠO GIỎ HÀNG CHO CỬA HÀNG (ĐƠN NHÁP)
+    // =======================================================
     private Cart getOrCreateCart(Store store) {
-        return cartRepository.findByStore_StoreId(store.getStoreId()).orElseGet(() ->
-                cartRepository.save(Cart.builder()
-                        .cartId("CART-" + store.getStoreId())
-                        .store(store)
-                        .lastUpdated(LocalDateTime.now())
-                        .items(new ArrayList<>())
-                        .build())
-        );
+        return cartRepository.findByStore_StoreId(store.getStoreId()).orElseGet(() -> {
+            Cart newCart = Cart.builder()
+                    .cartId("CART-" + store.getStoreId())
+                    .store(store)
+                    .lastUpdated(LocalDateTime.now())
+                    .build();
+            return cartRepository.save(newCart);
+        });
     }
 
+    // =======================================================
+    // 2. THÊM MÓN VÀO GIỎ HÀNG
+    // =======================================================
     @Transactional
     public void addToCart(String username, AddToCartRequest request) {
-        Cart cart = getOrCreateCart(getStore(username));
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
-        // Tìm xem sản phẩm đã có trong giỏ chưa
-        CartItem cartItem = cart.getItems().stream()
-                .filter(item -> item.getProduct().getProductId().equals(request.getProductId()))
-                .findFirst()
-                .orElseGet(() -> {
-                    CartItem newItem = CartItem.builder()
-                            .id(new CartItemKey(cart.getCartId(), product.getProductId()))
-                            .cart(cart).product(product).quantity(0).build();
-                    cart.getItems().add(newItem);
-                    return newItem;
-                });
+        CartItemKey key = new CartItemKey(cart.getCartId(), product.getProductId());
+
+        CartItem cartItem = cartItemRepository.findById(key).orElse(
+                CartItem.builder()
+                        .id(key)
+                        .cart(cart)
+                        .product(product)
+                        .quantity(0)
+                        .build()
+        );
 
         cartItem.setQuantity(cartItem.getQuantity() + request.getQuantity());
+        cartItemRepository.save(cartItem);
+
         cart.setLastUpdated(LocalDateTime.now());
         cartRepository.save(cart);
     }
 
+    // =======================================================
+    // 3. XEM GIỎ HÀNG (VIEW CART)
+    // =======================================================
     public CartResponse getCart(String username) {
-        Store store = getStore(username);
+        Store store = getStoreByUsername(username);
         Cart cart = getOrCreateCart(store);
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
 
-        List<CartResponse.CartItemDto> itemDtos = cart.getItems().stream().map(item -> {
-            BigDecimal subTotal = item.getProduct().getSellingPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            return CartResponse.CartItemDto.builder()
-                    .productId(item.getProduct().getProductId())
-                    .productName(item.getProduct().getProductName())
+        List<CartResponse.CartItemDto> itemDtos = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (CartItem item : cartItems) {
+            Product product = item.getProduct();
+            BigDecimal subTotal = product.getSellingPrice().multiply(new BigDecimal(item.getQuantity()));
+            totalAmount = totalAmount.add(subTotal);
+
+            itemDtos.add(CartResponse.CartItemDto.builder()
+                    .productId(product.getProductId())
+                    .productName(product.getProductName())
                     .quantity(item.getQuantity())
-                    .unitPrice(item.getProduct().getSellingPrice())
+                    .unitPrice(product.getSellingPrice())
                     .subTotal(subTotal)
-                    .build();
-        }).collect(Collectors.toList());
+                    .build());
+        }
 
-        BigDecimal total = itemDtos.stream().map(CartResponse.CartItemDto::getSubTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return CartResponse.builder().cartId(cart.getCartId()).storeId(store.getStoreId()).items(itemDtos).totalAmount(total).build();
+        return CartResponse.builder()
+                .cartId(cart.getCartId())
+                .storeId(store.getStoreId())
+                .items(itemDtos)
+                .totalAmount(totalAmount)
+                .build();
     }
 
+    // =======================================================
+    // 4. CHỐT ĐƠN TỪ GIỎ HÀNG (ỦY QUYỀN CHO ORDER SERVICE)
+    // =======================================================
     @Transactional
     public OrderResponse checkoutCart(String username, CheckoutRequest request) {
-        Store store = getStore(username);
-        Cart cart = cartRepository.findByStore_StoreId(store.getStoreId())
-                .filter(c -> !c.getItems().isEmpty())
-                .orElseThrow(() -> new RuntimeException("Giỏ hàng đang trống!"));
+        Store store = getStoreByUsername(username);
 
-        // Map sang OrderRequest (Sử dụng Constructor 2 tham số đã sửa ở bước trước)
+        // 4.1. Lấy giỏ hàng ra
+        Cart cart = cartRepository.findByStore_StoreId(store.getStoreId())
+                .orElseThrow(() -> new RuntimeException("Giỏ hàng đang trống, không có gì để chốt!"));
+
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Chưa có món nào trong giỏ hàng cả Sếp ơi!");
+        }
+
+        // 4.2. ÉP KIỂU TỪ GIỎ HÀNG SANG ORDER REQUEST
         OrderRequest orderReq = new OrderRequest();
         orderReq.setStoreId(store.getStoreId());
         orderReq.setNote(request.getNote());
-        orderReq.setItems(cart.getItems().stream().map(i ->
-                new OrderRequest.OrderItemRequest(i.getProduct().getProductId(), i.getQuantity())
-        ).collect(Collectors.toList()));
 
-        OrderResponse response = orderService.createOrder(orderReq, request.getOrderType() == Order.OrderType.URGENT);
+        // LƯU Ý: Nếu CheckoutRequest của Sếp có trường deliveryWindow thì get vào đây,
+        // không có thì truyền null cũng không sao vì OrderService đã có logic lo vụ này
+        // orderReq.setDeliveryWindow(request.getDeliveryWindow());
 
-        // Xóa giỏ hàng sau khi checkout
-        cart.getItems().clear();
-        cartRepository.save(cart);
+        List<OrderRequest.OrderItemRequest> itemReqs = cartItems.stream().map(cItem -> {
+            OrderRequest.OrderItemRequest i = new OrderRequest.OrderItemRequest();
+            i.setProductId(cItem.getProduct().getProductId());
+            i.setQuantity(cItem.getQuantity());
+            return i;
+        }).collect(Collectors.toList());
+
+        orderReq.setItems(itemReqs);
+
+        // 4.3. CHUYỂN PHÁT NHANH SANG ORDER SERVICE XỬ LÝ (Tận dụng rào chắn ERP)
+        boolean isUrgent = (request.getOrderType() == Order.OrderType.URGENT);
+        OrderResponse response = orderService.createOrder(orderReq, isUrgent);
+
+        // 4.4. DỌN SẠCH GIỎ HÀNG SAU KHI CHỐT THÀNH CÔNG
+        cartItemRepository.deleteByCart_CartId(cart.getCartId());
+        log.info("Cửa hàng {} đã chốt Giỏ hàng thành Đơn thật thành công! Mã đơn: {}", store.getStoreId(), response.getOrderId());
 
         return response;
     }
 
+    // =======================================================
+    // 5. CẬP NHẬT SỐ LƯỢNG MÓN TRONG GIỎ
+    // =======================================================
     @Transactional
     public void updateCartItem(String username, String productId, Integer newQuantity) {
-        Cart cart = getOrCreateCart(getStore(username));
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
 
-        // Nếu quantity <= 0 thì xóa luôn
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
         if (newQuantity <= 0) {
-            removeCartItem(username, productId);
-            return;
+            cartItemRepository.delete(cartItem);
+        } else {
+            cartItem.setQuantity(newQuantity);
+            cartItemRepository.save(cartItem);
         }
-
-        cart.getItems().stream()
-                .filter(item -> item.getProduct().getProductId().equals(productId))
-                .findFirst()
-                .ifPresentOrElse(
-                        item -> item.setQuantity(newQuantity),
-                        () -> { throw new RuntimeException("Không tìm thấy sản phẩm trong giỏ!"); }
-                );
 
         cart.setLastUpdated(LocalDateTime.now());
         cartRepository.save(cart);
     }
 
-    // THÊM LẠI HÀM NÀY ĐỂ FIX LỖI Ở CONTROLLER
+    // =======================================================
+    // 6. XÓA HẲN MÓN KHỎI GIỎ HÀNG
+    // =======================================================
     @Transactional
     public void removeCartItem(String username, String productId) {
-        Cart cart = getOrCreateCart(getStore(username));
-        boolean removed = cart.getItems().removeIf(item -> item.getProduct().getProductId().equals(productId));
+        Store store = getStoreByUsername(username);
+        Cart cart = getOrCreateCart(store);
 
-        if (!removed) {
-            throw new RuntimeException("Sản phẩm không tồn tại trong giỏ hàng!");
-        }
+        CartItemKey key = new CartItemKey(cart.getCartId(), productId);
+        CartItem cartItem = cartItemRepository.findById(key)
+                .orElseThrow(() -> new RuntimeException("Sản phẩm này không có trong giỏ hàng!"));
+
+        cartItemRepository.delete(cartItem);
 
         cart.setLastUpdated(LocalDateTime.now());
         cartRepository.save(cart);
