@@ -55,6 +55,7 @@ public class ConfirmReceiptService {
 
         // 1) Update order -> DONE
         order.setStatus(Order.OrderStatus.DONE);
+        if (note != null) order.setNote(note); // <--- Thêm dòng này để không mất ghi chú
         orderRepository.save(order);
 
         // 2) Optional: cộng kho
@@ -73,6 +74,8 @@ public class ConfirmReceiptService {
                     Stock s = new Stock();
                     s.setId(key);
                     s.setQuantity(0);
+                    s.setStore(order.getStore());   // <--- Bổ sung dòng này
+                    s.setProduct(item.getProduct()); // <--- Bổ sung dòng này
                     return s;
                 });
 
