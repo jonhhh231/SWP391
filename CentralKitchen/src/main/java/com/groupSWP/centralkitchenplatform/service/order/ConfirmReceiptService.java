@@ -27,27 +27,39 @@ public class ConfirmReceiptService {
 
     @Transactional
     public ConfirmReceiptResponse confirmReceipt(String orderId, boolean updateStock, String note) {
+
         // 1. Tìm đơn hàng
+        // 🚨 TẠI SAO SỬA 1: Đổi `RuntimeException` thành `IllegalArgumentException`.
+        // Lý do: Nếu dùng RuntimeException, Spring Boot sẽ quăng lỗi 500 (Server Error) đỏ lòm.
+        // Đổi sang IllegalArgumentException thì cái file GlobalExceptionHandler tụi mình vừa viết
+        // mới bắt được và ném về FE file JSON lỗi 400 siêu đẹp.
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng: " + orderId)); // Sửa thành IllegalArgumentException
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng: " + orderId));
 
         Order.OrderStatus oldStatus = order.getStatus();
 
         // 2. Kiểm tra Idempotent (Đã hoàn thành thì không làm gì thêm)
         if (oldStatus == Order.OrderStatus.DONE) {
             log.info("Order {} already confirmed", orderId);
+            // 🚨 TẠI SAO SỬA 2: Truyền thẳng `oldStatus.name()` vào hàm buildResponse.
+            // Code cũ của bạn không truyền, nên FE sẽ không biết trạng thái cũ là gì.
             return buildResponse(order, oldStatus.name(), false, false, "Đơn đã được xác nhận trước đó");
         }
 
         // 3. Chỉ cho phép xác nhận khi đang SHIPPING
         if (oldStatus != Order.OrderStatus.SHIPPING) {
+            // 🚨 TẠI SAO SỬA 1 (Lặp lại): Đổi để bắt lỗi đẹp cho FE.
             throw new IllegalArgumentException("Chỉ có thể xác nhận khi đơn đang SHIPPING. Trạng thái hiện tại: " + oldStatus);
         }
 
-        // 4. Cập nhật Order -> DONE và lưu Ghi chú
+        // 4. Cập nhật Order -> DONE
         order.setStatus(Order.OrderStatus.DONE);
+
+        // 🚨 TẠI SAO SỬA 3: Vớt lại biến `note`.
+        // Lý do: Code cũ của bạn có nhận tham số `String note` nhưng lại không hề gọi `order.setNote()`.
+        // Nếu không có đoạn này, ghi chú của cửa hàng gửi lên sẽ rơi vào hư vô, Database không lưu được.
         if (note != null && !note.trim().isEmpty()) {
-            order.setNote(note); // Vớt lại cái ghi chú FE gửi lên
+            order.setNote(note);
         }
         orderRepository.save(order);
 
@@ -59,17 +71,19 @@ public class ConfirmReceiptService {
                 String productId = item.getProduct().getProductId();
                 StockKey key = new StockKey(storeId, productId);
 
-                // Khởi tạo Stock mới nếu chưa có hoặc lấy từ DB
                 Stock stock = stockRepository.findById(key).orElseGet(() -> {
                     Stock s = new Stock();
                     s.setId(key);
-                    s.setQuantity(0); // Nếu DB dùng BigDecimal thì nhớ đổi thành BigDecimal.ZERO nhé
+                    // 💡 LƯU Ý NHỎ: Nếu biến Quantity của bạn là kiểu int/double thì gán 0 là đúng.
+                    // Nhưng nếu DB bạn thiết kế kiểu BigDecimal thì chỗ này phải đổi thành BigDecimal.ZERO nhé!
+                    s.setQuantity(0);
                     s.setStore(order.getStore());
                     s.setProduct(item.getProduct());
                     return s;
                 });
 
-                // Chú ý: Cứ giả định Quantity của bạn là Integer, nếu là BigDecimal thì dùng .add()
+                // 💡 LƯU Ý NHỎ: Tương tự, nếu dùng BigDecimal thì phải đổi thành:
+                // stock.setQuantity(stock.getQuantity().add(item.getQuantity()));
                 stock.setQuantity(stock.getQuantity() + item.getQuantity());
                 stock.setLastUpdated(LocalDateTime.now());
                 stockRepository.save(stock);
@@ -83,7 +97,7 @@ public class ConfirmReceiptService {
         log.info("ConfirmReceipt success: order={}, stockUpdated={}, shipmentCompleted={}",
                 orderId, stockUpdated, shipmentCompleted);
 
-        // 7. Truyền đúng oldStatus.name() vào để FE hiển thị chuẩn
+        // 🚨 TẠI SAO SỬA 4: Bắt buộc phải truyền `oldStatus.name()` vào hàm buildResponse.
         return buildResponse(order, oldStatus.name(), stockUpdated, shipmentCompleted, "Xác nhận nhập kho thành công");
     }
 
@@ -92,25 +106,28 @@ public class ConfirmReceiptService {
 
         String shipmentId = order.getShipment().getShipmentId();
 
-        // Kiểm tra xem còn đơn nào trong cùng Shipment mà chưa DONE không
         boolean stillHasNotDone = orderRepository.existsByShipment_ShipmentIdAndStatusNot(
                 shipmentId, Order.OrderStatus.DONE);
 
         if (!stillHasNotDone) {
             Shipment shipment = order.getShipment();
-            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED); // Giả định có enum DELIVERED
+            shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
             shipmentRepository.save(shipment);
             return true;
         }
         return false;
     }
 
-    // Sửa lại hàm này để nhận biến oldStatusString
+    // 🚨 TẠI SAO SỬA 4 (Tiếp theo): Sửa lại tham số đầu vào của hàm này để nhận `oldStatusString`.
+    // Lý do: Code cũ của bạn gọi `.oldStatus(order.getStatus().name())`. Mà ở Bước 4 tụi mình đã
+    // lỡ set nó thành DONE rồi. Nên nếu dùng code cũ, FE sẽ nhận được câu báo lỗi ngớ ngẩn:
+    // "Trạng thái cũ là DONE, trạng thái mới là DONE". Truyền biến cũ vào thì nó mới báo đúng là
+    // "Từ SHIPPING chuyển sang DONE".
     private ConfirmReceiptResponse buildResponse(Order order, String oldStatusString, boolean stock, boolean ship, String msg) {
         return ConfirmReceiptResponse.builder()
                 .orderId(order.getOrderId())
-                .oldStatus(oldStatusString) // Đã sửa lỗi hiển thị sai
-                .newStatus(order.getStatus().name()) // Lúc này sẽ là DONE
+                .oldStatus(oldStatusString)
+                .newStatus(order.getStatus().name())
                 .stockUpdated(stock)
                 .shipmentCompleted(ship)
                 .message(msg)
