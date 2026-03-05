@@ -9,13 +9,13 @@ import java.math.BigDecimal;
 @Data
 public class WastageRequest {
 
-    @NotBlank(message = "run_id (Mã mẻ nấu) không được để trống")
+    @NotBlank(message = "Vui lòng cung cấp mã mẻ nấu.")
     private String runId;
 
-    @NotNull(message = "Số lượng hao hụt không được để trống")
-    @Positive(message = "Số lượng hao hụt (waste_qty) phải lớn hơn 0")
+    @NotNull(message = "Vui lòng nhập số lượng hao hụt.")
+    @Positive(message = "Số lượng hao hụt phải lớn hơn 0.")
     private BigDecimal wasteQty;
 
-    @NotBlank(message = "Bắt buộc phải nhập lý do hao hụt (VD: Cháy, đổ, sai công thức...)")
+    @NotBlank(message = "Vui lòng nhập nguyên nhân hao hụt (VD: Cháy khét, đổ vỡ, sai công thức...).")
     private String reason;
 }
