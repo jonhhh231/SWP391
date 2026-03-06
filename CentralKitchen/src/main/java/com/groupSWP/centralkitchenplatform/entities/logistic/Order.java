@@ -44,7 +44,7 @@ public class Order extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    public enum OrderStatus { NEW, AGGREGATED, COOKING, SHIPPING, DONE, CANCELLED }
+    public enum OrderStatus { NEW, AGGREGATED, COOKING, READY_TO_SHIP, SHIPPING, DONE, CANCELLED }
     public enum OrderType { STANDARD, URGENT, COMPENSATION }
     public enum DeliveryWindow { MORNING, AFTERNOON }
 }

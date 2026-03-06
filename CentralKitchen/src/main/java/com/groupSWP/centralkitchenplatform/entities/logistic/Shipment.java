@@ -48,9 +48,11 @@ public class Shipment extends BaseEntity {
         RESOLVED       // Đã xử lý xong sự cố (đã lên đơn bù)
     }
 
+    // [ĐÃ SỬA CHỖ NÀY]: Cập nhật theo đúng chuẩn Spec mới
     public enum ShipmentType {
-        STANDARD,      // Đơn giao hàng bình thường
-        REPLACEMENT
+        MAIN_ROUTE,    // Chuyến xe chở đơn STANDARD (Gom nhiều đơn, giao sáng hôm sau)
+        EXPRESS,       // Chuyến xe chở đơn URGENT (Giao gấp trong 2 tiếng)
+        REPLACEMENT    // Chuyến xe đền bù (Giữ lại cho luồng xử lý sự cố)
     }
     private LocalDateTime resolvedAt;
 }
