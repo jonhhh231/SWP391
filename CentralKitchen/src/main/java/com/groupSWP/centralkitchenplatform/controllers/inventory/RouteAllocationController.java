@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/logistics")
 @RequiredArgsConstructor
-public class LogisticsController {
+public class RouteAllocationController {
 
     private final RouteAllocationService routeAllocationService;
 
