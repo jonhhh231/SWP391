@@ -5,12 +5,9 @@ import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse;
 import com.groupSWP.centralkitchenplatform.service.product.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,23 +18,21 @@ import java.util.Map;
 public class ProductController {
     private final ProductService productService;
 
-    // API 1: Tạo sản phẩm mới (Nhận JSON Data + File Ảnh)
-    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+    // API 1: Tạo sản phẩm mới (Nhận JSON Data thuần)
+    @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
-            @RequestPart("product") ProductRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image
-    ) throws IOException {
-        return ResponseEntity.ok(productService.createProduct(request, image));
+            @RequestBody ProductRequest request
+    ) {
+        return ResponseEntity.ok(productService.createProduct(request));
     }
 
-    // API 1.2: Cập nhật sản phẩm (Nhận JSON Data + File Ảnh mới nếu có)
-    @PutMapping(value = "/{id}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+    // API 1.2: Cập nhật sản phẩm (Nhận JSON Data thuần)
+    @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable String id,
-            @RequestPart(value = "product", required = false) ProductRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image
-    ) throws IOException {
-        return ResponseEntity.ok(productService.updateProduct(id, request, image));
+            @RequestBody ProductRequest request
+    ) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
     // API 1.3: XÓA MỀM (Soft Delete)

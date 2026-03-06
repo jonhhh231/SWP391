@@ -29,8 +29,6 @@ public class Product extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private UnitType baseUnit;
     private boolean isActive;
-    @Column(name = "image_url") // Thêm dòng này
-    private String imageUrl;    // Thêm dòng này
 
     @OneToMany(mappedBy = "product")
     @JsonIgnore
