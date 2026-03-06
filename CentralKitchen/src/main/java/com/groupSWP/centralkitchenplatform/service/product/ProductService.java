@@ -7,7 +7,6 @@ import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.product.CategoryRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
-import com.groupSWP.centralkitchenplatform.service.common.CloudinaryService;
 import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,9 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 
 @Service
@@ -28,21 +25,14 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final FormulaService formulaService;
     private final CategoryRepository categoryRepository;
-    private final CloudinaryService cloudinaryService;
 
     @Transactional
-    public ProductResponse createProduct(ProductRequest request, MultipartFile image) throws IOException {
+    public ProductResponse createProduct(ProductRequest request) {
         // 1. Tìm Category từ ID
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-        // 2. Xử lý upload ảnh (nếu có)
-        String imageUrl = null;
-        if (image != null && !image.isEmpty()) {
-            imageUrl = cloudinaryService.uploadImage(image);
-        }
-
-        // 3. Khởi tạo Entity Product
+        // 2. Khởi tạo Entity Product (Đã bỏ imageUrl)
         Product product = Product.builder()
                 .productId(request.getProductId())
                 .productName(request.getProductName())
@@ -50,12 +40,11 @@ public class ProductService {
                 .sellingPrice(request.getSellingPrice())
                 .baseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()))
                 .isActive(true)
-                .imageUrl(imageUrl)
                 .build();
 
         Product savedProduct = productRepository.save(product);
 
-        // 4. Lưu công thức (BOM)
+        // 3. Lưu công thức (BOM)
         if (request.getIngredients() != null && !request.getIngredients().isEmpty()) {
             formulaService.saveFormulas(savedProduct, request.getIngredients());
         }
@@ -64,7 +53,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponse updateProduct(String id, ProductRequest request, MultipartFile image) throws IOException {
+    public ProductResponse updateProduct(String id, ProductRequest request) {
         // 1. Lấy sản phẩm hiện tại
         Product existingProduct = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
@@ -89,12 +78,6 @@ public class ProductService {
             if (request.getIngredients() != null) {
                 formulaService.updateFormulas(existingProduct, request.getIngredients());
             }
-        }
-
-        // 3. Xử lý upload ảnh mới
-        if (image != null && !image.isEmpty()) {
-            String newImageUrl = cloudinaryService.uploadImage(image);
-            existingProduct.setImageUrl(newImageUrl);
         }
 
         Product updatedProduct = productRepository.save(existingProduct);
@@ -141,7 +124,7 @@ public class ProductService {
                 .sellingPrice(product.getSellingPrice())
                 .baseUnit(product.getBaseUnit() != null ? product.getBaseUnit().name() : null)
                 .isActive(product.isActive())
-                .imageUrl(product.getImageUrl())
+                // .imageUrl(product.getImageUrl()) // Bạn có thể xóa dòng này nếu DTO cũng đã bỏ field imageUrl
                 .build();
     }
 }
