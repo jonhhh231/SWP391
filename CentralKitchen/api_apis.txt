@@ -1,7 +1,0 @@
-﻿--- Feature: be/confirm-receipt-final ---
---- Feature: be/settings-change-password ---
---- Feature: be/store-status-toggle ---
---- Feature: be/finalRouteAllocation ---
---- Feature: be/fixManageRecipes ---
---- Feature: be/GetProductList ---
---- Feature: be/BOM/Wastage_spoilage ---
