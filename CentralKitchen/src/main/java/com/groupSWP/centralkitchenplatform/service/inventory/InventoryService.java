@@ -81,7 +81,11 @@ public class InventoryService {
             }
 
             BigDecimal baseQuantity = itemReq.getQuantity().multiply(conversionFactor);
-            BigDecimal baseUnitCost = itemReq.getImportPrice().divide(conversionFactor, 2, RoundingMode.HALF_UP);
+
+            // 👉 ĐIỂM FIX THEO Ý SẾP: itemReq.getImportPrice() đang là TỔNG TIỀN của dòng nhập này
+            BigDecimal lineTotal = itemReq.getImportPrice();
+            // 👉 CHIA NGƯỢC: Lấy Tổng tiền / Tổng số lượng gốc = Giá của 1 Đơn Vị Gốc
+            BigDecimal baseUnitCost = lineTotal.divide(baseQuantity, 2, RoundingMode.HALF_UP);
 
             // 🔥 ĐIỂM ĂN TIỀN LÀ ĐÂY: Thêm remainingQuantity để FIFO có data mà trừ!
             ImportItem importItem = ImportItem.builder()
@@ -89,11 +93,11 @@ public class InventoryService {
                     .ingredient(ingredient)
                     .quantity(itemReq.getQuantity())
                     .remainingQuantity(baseQuantity)      // Dòng sống còn của kho vật lý!
-                    .importPrice(itemReq.getImportPrice())
+                    .importPrice(baseUnitCost)            // 👉 LƯU GIÁ VỐN 1 ĐƠN VỊ GỐC (Thay vì lưu itemReq.getImportPrice())
                     .build();
             importItems.add(importItem);
 
-            BigDecimal lineTotal = itemReq.getImportPrice().multiply(itemReq.getQuantity());
+            // 👉 CỘNG THẲNG TIỀN VÀO TỔNG PHIẾU NHẬP (Không nhân thêm quantity nữa)
             totalAmount = totalAmount.add(lineTotal);
 
             BigDecimal currentStock = (ingredient.getKitchenStock() == null) ? BigDecimal.ZERO : ingredient.getKitchenStock();
