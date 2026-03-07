@@ -21,7 +21,7 @@ public class ProductController {
 
     // API 1: Tạo sản phẩm mới (Nhận JSON Data thuần)
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
     public ResponseEntity<ProductResponse> createProduct(
             @RequestBody ProductRequest request
     ) {
@@ -30,7 +30,7 @@ public class ProductController {
 
     // API 1.2: Cập nhật sản phẩm (Nhận JSON Data thuần)
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable String id,
             @RequestBody ProductRequest request
@@ -40,7 +40,7 @@ public class ProductController {
 
     // API 1.3: XÓA MỀM (Soft Delete)
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
     public ResponseEntity<String> deleteProduct(@PathVariable String id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok("Đã ẩn sản phẩm thành công!");
