@@ -39,7 +39,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteProduct(@PathVariable String id) {
         productService.deleteProduct(id);
-        return ResponseEntity.ok("Đã ẩn sản phẩm thành công (Soft Delete)!");
+        return ResponseEntity.ok("Đã ẩn sản phẩm thành công!");
     }
 
     // API 2: Lấy danh sách sản phẩm (Có phân trang & Lọc)
