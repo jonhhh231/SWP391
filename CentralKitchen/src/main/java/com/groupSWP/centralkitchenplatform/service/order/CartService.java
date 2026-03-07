@@ -133,7 +133,7 @@ public class CartService {
     // =======================================================
     // 4. CHỐT ĐƠN TỪ GIỎ HÀNG (ỦY QUYỀN CHO ORDER SERVICE)
     // =======================================================
-    @Transactional
+    @Transactional(rollbackFor = Exception.class) // 🛡️ BẢO VỆ CHÉO: Lỗi bất kỳ chỗ nào cũng ROLLBACK toàn bộ luồng
     public OrderResponse checkoutCart(String username, CheckoutRequest request) {
         Store store = getStoreByUsername(username);
 
@@ -143,32 +143,14 @@ public class CartService {
 
         List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cart.getCartId());
         if (cartItems.isEmpty()) {
-            throw new RuntimeException("Chưa có món nào trong giỏ hàng cả Sếp ơi!");
+            throw new RuntimeException("Chưa có món nào trong giỏ hàng cả!");
         }
 
-        // 4.2. ÉP KIỂU TỪ GIỎ HÀNG SANG ORDER REQUEST
-        OrderRequest orderReq = new OrderRequest();
-        orderReq.setStoreId(store.getStoreId());
-        orderReq.setNote(request.getNote());
-
-        // LƯU Ý: Nếu CheckoutRequest của Sếp có trường deliveryWindow thì get vào đây,
-        // không có thì truyền null cũng không sao vì OrderService đã có logic lo vụ này
-        // orderReq.setDeliveryWindow(request.getDeliveryWindow());
-
-        List<OrderRequest.OrderItemRequest> itemReqs = cartItems.stream().map(cItem -> {
-            OrderRequest.OrderItemRequest i = new OrderRequest.OrderItemRequest();
-            i.setProductId(cItem.getProduct().getProductId());
-            i.setQuantity(cItem.getQuantity());
-            return i;
-        }).collect(Collectors.toList());
-
-        orderReq.setItems(itemReqs);
-
-        // 4.3. CHUYỂN PHÁT NHANH SANG ORDER SERVICE XỬ LÝ (Tận dụng rào chắn ERP)
+        // 4.2. GỌI TRỰC TIẾP HÀM MỚI TẠO BÊN ORDER SERVICE (Không cần map DTO nữa)
         boolean isUrgent = (request.getOrderType() == Order.OrderType.URGENT);
-        OrderResponse response = orderService.createOrder(orderReq, isUrgent);
+        OrderResponse response = orderService.createOrderFromCart(store, cartItems, request.getNote(), isUrgent);
 
-        // 4.4. DỌN SẠCH GIỎ HÀNG SAU KHI CHỐT THÀNH CÔNG
+        // 4.3. DỌN SẠCH GIỎ HÀNG SAU KHI CHỐT THÀNH CÔNG
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
         log.info("Cửa hàng {} đã chốt Giỏ hàng thành Đơn thật thành công! Mã đơn: {}", store.getStoreId(), response.getOrderId());
 
