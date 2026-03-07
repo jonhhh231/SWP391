@@ -4,6 +4,7 @@ import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -13,6 +14,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     List<Order> findByStore_StoreIdOrderByCreatedAtDesc(String storeId);
     List<Order> findByStatus(Order.OrderStatus status);
     List<Order> findByStore_StoreId(String storeId);// Lấy tất cả đơn hàng của 1 cửa hàng
+    List<Order> findByCreatedAtGreaterThanEqualAndStatusNot(LocalDateTime startTime, Order.OrderStatus status);
     boolean existsByShipment_ShipmentIdAndStatusNot(String shipmentId, Order.OrderStatus status);
     List<Order> findByStatusAndShipmentIsNull(Order.OrderStatus status);
 }
