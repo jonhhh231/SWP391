@@ -7,5 +7,6 @@ public record RegisterRequest(
         String password,
         String fullName,
         SystemUser.SystemRole role,
-        String email // BẮT BUỘC THÊM DÒNG NÀY
+        String email, //
+        String storeId
 ) {}
