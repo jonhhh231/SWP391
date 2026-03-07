@@ -18,6 +18,8 @@ public class RecipeResponse {
     public static class Item {
         private String ingredientId;
         private String ingredientName;
+        // THÊM ĐÚNG 1 DÒNG NÀY LÀ HẾT BÁO LỖI ĐỎ NHA SẾP
+        private String unit;
         private BigDecimal amountNeeded;
     }
 }

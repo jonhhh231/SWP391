@@ -1,0 +1,27 @@
+﻿=============================
+BRANCH: origin/be/fixRouteAllocation
+=============================
+=============================
+BRANCH: origin/be/confirm-receipt-final
+=============================
+=============================
+BRANCH: origin/be/BOM/Wastage_spoilage
+=============================
+=============================
+BRANCH: origin/be/settings-change-password
+=============================
+=============================
+BRANCH: origin/be/store-status-toggle
+=============================
+=============================
+BRANCH: origin/be/store-profile-settings
+=============================
+=============================
+BRANCH: origin/be/fixManageRecipes
+=============================
+=============================
+BRANCH: origin/be/GetProductList
+=============================
+=============================
+BRANCH: be/GetProductList
+=============================
