@@ -47,7 +47,10 @@ public class SystemConfigController {
             updatedBy = systemUserRepository.findByAccount_Username(principal.getName()).orElse(null);
         }
         SystemConfig updatedConfig = systemConfigService.updateConfig(
-                configKey, request.configValue(), request.description(), updatedBy
+                configKey,
+                request.configValue(),
+                request.description(),
+                updatedBy
         );
         return ResponseEntity.ok(updatedConfig);
     }
