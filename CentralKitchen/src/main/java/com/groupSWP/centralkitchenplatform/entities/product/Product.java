@@ -34,7 +34,7 @@ public class Product extends BaseEntity {
     @JsonIgnore
     private List<Stock> stocks;
 
-    @OneToMany(mappedBy = "product")
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Formula> formulas; // BOM
 
