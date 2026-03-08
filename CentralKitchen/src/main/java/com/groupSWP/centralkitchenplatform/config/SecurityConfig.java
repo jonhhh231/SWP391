@@ -49,9 +49,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/recipes/**").hasAnyRole("ADMIN", "MANAGER")
 
                         // 🔒 BẢO VỆ DỮ LIỆU CỐT LÕI: Gom gọn chặn Cửa hàng tự ý Thêm/Sửa/Xóa
-                        .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT,  "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+
 
                         // --- 3. SUPPLY COORDINATOR (Điều phối) ---
                         // API liên quan đến vận chuyển, nhập hàng
@@ -61,9 +65,11 @@ public class SecurityConfig {
                         // API xem công thức, cập nhật trạng thái nấu, nhập kho (inventory)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
+
+
                         // --- 5. FRANCHISE STORE STAFF (Cửa hàng) ---
                         // API đặt hàng, xem lịch sử đơn hàng của cửa hàng
-                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
+                        .requestMatchers("/api/store/**").hasAnyRole("STORE_MANAGER", "ADMIN", "MANAGER")
 
                         // --- 6. API DÙNG CHUNG (Chỉ được XEM) ---
                         // Bất kỳ ai đăng nhập rồi cũng xem được danh sách Món, Danh mục, Nguyên liệu
@@ -87,7 +93,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
 
         // Cho phép các method này
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
 
         // Cho phép gửi kèm header (quan trọng để gửi Token Bearer)
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
