@@ -28,13 +28,24 @@ public class ProductService {
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
-        // 1. Tìm Category từ ID
+
+        // 🔥 0. KIỂM TRA TRÙNG LẶP MÃ SẢN PHẨM Ở ĐÂY NÈ SẾP
+        if (request.getProductId() == null || request.getProductId().trim().isEmpty()) {
+            throw new RuntimeException("Mã sản phẩm không được để trống!");
+        }
+
+        // Hàm existsById là tính năng có sẵn cực xịn của Spring Data JPA
+        if (productRepository.existsById(request.getProductId())) {
+            throw new RuntimeException("Mã sản phẩm '" + request.getProductId() + "' đã tồn tại trong hệ thống. Vui lòng nhập mã khác!");
+        }
+
+        // 1. Tìm Category từ ID (Giữ nguyên code cũ của sếp)
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-        // 2. Khởi tạo Entity Product (Đã bỏ imageUrl)
+        // 2. Khởi tạo Entity Product
         Product product = Product.builder()
-                .productId(request.getProductId())
+                .productId(request.getProductId()) // Yên tâm xài mã FE truyền lên vì đã check trùng rồi!
                 .productName(request.getProductName())
                 .category(category)
                 .sellingPrice(request.getSellingPrice())
