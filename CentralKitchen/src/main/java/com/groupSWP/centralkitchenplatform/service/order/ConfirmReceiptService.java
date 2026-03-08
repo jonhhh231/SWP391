@@ -15,7 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -55,33 +58,49 @@ public class ConfirmReceiptService {
 
         // 1) Update order -> DONE
         order.setStatus(Order.OrderStatus.DONE);
-        if (note != null) order.setNote(note); // <--- Thêm dòng này để không mất ghi chú
+        if (note != null) order.setNote(note);
         orderRepository.save(order);
 
-        // 2) Optional: cộng kho
+        // 2) Optional: cộng kho (Đã Tối Ưu Performance)
         boolean stockUpdated = false;
         if (updateStock) {
-            // CẦN: orderItemRepository có method findByOrder_OrderId(String)
             List<OrderItem> items = orderItemRepository.findByOrder_OrderId(orderId);
+            String storeId = order.getStore().getStoreId();
 
+            // TỐI ƯU READ: Gom tất cả Khóa (Keys) của các món hàng lại
+            List<StockKey> stockKeys = items.stream()
+                    .map(item -> new StockKey(storeId, item.getProduct().getProductId()))
+                    .toList();
+
+            // Bắn 1 câu lệnh SELECT duy nhất lấy lên toàn bộ kho, chuyển thành Map để tra cứu trên RAM
+            Map<StockKey, Stock> existingStocksMap = stockRepository.findAllById(stockKeys)
+                    .stream()
+                    .collect(Collectors.toMap(Stock::getId, s -> s));
+
+            List<Stock> stocksToSave = new ArrayList<>();
+
+            // Vòng lặp tính toán (Chỉ chạy trên RAM)
             for (OrderItem item : items) {
-                String storeId = order.getStore().getStoreId();
-                String productId = item.getProduct().getProductId();
+                StockKey key = new StockKey(storeId, item.getProduct().getProductId());
 
-                StockKey key = new StockKey(storeId, productId);
+                // Tra cứu kho từ Map. Nếu chưa có thì trả về một object rỗng mới tạo
+                Stock stock = existingStocksMap.getOrDefault(key, new Stock());
 
-                Stock stock = stockRepository.findById(key).orElseGet(() -> {
-                    Stock s = new Stock();
-                    s.setId(key);
-                    s.setQuantity(0);
-                    s.setStore(order.getStore());   // <--- Bổ sung dòng này
-                    s.setProduct(item.getProduct()); // <--- Bổ sung dòng này
-                    return s;
-                });
+                // Nếu là kho mới tinh chưa từng tồn tại trong DB
+                if (stock.getId() == null) {
+                    stock.setId(key);
+                    stock.setQuantity(0); // Khởi tạo số lượng bằng 0 trước khi cộng
+                    stock.setStore(order.getStore());
+                    stock.setProduct(item.getProduct());
+                }
 
+                // Cộng dồn số lượng hàng nhận vào kho
                 stock.setQuantity(stock.getQuantity() + item.getQuantity());
-                stockRepository.save(stock);
+                stocksToSave.add(stock);
             }
+
+            // TỐI ƯU WRITE: Lưu tất cả xuống DB trong 1 lần duy nhất
+            stockRepository.saveAll(stocksToSave);
             stockUpdated = true;
         }
 
@@ -94,8 +113,6 @@ public class ConfirmReceiptService {
                     orderRepository.existsByShipment_ShipmentIdAndStatusNot(shipmentId, Order.OrderStatus.DONE);
 
             if (!stillHasNotDone) {
-                // ⚠️ Nếu ShipmentRepository của bạn là <Shipment, UUID> thì sẽ lỗi.
-                //    Bạn cần ShipmentRepository extends JpaRepository<Shipment, String>
                 Shipment shipment = shipmentRepository.findById(shipmentId)
                         .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy shipment: " + shipmentId));
 
