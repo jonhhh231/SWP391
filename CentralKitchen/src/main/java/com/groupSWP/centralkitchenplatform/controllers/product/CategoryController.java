@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'KITCHEN_MANAGER', 'ROLE_KITCHEN_MANAGER')")
+@PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'KITCHEN_MANAGER', 'ROLE_KITCHEN_MANAGER')")
 //@PreAuthorize("hasRole('MANAGER_KITCHEN')") // 🌟 BẢO MẬT: Phân quyền toàn bộ class cho KITCHEN_MANAGER
 public class CategoryController {
 
