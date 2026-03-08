@@ -24,19 +24,19 @@ public class AnalyticsService {
     public DashboardSummary getDashboardStats() {
         LocalDate today = LocalDate.now();
 
-        // Mốc thời gian: Lấy từ đầu tháng (để tính doanh thu tháng)
+        // Mốc thời gian
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime startOf7DaysAgo = today.minusDays(6).atStartOfDay(); // 7 ngày gần nhất (tính cả hôm nay)
+        LocalDateTime startOf7DaysAgo = today.minusDays(6).atStartOfDay();
 
-        // 1. CHỌC XUỐNG DB ĐÚNG 1 LẦN: Lấy tất cả đơn từ đầu tháng tới giờ (trừ đơn CANCELLED)
+        // 1. Lấy tất cả đơn từ đầu tháng (Bỏ qua CANCELLED)
         List<Order> validOrdersThisMonth = orderRepository
                 .findByCreatedAtGreaterThanEqualAndStatusNot(startOfMonth, Order.OrderStatus.CANCELLED);
 
-        // 2. TÍNH TOÁN SỐ LIỆU "THÁNG NÀY"
+        // 2. Doanh thu THÁNG NÀY
         BigDecimal revenueThisMonth = calculateTotal(validOrdersThisMonth);
 
-        // 3. LỌC RA SỐ LIỆU "HÔM NAY"
+        // 3. Doanh thu HÔM NAY
         List<Order> ordersToday = validOrdersThisMonth.stream()
                 .filter(o -> !o.getCreatedAt().isBefore(startOfDay))
                 .toList();
@@ -44,17 +44,15 @@ public class AnalyticsService {
         long totalOrdersToday = ordersToday.size();
         BigDecimal revenueToday = calculateTotal(ordersToday);
 
-        // 4. LỌC RA SỐ LIỆU "7 NGÀY QUA" VÀ VẼ BIỂU ĐỒ
+        // 4. Biểu đồ 7 ngày
         List<Order> last7DaysOrders = validOrdersThisMonth.stream()
                 .filter(o -> !o.getCreatedAt().isBefore(startOf7DaysAgo))
                 .toList();
 
-        // Gom nhóm đơn hàng theo từng ngày (Ví dụ: Ngày 05 có 3 đơn, Ngày 06 có 10 đơn...)
         Map<LocalDate, List<Order>> ordersGroupedByDate = last7DaysOrders.stream()
                 .collect(Collectors.groupingBy(o -> o.getCreatedAt().toLocalDate()));
 
         List<ChartDataPoint> trend = new ArrayList<>();
-        // Vòng lặp đếm lùi từ 6 ngày trước cho tới hôm nay để vẽ biểu đồ từ Trái sang Phải
         for (int i = 6; i >= 0; i--) {
             LocalDate targetDate = today.minusDays(i);
             List<Order> dailyOrders = ordersGroupedByDate.getOrDefault(targetDate, new ArrayList<>());
@@ -65,7 +63,6 @@ public class AnalyticsService {
             trend.add(new ChartDataPoint(targetDate.toString(), dailyRevenue, dailyCount));
         }
 
-        // 5. ĐÓNG GÓI TRẢ VỀ CHO CONTROLLER
         return DashboardSummary.builder()
                 .totalRevenueToday(revenueToday)
                 .totalRevenueThisMonth(revenueThisMonth)
@@ -74,14 +71,14 @@ public class AnalyticsService {
                 .build();
     }
 
-    // Hàm phụ trợ tính tổng tiền = (Tổng đơn) + (Phụ phí)
+    /**
+     * 🛠️ FIX BY MIMI:
+     * Vì trong OrderService Sếp đã cộng Surcharge vào TotalAmount trước khi save,
+     * nên ở đây mình chỉ cần lấy TotalAmount là đủ số liệu cuối cùng.
+     */
     private BigDecimal calculateTotal(List<Order> orders) {
         return orders.stream()
-                .map(o -> {
-                    BigDecimal amount = o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO;
-                    BigDecimal surcharge = o.getSurcharge() != null ? o.getSurcharge() : BigDecimal.ZERO;
-                    return amount.add(surcharge);
-                })
+                .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
