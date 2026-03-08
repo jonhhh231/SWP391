@@ -28,9 +28,20 @@ public class UnitConversionService {
         // 2. Validate Enum Unit (Chống nhập bậy)
         UnitType unitToConvert;
         try {
-            unitToConvert = UnitType.valueOf(request.getUnitName());
+            // Thêm trim() và toUpperCase() để nhỡ Frontend truyền khoảng trắng hoặc chữ thường
+            unitToConvert = UnitType.valueOf(request.getUnitName().trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Lỗi: Đơn vị '" + request.getUnitName() + "' không hợp lệ!");
+        }
+
+        // 👉 ĐIỂM FIX 1: Chặn hệ số quy đổi <= 0 (Cứu sống luồng Nhập kho khỏi lỗi chia cho 0)
+        if (request.getConversionFactor() == null || request.getConversionFactor().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Lỗi: Hệ số quy đổi phải lớn hơn 0!");
+        }
+
+        // 👉 ĐIỂM FIX 2: Chặn tạo luật quy đổi trùng với đơn vị gốc
+        if (unitToConvert == ingredient.getUnit()) {
+            throw new RuntimeException("Lỗi: Không thể tạo quy đổi trùng với đơn vị gốc (" + ingredient.getUnit().name() + ") của nguyên liệu!");
         }
 
         // 3. Chặn trùng lặp (1 Nguyên liệu không thể có 2 công thức cho cùng 1 đơn vị)
