@@ -159,6 +159,92 @@ public class OrderService {
                 .build();
     }
 
+    // =========================================================================
+    // HÀM MỚI: TẠO ĐƠN TRỰC TIẾP TỪ GIỎ HÀNG (CHỐNG LỖI N+1 QUERY)
+    // =========================================================================
+    @Transactional(rollbackFor = Exception.class)
+    public OrderResponse createOrderFromCart(Store store, List<com.groupSWP.centralkitchenplatform.entities.cart.CartItem> cartItems, String note, boolean isUrgent) {
+
+        // 1. LẤY CONFIG & RÀO CHẮN THỜI GIAN
+        LocalTime now = LocalTime.now();
+        LocalTime OPEN_TIME = systemConfigService.getLocalTimeConfig("OPEN_TIME", "08:00");
+        LocalTime URGENT_CUTOFF = systemConfigService.getLocalTimeConfig("URGENT_CUTOFF_TIME", "10:30");
+        LocalTime STANDARD_CUTOFF = systemConfigService.getLocalTimeConfig("STANDARD_CUTOFF_TIME", "13:00");
+        BigDecimal URGENT_SURCHARGE = systemConfigService.getBigDecimalConfig("URGENT_SURCHARGE", "100000");
+
+        if (now.isBefore(OPEN_TIME)) throw new RuntimeException("Hệ thống chưa mở cửa (" + OPEN_TIME + " AM mới nhận đơn nha)!");
+        if (isUrgent && now.isAfter(URGENT_CUTOFF)) throw new RuntimeException("Đã quá " + URGENT_CUTOFF + " AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
+        if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) throw new RuntimeException("Đã quá " + STANDARD_CUTOFF + " PM, vui lòng chờ mai đặt đơn THƯỜNG nhé!");
+
+        // 2. TẠO ĐƠN HÀNG (VỎ BIÊN LAI)
+        Order order = new Order();
+        order.setStore(store);
+        order.setStatus(Order.OrderStatus.NEW);
+        order.setNote(note);
+
+        BigDecimal surcharge = BigDecimal.ZERO;
+        String prefix = "STD";
+        if (isUrgent) {
+            order.setOrderType(Order.OrderType.URGENT);
+            order.setDeliveryWindow(Order.DeliveryWindow.AFTERNOON);
+            order.setDeliveryDate(LocalDate.now());
+            surcharge = URGENT_SURCHARGE;
+            prefix = "URG";
+        } else {
+            order.setOrderType(Order.OrderType.STANDARD);
+            order.setDeliveryWindow(Order.DeliveryWindow.MORNING);
+            order.setDeliveryDate(LocalDate.now().plusDays(1));
+        }
+        order.setSurcharge(surcharge);
+        order.setOrderId(generateSmartOrderId(prefix, store.getStoreId()));
+
+        // 3. RÚT RUỘT TỪ CART ITEM -> ORDER ITEM (Siêu nhanh, không query DB)
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+
+        for (com.groupSWP.centralkitchenplatform.entities.cart.CartItem cItem : cartItems) {
+            Product product = cItem.getProduct(); // Lôi thẳng Product đã dính sẵn từ Giỏ hàng ra xài luôn
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setId(new OrderItemKey(order.getOrderId(), product.getProductId()));
+            orderItem.setOrder(order);
+            orderItem.setProduct(product);
+            orderItem.setQuantity(cItem.getQuantity());
+            orderItem.setPriceAtOrder(product.getSellingPrice());
+
+            totalAmount = totalAmount.add(product.getSellingPrice().multiply(BigDecimal.valueOf(cItem.getQuantity())));
+            orderItems.add(orderItem);
+        }
+
+        // 4. LƯU DATABASE
+        order.setTotalAmount(totalAmount.add(surcharge));
+        order.setOrderItems(orderItems);
+        Order savedOrder = orderRepository.save(order);
+
+        // 5. TRẢ VỀ DỮ LIỆU ĐẦY ĐỦ CHO FRONTEND
+        return OrderResponse.builder()
+                .orderId(savedOrder.getOrderId())
+                .status(savedOrder.getStatus().name())
+                .totalAmount(savedOrder.getTotalAmount())
+                .message(isUrgent ? "Chốt đơn KHẨN CẤP thành công!" : "Chốt đơn TIÊU CHUẨN thành công!")
+                .storeId(savedOrder.getStore().getStoreId())
+                .orderType(savedOrder.getOrderType())
+                .note(savedOrder.getNote())
+                .surcharge(savedOrder.getSurcharge())
+                .deliveryDate(savedOrder.getDeliveryDate())
+                .deliveryWindow(savedOrder.getDeliveryWindow())
+                .items(savedOrder.getOrderItems().stream().map(item ->
+                        OrderResponse.OrderItemDto.builder()
+                                .productId(item.getProduct().getProductId())
+                                .productName(item.getProduct().getProductName())
+                                .quantity(item.getQuantity())
+                                .priceAtOrder(item.getPriceAtOrder())
+                                .subTotal(item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity())))
+                                .build()
+                ).collect(Collectors.toList()))
+                .build();
+    }
+
     private String generateSmartOrderId(String prefix, String storeId) {
         String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         String randomPart = UUID.randomUUID().toString().substring(0, 4).toUpperCase();

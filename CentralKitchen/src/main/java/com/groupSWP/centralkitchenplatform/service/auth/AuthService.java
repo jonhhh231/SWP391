@@ -5,6 +5,7 @@ import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.auth.SystemUserRepository;
+import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import com.groupSWP.centralkitchenplatform.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,8 @@ public class AuthService {
 
     private final OtpService otpService;
     private final MailService mailService;
+
+    private final StoreRepository storeRepository;
 
     public AuthResponse login(AuthRequest request) {
         Account account = accountRepository.findByUsername(request.username())
@@ -75,16 +78,49 @@ public class AuthService {
 
     @Transactional(rollbackFor = Exception.class)
     public String register(RegisterRequest request) {
+        // 1. Kiểm tra Username trùng lặp
         if (accountRepository.findByUsername(request.username()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username này đã tồn tại!");
+            throw new RuntimeException("Username này đã tồn tại trong hệ thống!");
         }
 
+        // ==========================================
+        // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG
+        // ==========================================
+        com.groupSWP.centralkitchenplatform.entities.auth.Store store = null; // Khai báo sẵn
+
+        if (request.role() == SystemUser.SystemRole.STORE_MANAGER) {
+
+            // Luật 1: Phải có mã Cửa hàng
+            if (request.storeId() == null || request.storeId().isBlank()) {
+                throw new RuntimeException("Tạo tài khoản Cửa hàng trưởng bắt buộc phải truyền storeId!");
+            }
+
+            // Luật 2: Cửa hàng phải tồn tại
+            store = storeRepository.findById(request.storeId())
+                    .orElseThrow(() -> new RuntimeException("Cửa hàng không tồn tại (Sai storeId)!"));
+
+            // Luật 3: Kiểm tra Cửa hàng này đã có tài khoản Account nào móc vào chưa
+            if (store.getAccount() != null) {
+                // 👈 Dùng getName() thay vì getStoreName()
+                throw new RuntimeException("Cửa hàng [" + store.getName() + "] đã có Quản lý rồi! Không thể bổ nhiệm thêm.");
+            }
+        }
+        // ==========================================
+
+        // 3. Tạo Account
         Account account = new Account();
         account.setUsername(request.username());
         account.setPassword(passwordEncoder.encode(request.password()));
         account.setRole(request.role().name());
+
+        // 👑 NẾU LÀ QUẢN LÝ THÌ GẮN CỬA HÀNG VÀO ACCOUNT LUN TRƯỚC KHI LƯU
+        if (store != null) {
+            account.setStore(store); // 👈 Bảng Account giữ khóa nên mình set ở đây!
+        }
+
         account = accountRepository.save(account);
 
+        // 4. Tạo Hồ sơ SystemUser
         SystemUser userProfile = SystemUser.builder()
                 .userId(generateStaffId(request.role()))
                 .fullName(request.fullName())
@@ -94,7 +130,9 @@ public class AuthService {
                 .build();
 
         systemUserRepository.save(userProfile);
-        return "Đăng ký thành công! Mã nhân viên: " + userProfile.getUserId();
+
+        return "Đăng ký thành công! Mã nhân viên: " + userProfile.getUserId() +
+                (request.storeId() != null ? " | Đã bổ nhiệm quản lý Cửa hàng: " + request.storeId() : "");
     }
 
     private String generateStaffId(SystemUser.SystemRole role) {

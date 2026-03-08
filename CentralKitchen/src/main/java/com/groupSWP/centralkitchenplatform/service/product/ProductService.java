@@ -84,14 +84,16 @@ public class ProductService {
                         .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại: " + request.getCategoryId()));
                 existingProduct.setCategory(category);
             }
-
-            // Cập nhật công thức
-            if (request.getIngredients() != null) {
-                formulaService.updateFormulas(existingProduct, request.getIngredients());
-            }
         }
 
+        // 👉 ĐIỂM FIX LỖI: Chuyển lệnh save() lên TRƯỚC khi update công thức
         Product updatedProduct = productRepository.save(existingProduct);
+
+        // 👉 ĐIỂM FIX LỖI: Update công thức cho Product ĐÃ ĐƯỢC SAVE
+        if (request != null && request.getIngredients() != null) {
+            formulaService.updateFormulas(updatedProduct, request.getIngredients());
+        }
+
         return mapToResponse(updatedProduct);
     }
 
