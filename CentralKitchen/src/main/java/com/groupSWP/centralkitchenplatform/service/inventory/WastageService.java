@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -22,9 +23,9 @@ import java.util.List;
 public class WastageService {
 
     private final ProductionRunRepository productionRunRepository;
-    private final FormulaRepository formulaRepository; // Đổi sang lấy Formula
+    private final FormulaRepository formulaRepository;
     private final IngredientRepository ingredientRepository;
-    private final InventoryLogRepository inventoryLogRepository; // Thêm repo ghi log
+    private final InventoryLogRepository inventoryLogRepository;
 
     @Transactional
     public WastageResponse recordWastage(WastageRequest request) {
@@ -46,47 +47,53 @@ public class WastageService {
 
         // 3. Cập nhật waste_qty và ghi chú (reason) vào production_run
         run.setWasteQty(newWaste);
-        run.setNote(request.getReason()); // LƯU LÝ DO HAO HỤT VÀO ĐÂY
+        run.setNote(request.getReason());
         productionRunRepository.save(run);
 
         // 4. Trừ kho nguyên liệu CHUẨN THEO CÔNG THỨC (BOM)
-        // SỬA LỖI 1: Gọi đúng tên hàm trong Repository
         List<Formula> formulas = formulaRepository.findByProduct_ProductId(run.getProduct().getProductId());
+
+        // Khai báo List để tối ưu hóa việc lưu Database (Batch Save)
+        List<Ingredient> ingredientsToUpdate = new ArrayList<>();
+        List<InventoryLog> logsToSave = new ArrayList<>();
 
         for (Formula formula : formulas) {
             Ingredient ingredient = formula.getIngredient();
-
             BigDecimal actualIngredientWaste = request.getWasteQty().multiply(formula.getAmountNeeded());
 
-            BigDecimal newStock = ingredient.getKitchenStock().subtract(actualIngredientWaste);
+            // Đề phòng trường hợp kitchenStock bị null trong DB
+            BigDecimal currentStock = ingredient.getKitchenStock() != null ? ingredient.getKitchenStock() : BigDecimal.ZERO;
+            BigDecimal newStock = currentStock.subtract(actualIngredientWaste);
+
+            // VÁ LỖ HỔNG LOGIC: Trừ lố kho thì báo lỗi ngay, không tự động gán bằng 0
             if (newStock.compareTo(BigDecimal.ZERO) < 0) {
-                newStock = BigDecimal.ZERO;
+                throw new IllegalArgumentException(
+                        "Tồn kho nguyên liệu không đủ để trừ hao hụt! " +
+                                "Tồn hiện tại: " + currentStock + ", Cần trừ: " + actualIngredientWaste);
             }
+
             ingredient.setKitchenStock(newStock);
-            ingredientRepository.save(ingredient);
+            ingredientsToUpdate.add(ingredient); // Thêm vào danh sách chờ lưu
 
             // 5. LƯU VẾT VÀO INVENTORY_LOG
             InventoryLog log = new InventoryLog();
-
-            // SỬA LỖI 2: Truyền Object thay vì truyền String ID
             log.setIngredient(ingredient);
             log.setProductionRun(run);
-
             log.setQuantityDeducted(actualIngredientWaste);
             log.setReferenceCode("WASTE-" + run.getRunId());
             log.setNote("Hao hụt sản xuất. Lý do: " + request.getReason());
-
-            // FIX BẪY NULL: Bắt buộc phải set thời gian tạo
             log.setCreatedAt(java.time.LocalDateTime.now());
 
-            // ⚠️ CẢNH BÁO ĐỎ: Entity InventoryLog ép buộc importItem không được null
-            // Tạm thời set null nếu bạn chưa làm thuật toán FIFO,
-            // NHƯNG để code chạy được, bạn phải vào InventoryLog đổi nullable = true
-            // Hoặc lấy lô hàng cũ nhất ra gán vào đây: log.setImportItem(lô_cũ_nhất);
+            // LƯU Ý: Vẫn đang để trống importItem ở đây (Cần check nullable = true trong Entity InventoryLog)
 
-            inventoryLogRepository.save(log);
+            logsToSave.add(log); // Thêm vào danh sách chờ lưu
         }
 
+        // TỐI ƯU PERFORMANCE: Lưu tất cả dữ liệu cùng 1 lúc ngoài vòng lặp
+        if (!ingredientsToUpdate.isEmpty()) {
+            ingredientRepository.saveAll(ingredientsToUpdate);
+            inventoryLogRepository.saveAll(logsToSave);
+        }
 
         // 6. Trả về response
         return WastageResponse.builder()
