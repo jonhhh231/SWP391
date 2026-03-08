@@ -45,44 +45,47 @@ public class ProductionService {
 
         String generatedRunId = "RUN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        // 🔥 UPDATE V2.2: LƯU MẺ NẤU TRƯỚC ĐỂ LẤY OBJECT CHO KHÓA NGOẠI (FK) CỦA LOG
+        // 1. Khởi tạo mẻ nấu (Chưa có giá vốn)
         ProductionRun run = new ProductionRun();
         run.setRunId(generatedRunId);
         run.setProduct(product);
         run.setPlannedQty(request.getQuantity());
         run.setActualQty(BigDecimal.ZERO);
         run.setWasteQty(BigDecimal.ZERO);
-        run.setTotalCostAtProduction(BigDecimal.ZERO); // Khởi tạo giá vốn = 0
+        run.setTotalCostAtProduction(BigDecimal.ZERO);
         run.setProductionDate(LocalDateTime.now());
         run.setStatus(ProductionRun.ProductionStatus.PLANNED);
         run.setBatchCode("BATCH-" + System.currentTimeMillis());
 
         ProductionRun savedRun = productionRunRepository.save(run);
 
-        // Biến cộng dồn tổng chi phí (Giá vốn) của toàn bộ mẻ nấu này
         BigDecimal totalProductionCost = BigDecimal.ZERO;
 
+        // 2. Duyệt qua từng nguyên liệu trong công thức để trừ kho
         for (Formula formula : product.getFormulas()) {
             Ingredient ingredient = formula.getIngredient();
+
+            // Theo thiết kế: amountNeeded đã là ĐƠN VỊ GỐC (Base Unit)
             BigDecimal amountPerUnit = formula.getAmountNeeded();
+
+            // Tính tổng lượng nguyên liệu cần thiết cho toàn bộ mẻ nấu này
             BigDecimal totalNeeded = amountPerUnit.multiply(request.getQuantity());
+
             BigDecimal currentStock = ingredient.getKitchenStock() != null ? ingredient.getKitchenStock() : BigDecimal.ZERO;
 
+            // Chốt chặn an toàn: Kiểm tra kho trước khi trừ
             if (currentStock.compareTo(totalNeeded) < 0) {
                 throw new RuntimeException("Không đủ nguyên liệu: " + ingredient.getName() +
                         ". Cần: " + totalNeeded + " " + ingredient.getUnit() +
                         ", Hiện có: " + currentStock);
             }
 
-            // 🔥 UPDATE V2.2: TRUYỀN HẲN OBJECT `savedRun` VÀO ĐỂ GHI LOG.
-            // Hàm này giờ xịn hơn: Trừ xong nó trả về CHI PHÍ của lượng nguyên liệu vừa trừ!
+            // Gọi hàm trừ kho FIFO và lấy về tổng giá vốn của lượng nguyên liệu bị trừ
             BigDecimal ingredientCost = deductIngredientWithFIFO(ingredient, totalNeeded, savedRun);
-
-            // Cộng dồn vào giá vốn tổng
             totalProductionCost = totalProductionCost.add(ingredientCost);
         }
 
-        // 🔥 UPDATE V2.2: Cập nhật lại giá vốn thực tế cuối cùng cho mẻ nấu
+        // 3. Cập nhật lại giá vốn tổng cho mẻ nấu
         savedRun.setTotalCostAtProduction(totalProductionCost);
         productionRunRepository.save(savedRun);
 
@@ -96,7 +99,6 @@ public class ProductionService {
     }
 
     public List<ProductionResponse> getActiveProductionRuns() {
-        // ... (Giữ nguyên code cũ của Sếp) ...
         List<ProductionRun.ProductionStatus> activeStatuses = Arrays.asList(
                 ProductionRun.ProductionStatus.PLANNED,
                 ProductionRun.ProductionStatus.COOKING
@@ -113,61 +115,60 @@ public class ProductionService {
     }
 
     // =========================================================================
-    // HÀM TRỪ KHO FIFO (PHIÊN BẢN 2.2 - CÓ GHI LOG OBJECT VÀ TÍNH GIÁ VỐN)
+    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH - CÓ GHI LOG OBJECT VÀ TÍNH GIÁ VỐN)
     // =========================================================================
     private BigDecimal deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, ProductionRun run) {
-
         BigDecimal remainingToDeduct = quantityNeeded;
-        BigDecimal totalIngredientCost = BigDecimal.ZERO; // Máy tính tiền
+        BigDecimal totalIngredientCost = BigDecimal.ZERO;
 
-        // 🔥 UPDATE: Tìm các lô hàng có remainingQuantity > 0
+        // Lấy danh sách các lô hàng còn tồn của nguyên liệu này, xếp theo lô cũ nhất (ID tăng dần)
         List<ImportItem> availableBatches = importItemRepository
                 .findByIngredientAndRemainingQuantityGreaterThanOrderByIdAsc(ingredient, BigDecimal.ZERO);
 
         for (ImportItem batch : availableBatches) {
             if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
 
-            // 🔥 UPDATE: Thao tác trên cột RemainingQuantity
             BigDecimal batchQty = batch.getRemainingQuantity();
             BigDecimal deductedAmount;
 
             if (batchQty.compareTo(remainingToDeduct) >= 0) {
+                // Lô này đủ sức gánh toàn bộ số lượng cần trừ
                 batch.setRemainingQuantity(batchQty.subtract(remainingToDeduct));
                 deductedAmount = remainingToDeduct;
                 remainingToDeduct = BigDecimal.ZERO;
             } else {
+                // Lô này không đủ, trừ hết lô này rồi chuyển sang lô tiếp theo
                 batch.setRemainingQuantity(BigDecimal.ZERO);
                 deductedAmount = batchQty;
                 remainingToDeduct = remainingToDeduct.subtract(batchQty);
             }
             importItemRepository.save(batch);
 
-            // 🔥 UPDATE KẾ TOÁN: Tính tiền lô hàng này (SL bị trừ * Giá nhập của lô)
+            // Tính tiền lô hàng này (Số lượng bị trừ * Giá nhập của lô)
             BigDecimal costForThisBatch = deductedAmount.multiply(batch.getImportPrice());
             totalIngredientCost = totalIngredientCost.add(costForThisBatch);
 
-            // ==========================================
-            // GHI BIÊN BẢN (LOG) LẠI NGAY LẬP TỨC!
-            // ==========================================
+            // Ghi nhận biến động kho vào Log
             InventoryLog log = InventoryLog.builder()
-                    .importItem(batch)           // Truyền nguyên Object
-                    .ingredient(ingredient)      // Truyền nguyên Object
-                    .productionRun(run)          // Truyền nguyên Object
+                    .importItem(batch)
+                    .ingredient(ingredient)
+                    .productionRun(run)
                     .quantityDeducted(deductedAmount)
-                    .note("Hệ thống tự động trừ kho FIFO cho mẻ nấu: " + run.getRunId())
+                    .note("Trừ kho tự động FIFO cho mẻ nấu: " + run.getRunId())
                     .createdAt(LocalDateTime.now())
                     .build();
             inventoryLogRepository.save(log);
         }
 
+        // Chốt chặn cuối: Nếu duyệt hết kho mà vẫn thiếu (Lỗi đồng bộ dữ liệu)
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
-            throw new RuntimeException("LỖI NGHIÊM TRỌNG: Tồn kho các lô không đủ. Thiếu: " + remainingToDeduct);
+            throw new RuntimeException("LỖI NGHIÊM TRỌNG: Tồn kho các lô không khớp với tổng tồn. Thiếu: " + remainingToDeduct);
         }
 
+        // Trừ tổng tồn kho chung của nguyên liệu
         ingredient.setKitchenStock(ingredient.getKitchenStock().subtract(quantityNeeded));
         ingredientRepository.save(ingredient);
 
-        // Trả về số tiền tổng cộng vừa trừ để hàm cha lưu vào ProductionRun
         return totalIngredientCost;
     }
 }

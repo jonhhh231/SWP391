@@ -42,38 +42,54 @@ public class SecurityConfig {
                         .requestMatchers("/api/manager/**", "/api/orders/**", "/api/recipes/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
 
+                        // 🔥 [FIX LỖI 2]: Tách riêng quyền Quản lý Cửa hàng (/api/stores) khỏi Bếp trưởng.
+                        // Chỉ Admin và Manager mới được thêm/sửa/xóa Cửa hàng.
+                        .requestMatchers(HttpMethod.POST, "/api/stores", "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+
+                        .requestMatchers(HttpMethod.DELETE, "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+
                         // 🔥 ĐÃ FIX ĐƯỜNG DẪN + ROLE CHO PRODUCT, CATEGORY, INGREDIENT
+                        // [FIX LỖI 1]: Thêm MANAGER vào để Manager cũng sửa được món ăn, và thêm api conversions
                         .requestMatchers(HttpMethod.POST,
                                 "/api/products", "/api/products/**",
                                 "/api/categories", "/api/categories/**",
                                 "/api/ingredients", "/api/ingredients/**",
-                                "/api/stores", "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                                "/api/manager/conversions/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         .requestMatchers(HttpMethod.PUT,
-                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/manager/conversions/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         .requestMatchers(HttpMethod.DELETE,
-                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/manager/conversions/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         // COORDINATOR
                         .requestMatchers("/api/logistics/**", "/api/shipments/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "COORDINATOR", "ROLE_COORDINATOR")
 
                         // KITCHEN
+                        // (Luồng này Sếp viết chuẩn rồi, KITCHEN_MANAGER đã có quyền đụng vào /api/inventory/**)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         // STORE
-                        .requestMatchers("/api/store/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN", "STORE_MANAGER", "ROLE_STORE_MANAGER")
+                        // 🔥 [FIX LỖI 4]: Đã cấp thêm quyền cho MANAGER vào hỗ trợ Cửa hàng lúc cần thiết (Ví dụ Check Cart/Order hộ)
+                        .requestMatchers("/api/store/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "STORE_MANAGER", "ROLE_STORE_MANAGER")
 
                         // GET CÔNG KHAI (Chỉ cần có Token là xem được)
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products", "/api/products/**",
                                 "/api/categories", "/api/categories/**",
-                                "/api/ingredients", "/api/ingredients/**")
+                                "/api/ingredients", "/api/ingredients/**",
+                                "/api/stores", "/api/stores/**", // 🔥 Cho phép GET để load dropdown cửa hàng
+                                "/api/manager/conversions/**")   // 🔥 Cho phép GET để load dropdown đơn vị
                         .authenticated()
 
                         .anyRequest().authenticated()
@@ -88,7 +104,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // 🔥 Bổ sung thêm "PATCH" để chạy được API Dispatch Shipment
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
 
