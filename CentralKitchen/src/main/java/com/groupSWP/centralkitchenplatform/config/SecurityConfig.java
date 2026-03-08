@@ -31,42 +31,33 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // PUBLIC
                         .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
-                        // --- 1. CÔNG KHAI ---
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // --- 2. ADMIN & MANAGER (Sếp to) ---
-                        // Admin đi đâu cũng được
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // ADMIN
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 
-                        // Manager quản lý chung nên thường vào được các api quản lý
-                        .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
+                        // MANAGER
+                        .requestMatchers("/api/manager/**").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers("/api/orders/**").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers("/api/recipes/**").hasAnyAuthority("ADMIN", "MANAGER")
 
-                        // Manager và Admin quản lý toàn bộ đơn hàng
-                        .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "MANAGER")
+                        // ✅ CHỈ GIỮ DÒNG NÀY (bỏ dòng permitAll() ở trên)
+                        .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
 
-                        // Manage Recipes (BOM): chỉ ADMIN/MANAGER được quản lý công thức
-                        .requestMatchers("/api/recipes/**").hasAnyRole("ADMIN", "MANAGER")
+                        // COORDINATOR
+                        .requestMatchers("/api/logistics/**", "/api/shipments/**").hasAnyAuthority("ADMIN", "MANAGER", "COORDINATOR")
 
-                        // 🔒 BẢO VỆ DỮ LIỆU CỐT LÕI: Gom gọn chặn Cửa hàng tự ý Thêm/Sửa/Xóa
-                        .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyRole("ADMIN", "MANAGER")
+                        // KITCHEN
+                        .requestMatchers("/api/kitchen/**", "/api/inventory/**").hasAnyAuthority("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
-                        // --- 3. SUPPLY COORDINATOR (Điều phối) ---
-                        // API liên quan đến vận chuyển, nhập hàng
-                        .requestMatchers("/api/logistics/**", "/api/shipments/**").hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
+                        // STORE
+                        .requestMatchers("/api/store/**").hasAnyAuthority("ADMIN", "STORE_MANAGER")
 
-                        // --- 4. CENTRAL KITCHEN STAFF (Bếp) ---
-                        // API xem công thức, cập nhật trạng thái nấu, nhập kho (inventory)
-                        .requestMatchers("/api/kitchen/**", "/api/inventory/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
-
-                        // --- 5. FRANCHISE STORE STAFF (Cửa hàng) ---
-                        // API đặt hàng, xem lịch sử đơn hàng của cửa hàng
-                        .requestMatchers("/api/store/**").hasAnyRole("ADMIN", "STORE_MANAGER")
-
-                        // --- 6. API DÙNG CHUNG (Chỉ được XEM) ---
-                        // Bất kỳ ai đăng nhập rồi cũng xem được danh sách Món, Danh mục, Nguyên liệu
+                        // GET công khai
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/ingredients/**").authenticated()
 
                         .anyRequest().authenticated()
