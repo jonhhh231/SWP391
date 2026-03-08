@@ -93,8 +93,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
 
         // Cho phép các method này
-        configuration.setAllowedMethods(
-                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
         // Cho phép gửi kèm header (quan trọng để gửi Token Bearer)
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
