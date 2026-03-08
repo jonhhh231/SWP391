@@ -57,4 +57,42 @@ public class UnitConversionController {
         }
     }
 
+    // ==========================================================
+    // CÁC API MỚI THÊM: READ - UPDATE - DELETE
+    // ==========================================================
+
+    // API 1: Lấy danh sách quy đổi của 1 nguyên liệu (Dành cho Frontend làm Dropdown)
+    // GET /api/manager/conversions/ingredient/{ingredientId}
+    @GetMapping("/ingredient/{ingredientId}")
+    public ResponseEntity<?> getConversionsByIngredient(@PathVariable String ingredientId) {
+        return ResponseEntity.ok(conversionService.getConversionsByIngredient(ingredientId));
+    }
+
+    // API 2: Cập nhật hệ số quy đổi
+    // PUT /api/manager/conversions/{id}?newFactor=25
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateConversion(
+            @PathVariable Long id,
+            @RequestParam BigDecimal newFactor
+    ) {
+        try {
+            UnitConversion result = conversionService.updateConversion(id, newFactor);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // API 3: Xóa quy đổi
+    // DELETE /api/manager/conversions/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteConversion(@PathVariable Long id) {
+        try {
+            conversionService.deleteConversion(id);
+            return ResponseEntity.ok("Đã xóa công thức quy đổi thành công!");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -80,5 +81,40 @@ public class UnitConversionService {
 
         // 3. Tính toán: Số lượng * Hệ số (Factor)
         return quantity.multiply(conversion.getConversionFactor());
+    }
+
+    // ==========================================================
+    // CÁC HÀM MỚI THÊM: READ - UPDATE - DELETE
+    // ==========================================================
+
+    // 1. LẤY DANH SÁCH (Read): Lấy tất cả quy đổi của 1 nguyên liệu
+    public List<UnitConversion> getConversionsByIngredient(String ingredientId) {
+        // Có thể check thêm xem ingredientId có tồn tại không nếu cẩn thận,
+        // nhưng hàm Repository trả về List rỗng nếu không có cũng không sao.
+        return conversionRepository.findByIngredient_IngredientId(ingredientId);
+    }
+
+    // 2. CẬP NHẬT (Update): Chỉ cho phép sửa lại Hệ số quy đổi (Factor)
+    @Transactional
+    public UnitConversion updateConversion(Long id, BigDecimal newFactor) {
+        UnitConversion conversion = conversionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy công thức quy đổi có ID: " + id));
+
+        // Vẫn phải giữ chốt chặn số 0
+        if (newFactor == null || newFactor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Lỗi: Hệ số quy đổi mới phải lớn hơn 0!");
+        }
+
+        conversion.setConversionFactor(newFactor);
+        return conversionRepository.save(conversion);
+    }
+
+    // 3. XÓA (Delete): Xóa công thức nếu tạo nhầm
+    @Transactional
+    public void deleteConversion(Long id) {
+        if (!conversionRepository.existsById(id)) {
+            throw new RuntimeException("Lỗi: Không tìm thấy công thức quy đổi có ID: " + id);
+        }
+        conversionRepository.deleteById(id);
     }
 }
