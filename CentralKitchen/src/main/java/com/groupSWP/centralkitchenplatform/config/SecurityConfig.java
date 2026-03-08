@@ -3,7 +3,7 @@ package com.groupSWP.centralkitchenplatform.config;
 import com.groupSWP.centralkitchenplatform.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.*;
-import org.springframework.http.HttpMethod; // DÒNG NÀY MỚI THÊM: Để phân biệt GET, POST, PUT, DELETE
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,11 +21,11 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Cho phép sử dụng @PreAuthorize ở Controller
-@RequiredArgsConstructor // Tự động inject JwtAuthenticationFilter
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter; // Thêm bộ lọc đã viết
+    private final JwtAuthenticationFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -36,35 +36,49 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // ADMIN
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
 
                         // MANAGER
-                        .requestMatchers("/api/manager/**").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers("/api/orders/**").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers("/api/recipes/**").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers("/api/manager/**", "/api/orders/**", "/api/recipes/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
 
-                        // ✅ CHỈ GIỮ DÒNG NÀY (bỏ dòng permitAll() ở trên)
-                        .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**").hasAnyAuthority("ADMIN", "KITCHEN_MANAGER")
+                        // 🔥 ĐÃ FIX ĐƯỜNG DẪN + ROLE CHO PRODUCT, CATEGORY, INGREDIENT
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/products", "/api/products/**",
+                                "/api/categories", "/api/categories/**",
+                                "/api/ingredients", "/api/ingredients/**",
+                                "/api/stores", "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/stores/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         // COORDINATOR
-                        .requestMatchers("/api/logistics/**", "/api/shipments/**").hasAnyAuthority("ADMIN", "MANAGER", "COORDINATOR")
+                        .requestMatchers("/api/logistics/**", "/api/shipments/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "COORDINATOR", "ROLE_COORDINATOR")
 
                         // KITCHEN
-                        .requestMatchers("/api/kitchen/**", "/api/inventory/**").hasAnyAuthority("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        .requestMatchers("/api/kitchen/**", "/api/inventory/**")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
 
                         // STORE
-                        .requestMatchers("/api/store/**").hasAnyAuthority("ADMIN", "STORE_MANAGER")
+                        .requestMatchers("/api/store/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN", "STORE_MANAGER", "ROLE_STORE_MANAGER")
 
-                        // GET công khai
-                        .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/ingredients/**").authenticated()
+                        // GET CÔNG KHAI (Chỉ cần có Token là xem được)
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/products", "/api/products/**",
+                                "/api/categories", "/api/categories/**",
+                                "/api/ingredients", "/api/ingredients/**")
+                        .authenticated()
 
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 2. QUAN TRỌNG: Đăng ký Filter để kiểm tra Token trước khi xác thực
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -73,17 +87,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        // Cho phép frontend từ cổng 3000 gọi vào
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
-
-        // Cho phép các method này
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
-        // Cho phép gửi kèm header (quan trọng để gửi Token Bearer)
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-
-        // Cho phép gửi cookie/credentials (nếu cần)
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
