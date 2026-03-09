@@ -82,7 +82,13 @@ public class AuthService {
         if (accountRepository.findByUsername(request.username()).isPresent()) {
             throw new RuntimeException("Username này đã tồn tại trong hệ thống!");
         }
-
+        if (!org.springframework.util.StringUtils.hasText(request.email())) {
+            throw new RuntimeException("Email không được để trống! Cần có email hợp lệ để nhận mã OTP.");
+        }
+        String cleanEmail = request.email().trim();
+        if (systemUserRepository.findByEmail(cleanEmail).isPresent()) {
+            throw new RuntimeException("Email này đã được sử dụng cho một tài khoản khác!");
+        }
         // ==========================================
         // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG
         // ==========================================
@@ -124,7 +130,7 @@ public class AuthService {
         SystemUser userProfile = SystemUser.builder()
                 .userId(generateStaffId(request.role()))
                 .fullName(request.fullName())
-                .email(request.email())
+                .email(cleanEmail)
                 .role(request.role())
                 .account(account)
                 .build();
