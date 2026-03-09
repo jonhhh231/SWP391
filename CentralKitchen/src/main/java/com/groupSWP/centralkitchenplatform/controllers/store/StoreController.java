@@ -23,6 +23,11 @@ public class StoreController {
         return ResponseEntity.ok(newStore);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<java.util.List<StoreResponse>> getAllStores() {
+        return ResponseEntity.ok(storeService.getAllStores());
+    }
+
     @PutMapping("/{storeId}")
     public ResponseEntity<StoreResponse> updateStore(
             @PathVariable String storeId,
