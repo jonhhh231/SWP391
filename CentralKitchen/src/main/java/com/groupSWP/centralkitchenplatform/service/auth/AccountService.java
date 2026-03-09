@@ -44,4 +44,15 @@ public class AccountService {
         }
         return dto;
     }
+
+    public List<AccountResponse> searchAccountsByFullName(String keyword) {
+        // Kiểm tra an toàn: Nếu keyword rỗng, trả về toàn bộ danh sách
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAccountsExcludingAdmin();
+        }
+
+        // Gọi Repository để tìm kiếm và map sang DTO
+        List<Account> accounts = accountRepository.searchByFullNameExcludingAdmin(keyword.trim());
+        return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
 }
