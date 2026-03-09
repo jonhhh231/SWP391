@@ -65,6 +65,15 @@ public class StoreService {
         return mapToResponse(savedStore);
     }
 
+    // ======================================================
+    // LẤY DANH SÁCH TẤT CẢ CỬA HÀNG (API: /all)
+    // ======================================================
+    public java.util.List<StoreResponse> getAllStores() {
+        return storeRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     @Transactional
     public void softDeleteStore(String storeId) { // chưa test
         Store store = storeRepository.findById(storeId)
