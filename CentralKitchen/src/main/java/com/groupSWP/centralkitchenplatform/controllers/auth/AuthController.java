@@ -43,7 +43,6 @@ public class AuthController {
                 .role(updatedUser.getRole().name())
                 .username(principal.getName())
                 .build();
-
         return ResponseEntity.ok(response);
     }
 
