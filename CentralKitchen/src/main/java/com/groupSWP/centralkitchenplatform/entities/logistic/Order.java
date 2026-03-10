@@ -15,14 +15,17 @@ public class Order extends BaseEntity {
     @Id
     private String orderId;
 
+    // 1. Giữ lại bộ này (Có EnumType.STRING là chuẩn bài)
     @Enumerated(EnumType.STRING)
+    @Column(name = "status")
     private OrderStatus status;
 
     private BigDecimal totalAmount;
     private String note;
 
-
+    // 2. Giữ lại bộ này
     @Enumerated(EnumType.STRING)
+    @Column(name = "order_type")
     private OrderType orderType;
 
     @Enumerated(EnumType.STRING)
@@ -40,6 +43,16 @@ public class Order extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shipment_id")
     private Shipment shipment;
+
+    // ❌ XÓA BỎ ĐOẠN NÀY (Vì nó đang lặp lại cái ở trên)
+    // @Enumerated(EnumType.STRING)
+    // @Column(name = "order_type")
+    // private OrderType orderType;
+
+    // ❌ XÓA BỎ ĐOẠN NÀY LUÔN
+    // @Enumerated(EnumType.STRING)
+    // @Column(name = "status")
+    // private OrderStatus status;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
