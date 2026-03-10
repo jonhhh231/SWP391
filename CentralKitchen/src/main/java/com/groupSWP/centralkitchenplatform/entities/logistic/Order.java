@@ -55,7 +55,7 @@ public class Order extends BaseEntity {
         READY_TO_SHIP,
         SHIPPING,
         DELIVERED,        // MỚI: Tài xế (Coordinator) giao tới nơi, chờ Store Manager đếm hàng
-        PARTIAL_RECEIVED, // MỚI: Store Manager xác nhận giao thiếu hàng (Tùy chọn, để vứt sang tab Khiếu nại)
+        PARTIAL_RECEIVED, // MỚI: Store Manager xác nhận giao tiếu hàng (Tùy chọn, để vứt sang tab Khiếu nại)
         DONE,
         CANCELLED
     }

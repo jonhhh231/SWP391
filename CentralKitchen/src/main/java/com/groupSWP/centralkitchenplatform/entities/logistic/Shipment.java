@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.logistic;
 
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
@@ -35,6 +36,12 @@ public class Shipment extends BaseEntity {
 
     @OneToMany(mappedBy = "shipment")
     private List<Order> orders;
+
+
+    // Thêm vào Shipment.java
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private Account driver; // Liên kết tới bảng Account (User)
 
     @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default// Thêm cái này nếu dùng @Builder để tránh list bị null

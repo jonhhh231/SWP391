@@ -20,13 +20,16 @@ public class DemoIncidentController {
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
     @GetMapping("/pending")
     public ResponseEntity<List<Map<String, Object>>> getPendingIncidents() {
+        // 🔥 ĐÃ SỬA: Thêm PARTIAL_RECEIVED vào để nó bắt được các đơn giao thiếu
+        // 🔥 ĐÃ THÊM shipment_id
         String sql = """
             SELECT
               order_id AS id,
               store_id,
-              note AS issue_description
+              note AS issue_description,
+              shipment_id
             FROM orders
-            WHERE status IN ('DONE', 'CANCELLED')
+            WHERE status IN ('DONE', 'CANCELLED', 'PARTIAL_RECEIVED') 
               AND note IS NOT NULL
               AND note <> ''
               AND note NOT LIKE '%Đã xử lý%'

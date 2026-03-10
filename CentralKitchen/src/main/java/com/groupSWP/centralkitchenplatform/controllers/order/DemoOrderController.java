@@ -63,7 +63,7 @@ public class DemoOrderController {
 
     // 5. 🔥 API CHẠY AI PHÂN BỔ TUYẾN (DÙNG LOGIC THẬT CỦA BẠN)
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
-    @PostMapping("/allocate-routes")
+    @PostMapping("/demo-allocate-routes") // Đổi tên url ở đây
     public ResponseEntity<?> allocateRoutes(@RequestBody AllocateRoutesRequest request) {
         // Chuyền dữ liệu xuống file RouteAllocationService để nó chạy
         RouteAllocationResponse result = routeAllocationService.allocate(request);
@@ -88,5 +88,18 @@ public class DemoOrderController {
         String sql = "SELECT shipment_id, driver_name as driver, vehicle_plate as plate, status FROM shipments WHERE status = 'COMPLETED' ORDER BY updated_at DESC";
         List<Map<String, Object>> shipments = jdbcTemplate.queryForList(sql);
         return ResponseEntity.ok(shipments);
+    }
+
+    // =========================================================================
+    // 7. 🔥 API LẤY DANH SÁCH COORDINATOR ĐỂ FE HIỂN THỊ DROPDOWN GÁN TÀI XẾ
+    // =========================================================================
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+    @GetMapping("/coordinators-list")
+    public ResponseEntity<List<Map<String, Object>>> getCoordinatorAccounts() {
+        // Query lấy ra tất cả account có role là COORDINATOR
+        String sql = "SELECT account_id as id, username, role FROM accounts WHERE role = 'COORDINATOR'";
+        List<Map<String, Object>> coordinators = jdbcTemplate.queryForList(sql);
+
+        return ResponseEntity.ok(coordinators);
     }
 }
