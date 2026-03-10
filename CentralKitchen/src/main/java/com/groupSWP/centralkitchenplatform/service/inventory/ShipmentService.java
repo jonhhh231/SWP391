@@ -56,7 +56,7 @@ public class ShipmentService {
         shipmentRepository.save(shipment);
 
         // [SỬA 2]: Cập nhật trạng thái TOÀN BỘ ĐƠN HÀNG TRONG XE
-        Order.OrderStatus finalOrderStatus = hasIssue ? Order.OrderStatus.PARTIAL_RECEIVED : Order.OrderStatus.DONE;
+        Order.OrderStatus finalOrderStatus = hasIssue ? Order.OrderStatus.SHIPPING : Order.OrderStatus.PREPARING;
         if (shipment.getOrders() != null) {
             shipment.getOrders().forEach(o -> o.setStatus(finalOrderStatus));
             orderRepository.saveAll(shipment.getOrders());
@@ -90,7 +90,7 @@ public class ShipmentService {
         Order compensationOrder = new Order();
         compensationOrder.setOrderId("COMP-" + System.currentTimeMillis() % 10000);
         compensationOrder.setOrderType(Order.OrderType.COMPENSATION);
-        compensationOrder.setStatus(Order.OrderStatus.READY_TO_SHIP); // Để sẵn sàng giao
+        compensationOrder.setStatus(Order.OrderStatus.SHIPPING); // Để sẵn sàng giao
         compensationOrder.setShipment(savedReplacement);
 
         // Lấy lại cửa hàng từ đơn cũ (Do 1 xe chở cho 1 cửa hàng)

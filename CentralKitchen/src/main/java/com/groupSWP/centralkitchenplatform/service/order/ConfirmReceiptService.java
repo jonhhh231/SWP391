@@ -39,7 +39,7 @@ public class ConfirmReceiptService {
         Order.OrderStatus oldStatus = order.getStatus();
 
         // Idempotent: DONE rồi thì thôi (tránh cộng kho 2 lần)
-        if (oldStatus == Order.OrderStatus.DONE) {
+        if (oldStatus == Order.OrderStatus.SHIPPING) {
             log.info("ConfirmReceipt already confirmed order={} note={}", orderId, note);
             return ConfirmReceiptResponse.builder()
                     .orderId(orderId)
@@ -57,7 +57,7 @@ public class ConfirmReceiptService {
         }
 
         // 1) Update order -> DONE
-        order.setStatus(Order.OrderStatus.DONE);
+        order.setStatus(Order.OrderStatus.SHIPPING);
         if (note != null) order.setNote(note);
         orderRepository.save(order);
 
@@ -110,7 +110,7 @@ public class ConfirmReceiptService {
             String shipmentId = order.getShipment().getShipmentId();
 
             boolean stillHasNotDone =
-                    orderRepository.existsByShipment_ShipmentIdAndStatusNot(shipmentId, Order.OrderStatus.DONE);
+                    orderRepository.existsByShipment_ShipmentIdAndStatusNot(shipmentId, Order.OrderStatus.SHIPPING);
 
             if (!stillHasNotDone) {
                 Shipment shipment = shipmentRepository.findById(shipmentId)
@@ -123,12 +123,12 @@ public class ConfirmReceiptService {
         }
 
         log.info("ConfirmReceipt order={} old={} new={} stockUpdated={} shipmentCompleted={} note={}",
-                orderId, oldStatus, Order.OrderStatus.DONE, stockUpdated, shipmentCompleted, note);
+                orderId, oldStatus, Order.OrderStatus.SHIPPING, stockUpdated, shipmentCompleted, note);
 
         return ConfirmReceiptResponse.builder()
                 .orderId(orderId)
                 .oldStatus(oldStatus.name())
-                .newStatus(Order.OrderStatus.DONE.name())
+                .newStatus(Order.OrderStatus.SHIPPING.name())
                 .stockUpdated(stockUpdated)
                 .shipmentCompleted(shipmentCompleted)
                 .message("Xác nhận nhập kho thành công")

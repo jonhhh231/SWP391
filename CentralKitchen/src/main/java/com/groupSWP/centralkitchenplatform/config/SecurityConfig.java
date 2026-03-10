@@ -122,6 +122,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/store/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "STORE_MANAGER", "ROLE_STORE_MANAGER")
 
+                        // 1. Quyền cho Kitchen Manager (hoặc Admin/Manager) đổi trạng thái Đang chuẩn bị / Đang giao
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/orders/delivery/*/preparing",
+                                "/api/orders/delivery/*/shipping")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+
+                        // 2. Quyền cho Store Manager (hoặc Admin) xác nhận Đã nhận hàng
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/orders/delivery/*/confirm-receipt")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "STORE_MANAGER", "ROLE_STORE_MANAGER")
+
                         // Mọi endpoint khác không khai báo ở trên đều yêu cầu phải có Token hợp lệ
                         .anyRequest().authenticated()
                 )

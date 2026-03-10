@@ -291,7 +291,7 @@ public class OrderService {
             productionService.createProductionRun(request);
         }
 
-        for (Order order : pendingOrders) order.setStatus(Order.OrderStatus.AGGREGATED);
+        for (Order order : pendingOrders) order.setStatus(Order.OrderStatus.SHIPPING);
         orderRepository.saveAll(pendingOrders);
     }
 }

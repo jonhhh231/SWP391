@@ -44,7 +44,7 @@ public class RouteAllocationService {
         int maxUrgentPerTrip = (req != null && req.getMaxUrgentPerTrip() != null) ? req.getMaxUrgentPerTrip() : 2;
 
         // Lấy danh sách đơn hàng sẵn sàng xuất kho
-        List<Order> candidates = orderRepository.findByStatusAndShipmentIsNull(Order.OrderStatus.READY_TO_SHIP);
+        List<Order> candidates = orderRepository.findByStatusAndShipmentIsNull(Order.OrderStatus.SHIPPING);
 
         // 🔥 QUAN TRỌNG: In ra để debug xem có tìm thấy đơn không
         log.info("AI quét được: {} đơn hàng READY_TO_SHIP", candidates.size());

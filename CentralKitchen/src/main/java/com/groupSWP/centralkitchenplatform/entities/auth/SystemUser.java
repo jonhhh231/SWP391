@@ -29,11 +29,6 @@ public class SystemUser {
     // NVARCHAR giúp MySQL hỗ trợ tiếng Việt có dấu tốt hơn
     private String fullName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 30)
-    // Lưu dưới dạng VARCHAR(30) trong MySQL: "ADMIN", "KITCHEN_STAFF",...
-    private SystemRole role;
-
     @OneToMany(mappedBy = "coordinator", fetch = FetchType.LAZY)
     private List<Shipment> managedShipments;
 
@@ -43,12 +38,5 @@ public class SystemUser {
     @Column(name = "email", unique = true)
     private String email;
 
-    // Định nghĩa Enum ngay bên trong hoặc tách file riêng tùy bạn
-    public enum SystemRole {
-        ADMIN,              // 1. Quản trị hệ thống
-        MANAGER,            // 2. Quản lý vận hành (Sếp to)
-        COORDINATOR,        // 3. Điều phối cung ứng (Logistics)
-        KITCHEN_MANAGER,      // 4. Nhân viên quản lý bếp trung tâm
-        STORE_MANAGER         // 5. Nhân viên quản lý cửa hàng (Franchise)
-    }
+
 }
