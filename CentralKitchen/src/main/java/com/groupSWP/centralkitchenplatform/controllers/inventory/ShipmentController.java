@@ -13,20 +13,22 @@ import org.springframework.web.bind.annotation.*;
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
+     //Bị lỗi run do trùng API
+    // 1. API báo lỗi: Cho phép COORDINATOR hoặc MANAGER vào báo cáo giả lập
+    // 🔥 ĐÃ SỬA: Bao phủ toàn bộ các role với hasAnyAuthority
+//    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'COORDINATOR', 'ROLE_COORDINATOR', 'MANAGER', 'ROLE_MANAGER', 'STORE_MANAGER', 'ROLE_STORE_MANAGER')")
+//    @PostMapping("/{shipmentId}/report")
+//    public ResponseEntity<String> reportReceivedShipment(
+//            @PathVariable String shipmentId,
+//            @RequestBody ReportShipmentRequest request) {
+//
+//        String result = shipmentService.reportIssue(shipmentId, request);
+//        return ResponseEntity.ok(result);
+//    }
 
-    // API báo lỗi: Tham số là String shipmentId
-    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('ROLE_ADMIN') or hasRole('ADMIN')") // dòng này là để test cho dễ nào làm chỉnh lại sau
-    @PostMapping("/{shipmentId}/report")
-    public ResponseEntity<String> reportReceivedShipment(
-            @PathVariable String shipmentId,
-            @RequestBody ReportShipmentRequest request) {
-
-        String result = shipmentService.reportIssue(shipmentId, request);
-        return ResponseEntity.ok(result);
-    }
-
-    // API xử lý lỗi
-    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ADMIN') or hasAuthority('ADMIN') or hasAuthority('ROLE_ADMIN') or hasRole('ADMIN')") // dòng này chỉ để test cho dễ nào làm thì sửa lại sao
+    // 2. API xử lý lỗi (Giao bù)
+    // 🔥 ĐÃ SỬA: Bao phủ toàn bộ các role với hasAnyAuthority
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'COORDINATOR', 'ROLE_COORDINATOR', 'MANAGER', 'ROLE_MANAGER', 'STORE_MANAGER', 'ROLE_STORE_MANAGER')")
     @PostMapping("/{shipmentId}/resolve-replacement")
     public ResponseEntity<String> resolveAndCreateReplacement(
             @PathVariable String shipmentId) {

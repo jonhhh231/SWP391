@@ -9,7 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/logistics")
+@RequestMapping("/api/logistics/orders")
 @RequiredArgsConstructor
 public class RouteAllocationController {
 
