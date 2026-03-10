@@ -30,4 +30,6 @@ public class ShipmentDetail {
     public int getMissingQuantity() {
         return Math.max(0, expectedQuantity - receivedQuantity);
     }
+
+
 }

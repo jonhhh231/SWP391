@@ -4,6 +4,7 @@ import com.groupSWP.centralkitchenplatform.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,7 +30,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable)
+// 🔥 ĐÃ FIX CORS: Thêm dòng này để kích hoạt cấu hình CORS bên dưới
+        http.cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // 1. PUBLIC (Không cần Token)
                         .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
@@ -86,7 +89,7 @@ public class SecurityConfig {
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
 
                         // COORDINATOR
-                        .requestMatchers("/api/logistics/**", "/api/shipments/**")
+                        .requestMatchers("/api/logistics/**", "/api/shipments/**", "/api/orders/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "COORDINATOR", "ROLE_COORDINATOR")
 
                         // KITCHEN
