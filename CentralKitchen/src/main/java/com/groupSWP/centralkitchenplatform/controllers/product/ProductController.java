@@ -38,12 +38,11 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
-    // API 1.3: XÓA MỀM (Soft Delete)
-    @DeleteMapping("/{id}")
+    // API 1.3: Nút Gạt Xóa Mềm (Toggle Status)
+    @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
-    public ResponseEntity<String> deleteProduct(@PathVariable String id) {
-        productService.deleteProduct(id);
-        return ResponseEntity.ok("Đã ẩn sản phẩm thành công!");
+    public ResponseEntity<String> toggleProductStatus(@PathVariable String id) {
+        return ResponseEntity.ok(productService.toggleProductStatus(id));
     }
 
     // API 2: Lấy danh sách sản phẩm (Có phân trang & Lọc)

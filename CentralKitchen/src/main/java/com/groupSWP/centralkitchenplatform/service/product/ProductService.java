@@ -98,12 +98,18 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProduct(String id) {
+    public String toggleProductStatus(String id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
 
-        product.setActive(false);
+        // Đảo ngược trạng thái: Đang true (mở bán) -> false (ngừng bán) và ngược lại
+        product.setActive(!product.isActive());
         productRepository.save(product);
+
+        // Trả về câu thông báo cho FE mừng
+        return product.isActive() ?
+                "Đã MỞ BÁN lại sản phẩm: " + product.getProductName() :
+                "Đã NGỪNG KINH DOANH sản phẩm: " + product.getProductName();
     }
 
     public Page<ProductResponse> getAllProducts(
