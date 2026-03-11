@@ -13,6 +13,7 @@ import java.util.List;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Store extends BaseEntity {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String storeId; // ST01
     private String name;
     private String address;

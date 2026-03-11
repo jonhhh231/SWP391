@@ -8,6 +8,4 @@ import java.util.List;
 
 @Repository
 public interface IngredientRepository extends JpaRepository<Ingredient, String> {
-    List<Ingredient> findByFormulas_Product_ProductId(String productId);
-
 }
