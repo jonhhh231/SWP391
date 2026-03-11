@@ -11,7 +11,7 @@ public class AccountResponse {
     private String username;
     private String role;
     private boolean isActive;
-
+    private String storeName;
     // Thông tin từ SystemUser
     private String userId;
     private String fullName;
