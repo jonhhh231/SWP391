@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
 // [1] THÊM IMPORT NÀY
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import jakarta.persistence.*;
@@ -13,6 +14,7 @@ import java.util.List;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Ingredient {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String ingredientId;
     // [VŨ KHÍ MỚI] THÊM 2 DÒNG NÀY VÀO ĐỂ BẬT KHIÊN CHỐNG CHẠM DỮ LIỆU NHÉ
     @Version
@@ -25,13 +27,15 @@ public class Ingredient {
     private BigDecimal unitCost;
     private BigDecimal minThreshold;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "ingredient")
     private List<Formula> formulas;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "ingredient")
     private List<ImportItem> importItems;
 
-    // [3] THÊM ĐOẠN NÀY VÀO CUỐI CÙNG (Để nối với bảng quy đổi mới)
+    @JsonIgnore
     @OneToMany(mappedBy = "ingredient", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UnitConversion> conversions;
 }
