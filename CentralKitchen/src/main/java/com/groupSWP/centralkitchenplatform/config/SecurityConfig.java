@@ -57,8 +57,8 @@ public class SecurityConfig {
                         // =========================================================
                         .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-
                         // =========================================================
+
                         // 2. ƯU TIÊN 1: CÁC LUỒNG CỤ THỂ (Phải đặt lên trên cùng để tránh bị đè rule)
                         // =========================================================
 
@@ -112,7 +112,7 @@ public class SecurityConfig {
 
                         // Khu vực dành cho LOGISTICS / COORDINATOR
                         .requestMatchers("/api/logistics/**", "/api/shipments/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "COORDINATOR", "ROLE_COORDINATOR")
+                        .hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
 
                         // Khu vực dành cho KITCHEN MANAGER (Quản lý Bếp trung tâm)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**")

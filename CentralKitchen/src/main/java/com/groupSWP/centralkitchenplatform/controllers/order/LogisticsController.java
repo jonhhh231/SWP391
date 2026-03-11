@@ -74,14 +74,25 @@ public class LogisticsController {
     }
 
     // 7. API LẤY DANH SÁCH TÀI XẾ
+    // 7. API LẤY DANH SÁCH TÀI XẾ (ĐÃ FIX LỖI BASE64 UUID)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
     @GetMapping("/coordinators-list")
     public ResponseEntity<List<Map<String, Object>>> getCoordinatorAccounts() {
         String sql = "SELECT account_id as id, username, role FROM accounts WHERE role = 'COORDINATOR'";
         List<Map<String, Object>> coordinators = jdbcTemplate.queryForList(sql);
+
+        // 🔥 ĐOẠN XỬ LÝ MỚI: Dịch mảng byte (Base64) sang chuỗi UUID chuẩn
+        for (Map<String, Object> map : coordinators) {
+            Object idObj = map.get("id");
+            if (idObj instanceof byte[]) {
+                byte[] bytes = (byte[]) idObj;
+                java.nio.ByteBuffer byteBuffer = java.nio.ByteBuffer.wrap(bytes);
+                // Ghép 2 nửa 8-byte lại thành 1 UUID chuẩn 16-byte
+                java.util.UUID uuid = new java.util.UUID(byteBuffer.getLong(), byteBuffer.getLong());
+                // Thay thế cái Base64 cũ bằng chuỗi UUID đẹp đẽ
+                map.put("id", uuid.toString());
+            }
+        }
         return ResponseEntity.ok(coordinators);
     }
-
-
-
 }
