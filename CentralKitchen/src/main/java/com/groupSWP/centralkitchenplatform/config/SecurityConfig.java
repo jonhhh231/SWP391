@@ -94,7 +94,7 @@ public class SecurityConfig {
                         // =========================================================
 
                         // Khu vực dành riêng cho ADMIN
-                        .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // Khu vực dành cho MANAGER (Các luồng Conversions ngoại lệ đã được xử lý phía trên)
                         .requestMatchers("/api/manager/**", "/api/orders/**", "/api/recipes/**")

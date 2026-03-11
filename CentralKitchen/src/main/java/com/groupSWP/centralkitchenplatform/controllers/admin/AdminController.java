@@ -17,13 +17,12 @@ import java.util.List;
  * Lớp này cung cấp các điểm cuối (endpoints) để Admin quản lý vòng đời của
  * tài khoản người dùng, bao gồm: cấp phát tài khoản mới, tra cứu và lọc danh sách nhân sự.
  * </p>
- * <p><b>Chính sách bảo mật:</b> Toàn bộ các API trong Controller này đều bị ràng buộc bởi
- * {@code @PreAuthorize("hasRole('ADMIN')")}. Bất kỳ Role nào khác cố tình gọi vào đây
- * đều sẽ nhận về lỗi 403 Forbidden.</p>
+ * <p><b>Chính sách bảo mật:</b> Toàn bộ các API trong Controller này đều bị ràng buộc bởi quyền ADMIN.</p>
  */
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+// 🌟 ĐÃ SỬA: Dùng hasAnyAuthority để tránh lỗi 403 ngớ ngẩn do Spring Security tự ghép tiền tố ROLE_
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
@@ -32,53 +31,24 @@ public class AdminController {
 
     /**
      * API Cấp phát tài khoản nhân sự mới.
-     * <p>
-     * Phục vụ luồng nghiệp vụ: Admin là người duy nhất có quyền tạo tài khoản
-     * cho nhân viên (Cửa hàng trưởng, Điều phối viên, Quản lý bếp...) và gắn họ vào
-     * các cơ sở làm việc tương ứng.
-     * </p>
-     *
-     * @param request Dữ liệu đầu vào chứa thông tin tài khoản (username, password, role, storeId...).
-     * @return Thông báo xác nhận tạo tài khoản thành công cùng username vừa tạo.
      */
     @PostMapping("/register")
     public ResponseEntity<String> createEmployee(@RequestBody RegisterRequest request) {
         String result = authService.register(request);
-        // Ở đây biến result đang chứa thông báo từ Service, bạn có thể cân nhắc trả thẳng result về,
-        // hoặc giữ nguyên format của bạn nếu muốn đồng nhất message.
         return ResponseEntity.ok("Admin đã cấp tài khoản thành công! Username: " + request.username());
     }
 
     /**
      * API Tra cứu danh sách tài khoản linh hoạt (Tất cả hoặc theo từ khóa).
-     * <p>
-     * <b>Thiết kế tối ưu (2-in-1):</b>
-     * <ul>
-     * <li>Gửi Request không kèm tham số ({@code /list-accounts}): Lấy toàn bộ danh sách.</li>
-     * <li>Gửi Request kèm tham số (VD: {@code /list-accounts?keyword=Nguyễn}): Trả về danh sách được lọc theo tên.</li>
-     * </ul>
-     * </p>
-     *
-     * @param keyword Từ khóa tìm kiếm (đối chiếu với thuộc tính FullName của SystemUser). Không bắt buộc.
-     * @return Danh sách đối tượng {@link AccountResponse} đã được chuẩn hóa dữ liệu đầu ra.
      */
     @GetMapping("/list-accounts")
     public ResponseEntity<List<AccountResponse>> getAccounts(
             @RequestParam(required = false) String keyword) {
-
-        // Nhờ logic xử lý thông minh đã viết bên AccountService,
-        // Controller giờ đây chỉ cần gọi đúng 1 dòng này là xử lý được cả 2 trường hợp!
         return ResponseEntity.ok(accountService.searchAccountsByFullName(keyword));
     }
 
     /**
      * API Lọc danh sách các tài khoản đang hoạt động (Active).
-     * <p>
-     * Thường được Frontend sử dụng để hiển thị danh sách nhân sự khả dụng
-     * cho các nghiệp vụ phân công công việc.
-     * </p>
-     *
-     * @return Danh sách tài khoản có trạng thái {@code status = true}.
      */
     @GetMapping("/list-accounts/active")
     public ResponseEntity<List<AccountResponse>> getActiveAccounts() {
@@ -87,14 +57,50 @@ public class AdminController {
 
     /**
      * API Lọc danh sách các tài khoản đã bị khóa/ngưng hoạt động (Inactive).
-     * <p>
-     * Phục vụ mục đích kiểm toán (audit) hoặc xem xét mở khóa tài khoản của Admin.
-     * </p>
-     *
-     * @return Danh sách tài khoản có trạng thái {@code status = false}.
      */
     @GetMapping("/list-accounts/inactive")
     public ResponseEntity<List<AccountResponse>> getInactiveAccounts() {
         return ResponseEntity.ok(accountService.getAccountsByStatus(false));
+    }
+
+    // =========================================================================
+    // 🔥 CÁC NGHIỆP VỤ NHÂN SỰ MỚI (THĂNG CHỨC & CHUYỂN CÔNG TÁC)
+    // =========================================================================
+
+    /**
+     * API Thay đổi chức vụ (Role) của tài khoản.
+     * <p>Phục vụ nghiệp vụ thăng chức hoặc giáng chức nhân viên.</p>
+     *
+     * @param accountId ID của tài khoản cần thay đổi (UUID).
+     * @param roleName  Tên Role mới (VD: STORE_MANAGER, COORDINATOR...).
+     * @return Thông tin tài khoản sau khi đã được cập nhật Role.
+     */
+    @PatchMapping("/accounts/{accountId}/role")
+    public ResponseEntity<AccountResponse> changeAccountRole(
+            @PathVariable String accountId,
+            @RequestParam String roleName) {
+
+        AccountResponse updatedAccount = accountService.changeAccountRole(accountId, roleName);
+        return ResponseEntity.ok(updatedAccount);
+    }
+
+    /**
+     * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
+     * <p>
+     * Phục vụ nghiệp vụ điều chuyển nhân sự giữa các chi nhánh.
+     * Nếu không truyền storeId, hệ thống sẽ gỡ nhân viên khỏi cửa hàng hiện tại (rút về hội sở).
+     * </p>
+     *
+     * @param accountId ID của tài khoản cần điều chuyển (UUID).
+     * @param storeId   ID của cửa hàng mới (không bắt buộc).
+     * @return Thông tin tài khoản sau khi đã cập nhật nơi làm việc.
+     */
+    @PatchMapping("/accounts/{accountId}/store")
+    public ResponseEntity<AccountResponse> assignStoreToAccount(
+            @PathVariable String accountId,
+            @RequestParam(required = false) String storeId) {
+
+        AccountResponse updatedAccount = accountService.assignStoreToAccount(accountId, storeId);
+        return ResponseEntity.ok(updatedAccount);
     }
 }
