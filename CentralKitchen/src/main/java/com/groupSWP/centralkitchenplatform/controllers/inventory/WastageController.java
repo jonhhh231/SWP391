@@ -22,7 +22,7 @@ public class WastageController {
      * Role: KITCHEN_MANAGER, MANAGER, ADMIN
      */
     @PostMapping("/wastage")
-    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER','MANAGER','ADMIN')")//
+    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER','ADMIN')")//
     public ResponseEntity<WastageResponse> recordWastage(
             @Valid @RequestBody WastageRequest request) {
         return ResponseEntity.ok(wastageService.recordWastage(request));

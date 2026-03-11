@@ -53,10 +53,13 @@ public class Order extends BaseEntity {
 
     public enum OrderStatus {
         NEW,
-        PREPARING,        // MỚI: Đang chuẩn bị hàng
-        SHIPPING,         // MỚI/SỬA: Đang giao hàng
-        DELIVERED,        // MỚI/SỬA: Đã nhận hàng (Store Manager xác nhận hoặc hệ thống tự đóng)
-        CANCELLED
+        PREPARING,        // Bếp đang nấu
+        SHIPPING,         // Đang trên xe giao đến cửa hàng
+        DELIVERED,        // Xe đã tới nơi (Chờ Store Manager đếm hàng)
+        PARTIAL_RECEIVED, // Cửa hàng báo THIẾU HÀNG (Chờ Bếp lên đơn bù)
+        DONE,             // Cửa hàng báo NHẬN ĐỦ
+        CANCELLED,
+        READY_TO_SHIP
     }
     public enum OrderType { STANDARD, URGENT, COMPENSATION }
     public enum DeliveryWindow { MORNING, AFTERNOON }

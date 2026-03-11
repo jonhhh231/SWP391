@@ -24,7 +24,7 @@ public class StoreSettingsController {
      * Secondary Actor: ADMIN, MANAGER (Quản trị hệ thống)
      */
     @GetMapping("/profile")
-    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN', 'MANAGER')") // 🔥 Đã sửa thành hasAnyRole
+    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')") // 🔥 Đã sửa thành hasAnyRole
     public ResponseEntity<StoreProfileResponse> getStoreProfile(Principal principal) {
         return ResponseEntity.ok(storeSettingsService.getProfileByUsername(principal.getName()));
     }
@@ -35,7 +35,7 @@ public class StoreSettingsController {
      * Primary Actor: STORE_MANAGER
      */
     @PutMapping("/profile")
-    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN', 'MANAGER')") // 🔥 Đã sửa thành hasAnyRole
+    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')") // 🔥 Đã sửa thành hasAnyRole
     public ResponseEntity<String> updateStoreProfile(Principal principal, @RequestBody StoreProfileUpdateRequest request) {
         storeSettingsService.updateProfileByUsername(principal.getName(), request);
         return ResponseEntity.ok("Cập nhật thông tin thành công!");

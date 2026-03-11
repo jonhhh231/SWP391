@@ -13,27 +13,31 @@ import org.springframework.web.bind.annotation.*;
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
-     //Bị lỗi run do trùng API
-    // 1. API báo lỗi: Cho phép COORDINATOR hoặc MANAGER vào báo cáo giả lập
-    // 🔥 ĐÃ SỬA: Bao phủ toàn bộ các role với hasAnyAuthority
-//    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'COORDINATOR', 'ROLE_COORDINATOR', 'MANAGER', 'ROLE_MANAGER', 'STORE_MANAGER', 'ROLE_STORE_MANAGER')")
-//    @PostMapping("/{shipmentId}/report")
-//    public ResponseEntity<String> reportReceivedShipment(
-//            @PathVariable String shipmentId,
-//            @RequestBody ReportShipmentRequest request) {
-//
-//        String result = shipmentService.reportIssue(shipmentId, request);
-//        return ResponseEntity.ok(result);
-//    }
 
-    // 2. API xử lý lỗi (Giao bù)
-    // 🔥 ĐÃ SỬA: Bao phủ toàn bộ các role với hasAnyAuthority
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'COORDINATOR', 'ROLE_COORDINATOR', 'MANAGER', 'ROLE_MANAGER', 'STORE_MANAGER', 'ROLE_STORE_MANAGER')")
+    // STORE MANAGER: Gọi API này để CHỐT HÀNG (Nhận đủ hoặc Báo thiếu)
+    @PreAuthorize("hasAnyRole('STORE_MANAGER','ADMIN')")
+    @PostMapping("/{shipmentId}/report")
+    public ResponseEntity<?> reportReceivedShipment(
+            @PathVariable String shipmentId,
+            @RequestBody(required = false) ReportShipmentRequest request) { // Không bắt buộc có body nếu nhận đủ
+
+        try {
+            String result = shipmentService.reportIssue(shipmentId, request);
+            return ResponseEntity.ok(java.util.Map.of("message", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    // KITCHEN MANAGER: Gọi API này để TẠO ĐƠN BÙ khi nhận được báo cáo thiếu hàng
+    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/resolve-replacement")
-    public ResponseEntity<String> resolveAndCreateReplacement(
-            @PathVariable String shipmentId) {
-
-        String result = shipmentService.createReplacementShipment(shipmentId);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<?> resolveAndCreateReplacement(@PathVariable String shipmentId) {
+        try {
+            String result = shipmentService.createReplacementShipment(shipmentId);
+            return ResponseEntity.ok(java.util.Map.of("message", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 }

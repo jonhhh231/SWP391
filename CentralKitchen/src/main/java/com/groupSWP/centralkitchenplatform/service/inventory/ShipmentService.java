@@ -3,6 +3,7 @@ package com.groupSWP.centralkitchenplatform.service.inventory;
 import com.groupSWP.centralkitchenplatform.dto.logistics.ReportShipmentRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
+import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
@@ -16,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -24,7 +29,6 @@ public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final ShipmentDetailRepository shipmentDetailRepository;
-    // BỔ SUNG: Gọi OrderRepository để xử lý trạng thái Đơn hàng
     private final OrderRepository orderRepository;
     private final AccountRepository accountRepository;
 
@@ -33,36 +37,47 @@ public class ShipmentService {
         Shipment shipment = shipmentRepository.findById(shipmentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến giao hàng!"));
 
-        boolean hasIssue = false;
-
-        // Cập nhật số lượng thực nhận từ báo cáo của Cửa hàng
-        for (ReportShipmentRequest.ItemReport report : request.getReportedItems()) {
-            ShipmentDetail detail = shipment.getShipmentDetails().stream()
-                    .filter(d -> d.getProduct().getProductId().equals(report.getProductId()))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Sản phẩm " + report.getProductId() + " không có trong chuyến hàng này!"));
-
-            detail.setReceivedQuantity(report.getReceivedQuantity());
-            detail.setIssueNote(report.getNote());
-
-            // Đảm bảo sếp đã viết hàm getMissingQuantity() trong class ShipmentDetail nhé
-            if (detail.getMissingQuantity() > 0) {
-                hasIssue = true;
-            }
+        // Nếu xe chưa tới nơi mà đòi kiểm hàng thì chặn lại
+        if (shipment.getStatus() != Shipment.ShipmentStatus.DELIVERED) {
+            throw new RuntimeException("Chuyến xe chưa được đánh dấu là Đã Tới Nơi!");
         }
 
-        // [SỬA 1]: Cập nhật trạng thái CHUYẾN XE
-        shipment.setStatus(hasIssue ? Shipment.ShipmentStatus.ISSUE_REPORTED : Shipment.ShipmentStatus.DELIVERED);
+        boolean hasIssue = false;
+
+        // Nếu Store Manager có gửi danh sách báo cáo thiếu/lỗi
+        if (request != null && request.getReportedItems() != null && !request.getReportedItems().isEmpty()) {
+            for (ReportShipmentRequest.ItemReport report : request.getReportedItems()) {
+                ShipmentDetail detail = shipment.getShipmentDetails().stream()
+                        .filter(d -> d.getProduct().getProductId().equals(report.getProductId()))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Sản phẩm " + report.getProductId() + " không có trong chuyến hàng này!"));
+
+                detail.setReceivedQuantity(report.getReceivedQuantity());
+                detail.setIssueNote(report.getNote());
+
+                if (detail.getMissingQuantity() > 0) {
+                    hasIssue = true;
+                }
+            }
+        } else {
+            // Nút "Đã nhận đủ hàng": Mặc định set số lượng thực nhận = số lượng mong đợi cho tất cả
+            shipment.getShipmentDetails().forEach(detail -> {
+                detail.setReceivedQuantity(detail.getExpectedQuantity());
+            });
+        }
+
+        // 1. Cập nhật trạng thái CHUYẾN XE
+        shipment.setStatus(hasIssue ? Shipment.ShipmentStatus.ISSUE_REPORTED : Shipment.ShipmentStatus.RESOLVED);
         shipmentRepository.save(shipment);
 
-        // [SỬA 2]: Cập nhật trạng thái TOÀN BỘ ĐƠN HÀNG TRONG XE
-        Order.OrderStatus finalOrderStatus = hasIssue ? Order.OrderStatus.SHIPPING : Order.OrderStatus.PREPARING;
+        // 2. Cập nhật trạng thái TOÀN BỘ ĐƠN HÀNG TRONG XE
+        Order.OrderStatus finalOrderStatus = hasIssue ? Order.OrderStatus.PARTIAL_RECEIVED : Order.OrderStatus.DONE;
         if (shipment.getOrders() != null) {
             shipment.getOrders().forEach(o -> o.setStatus(finalOrderStatus));
             orderRepository.saveAll(shipment.getOrders());
         }
 
-        return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Chờ điều phối xử lý!" : "Chuyến hàng hoàn tất trọn vẹn!";
+        return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Đã báo cho Bếp trung tâm lên đơn bù!" : "Xác nhận nhận đủ hàng. Đơn hàng hoàn tất!";
     }
 
     @Transactional
@@ -90,7 +105,7 @@ public class ShipmentService {
         Order compensationOrder = new Order();
         compensationOrder.setOrderId("COMP-" + System.currentTimeMillis() % 10000);
         compensationOrder.setOrderType(Order.OrderType.COMPENSATION);
-        compensationOrder.setStatus(Order.OrderStatus.SHIPPING); // Để sẵn sàng giao
+        compensationOrder.setStatus(Order.OrderStatus.READY_TO_SHIP); // Để sẵn sàng giao
         compensationOrder.setShipment(savedReplacement);
 
         // Lấy lại cửa hàng từ đơn cũ (Do 1 xe chở cho 1 cửa hàng)
@@ -130,37 +145,36 @@ public class ShipmentService {
         return "Đã lên đơn BÙ (COMPENSATION) thành công! Mã chuyến mới: " + savedReplacement.getShipmentId();
     }
 
-    // 🔥 HÀM GÁN TÀI XẾ (Bị thiếu nãy giờ)
+    // 🔥 HÀM GÁN TÀI XẾ
     @Transactional
-    public void assignDriverToShipment(String shipmentId, String accountId, String vehiclePlate) {
-        // 1. Tìm chuyến xe
+    public void assignDriverToShipment(String shipmentId, String accountId) {
         Shipment shipment = shipmentRepository.findById(shipmentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe: " + shipmentId));
 
-        // 2. Tìm tài khoản COORDINATOR sẽ đi giao (Ép kiểu String sang UUID)
-        Account driver = accountRepository.findById(java.util.UUID.fromString(accountId))
+        Account driver = accountRepository.findById(UUID.fromString(accountId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản tài xế!"));
 
-        // 3. Gán tài khoản vào xe
-        shipment.setDriver( driver);
-
-        // 4. Lấy Username làm tên tài xế luôn cho lẹ, bao lỗi 100%
+        shipment.setDriver(driver);
         shipment.setDriverName(driver.getUsername());
+        shipment.setVehiclePlate(null);
 
-        shipment.setVehiclePlate(vehiclePlate);
-
-        // 5. Đổi trạng thái xe sang ĐANG ĐI GIAO
+        // Đổi trạng thái xe sang ĐANG ĐI GIAO
         shipment.setStatus(Shipment.ShipmentStatus.SHIPPING);
 
-        // 6. Lưu xuống Database
-        shipmentRepository.save(shipment);
+        // KÍCH HOẠT BỘ ĐẾM 6 TIẾNG
+        if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            shipment.getOrders().forEach(order -> {
+                order.setStatus(Order.OrderStatus.SHIPPING);
+                order.setShippingStartTime(now); // Chốt giờ xuất phát!
+            });
+            orderRepository.saveAll(shipment.getOrders());
+        }
 
-        log.info("Đã gán thành công tài xế {} cho chuyến xe {}", driver.getUsername(), shipmentId);
+        shipmentRepository.save(shipment);
+        log.info("Đã gán tài xế {} cho chuyến xe {}. Bắt đầu đếm ngược 6 tiếng cho các đơn hàng!", driver.getUsername(), shipmentId);
     }
 
-    // ... (code cũ của sếp giữ nguyên)
-
-    // 🔥 [MỚI]: Hàm dành cho Tài xế bấm khi xe tới cửa hàng
     // 🔥 Hàm dành cho Tài xế bấm khi xe tới cửa hàng
     @Transactional
     public void markShipmentAsDelivered(String shipmentId) {
@@ -174,16 +188,79 @@ public class ShipmentService {
         // 1. Đổi trạng thái xe thành ĐÃ TỚI NƠI
         shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
 
-        // 🔥 2. THÊM ĐOẠN NÀY: Đổi luôn trạng thái các Đơn hàng trên xe thành DELIVERED
+        // 2. Đổi luôn trạng thái các Đơn hàng trên xe thành DELIVERED
         if (shipment.getOrders() != null) {
             shipment.getOrders().forEach(o -> o.setStatus(Order.OrderStatus.DELIVERED));
             orderRepository.saveAll(shipment.getOrders());
         }
 
         shipmentRepository.save(shipment);
-
         log.info("Chuyến xe {} đã tới nơi an toàn, chờ Cửa hàng trưởng kiểm tra!", shipmentId);
     }
 
+    // =========================================================================
+    // 🔥 TẠO CHUYẾN XE BẰNG TAY (MANUAL ALLOCATION)
+    // =========================================================================
+    @Transactional
+    public String createManualShipment(List<String> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            throw new RuntimeException("Vui lòng chọn ít nhất 1 đơn hàng để tạo chuyến xe!");
+        }
 
-} // <- Dấu ngoặc đóng class ShipmentService
+        // 1. Tìm các đơn hàng dựa trên danh sách ID được truyền vào
+        List<Order> orders = orderRepository.findAllById(orderIds);
+
+        // Kiểm tra an toàn: Xem có đơn nào chưa sẵn sàng hoặc đã bị gán xe khác rồi không
+        boolean allReady = orders.stream().allMatch(o ->
+                o.getStatus() == Order.OrderStatus.READY_TO_SHIP && o.getShipment() == null);
+
+        if (!allReady) {
+            throw new RuntimeException("Có đơn hàng không hợp lệ (đã được gán xe hoặc chưa ở trạng thái READY_TO_SHIP)!");
+        }
+
+        // 2. Tạo một chuyến xe mới cứng (Trạng thái PENDING - chờ gán tài xế)
+        Shipment manualShipment = Shipment.builder()
+                .shipmentId("MAN-" + System.currentTimeMillis() % 10000)
+                .shipmentType(Shipment.ShipmentType.MAIN_ROUTE) // Chuyến gom đơn thường là tuyến chính
+                .status(Shipment.ShipmentStatus.PENDING)
+                .shipmentDetails(new ArrayList<>())
+                .orders(new ArrayList<>())
+                .build();
+
+        // Lưu chuyến xe xuống DB trước để lấy ID
+        Shipment savedShipment = shipmentRepository.saveAndFlush(manualShipment);
+
+        // 3. Quét qua các đơn hàng, gán xe vào đơn và cộng dồn số lượng từng món ăn
+        Map<String, ShipmentDetail> detailMap = new HashMap<>();
+
+        for (Order o : orders) {
+            o.setShipment(savedShipment); // Gắn ID chuyến xe vào đơn hàng
+
+            if (o.getOrderItems() != null) {
+                for (OrderItem item : o.getOrderItems()) {
+                    String productId = item.getProduct().getProductId();
+
+                    // Nếu món này đã có trong xe (do đơn trước cộng vào) thì lấy ra, chưa có thì tạo mới
+                    ShipmentDetail detail = detailMap.getOrDefault(productId,
+                            ShipmentDetail.builder()
+                                    .shipment(savedShipment)
+                                    .product(item.getProduct())
+                                    .productName(item.getProduct().getProductName())
+                                    .expectedQuantity(0)
+                                    .receivedQuantity(0)
+                                    .build());
+
+                    // Cộng dồn số lượng
+                    detail.setExpectedQuantity(detail.getExpectedQuantity() + item.getQuantity());
+                    detailMap.put(productId, detail);
+                }
+            }
+        }
+
+        // 4. Lưu lại toàn bộ cục thay đổi (Đơn hàng & Chi tiết xe) xuống Database
+        orderRepository.saveAll(orders);
+        shipmentDetailRepository.saveAll(detailMap.values());
+
+        return "Đã tạo thành công chuyến xe: " + savedShipment.getShipmentId();
+    }
+}

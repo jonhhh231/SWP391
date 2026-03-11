@@ -21,7 +21,7 @@ public class RecipeController {
     }
 
     // ĐÃ SỬA: Dùng hasAnyAuthority để bao lô cả trường hợp có và không có chữ ROLE_
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @PostMapping
     public ResponseEntity<String> upsertRecipe(@RequestBody RecipeUpsertRequest req) {
         recipeService.upsertRecipe(req);
@@ -29,7 +29,7 @@ public class RecipeController {
     }
 
     // ĐÃ SỬA: Dùng hasAnyAuthority
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @DeleteMapping("/{productId}")
     public ResponseEntity<String> deleteRecipe(@PathVariable String productId) {
         recipeService.deleteRecipe(productId);
