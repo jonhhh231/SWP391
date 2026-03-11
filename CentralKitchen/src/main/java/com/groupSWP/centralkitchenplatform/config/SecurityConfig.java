@@ -57,8 +57,8 @@ public class SecurityConfig {
                         // =========================================================
                         .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-
                         // =========================================================
+
                         // 2. ƯU TIÊN 1: CÁC LUỒNG CỤ THỂ (Phải đặt lên trên cùng để tránh bị đè rule)
                         // =========================================================
 
@@ -112,7 +112,7 @@ public class SecurityConfig {
 
                         // Khu vực dành cho LOGISTICS / COORDINATOR
                         .requestMatchers("/api/logistics/**", "/api/shipments/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "COORDINATOR", "ROLE_COORDINATOR")
+                        .hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
 
                         // Khu vực dành cho KITCHEN MANAGER (Quản lý Bếp trung tâm)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**")
@@ -121,6 +121,17 @@ public class SecurityConfig {
                         // Khu vực dành cho STORE MANAGER (Quản lý Cửa hàng lẻ)
                         .requestMatchers("/api/store/**")
                         .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "STORE_MANAGER", "ROLE_STORE_MANAGER")
+
+                        // 1. Quyền cho Kitchen Manager (hoặc Admin/Manager) đổi trạng thái Đang chuẩn bị / Đang giao
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/orders/delivery/*/preparing",
+                                "/api/orders/delivery/*/shipping")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+
+                        // 2. Quyền cho Store Manager (hoặc Admin) xác nhận Đã nhận hàng
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/orders/delivery/*/confirm-receipt")
+                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "STORE_MANAGER", "ROLE_STORE_MANAGER")
 
                         // Mọi endpoint khác không khai báo ở trên đều yêu cầu phải có Token hợp lệ
                         .anyRequest().authenticated()

@@ -13,12 +13,20 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     // Lấy danh sách đơn hàng của 1 cửa hàng cụ thể, sắp xếp cái nào mới đặt lên đầu
     // LƯU Ý: Nếu khóa chính của Store Sếp đặt là "id" thì đổi thành findByStore_Id
     List<Order> findByStore_StoreIdOrderByCreatedAtDesc(String storeId);
+
     List<Order> findByStatus(Order.OrderStatus status);
+
     List<Order> findByStore_StoreId(String storeId);// Lấy tất cả đơn hàng của 1 cửa hàng
+
     List<Order> findByCreatedAtGreaterThanEqualAndStatusNot(LocalDateTime startTime, Order.OrderStatus status);
+
+
     boolean existsByShipment_ShipmentIdAndStatusNot(String shipmentId, Order.OrderStatus status);
 
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.product", "store"})
     List<Order> findByStatusAndShipmentIsNull(Order.OrderStatus status);
+
+    // Tìm các đơn hàng đang giao và thời gian bắt đầu giao trước một mốc thời gian cụ thể
+    List<Order> findByStatusAndShippingStartTimeBefore(Order.OrderStatus status, LocalDateTime time);
 }

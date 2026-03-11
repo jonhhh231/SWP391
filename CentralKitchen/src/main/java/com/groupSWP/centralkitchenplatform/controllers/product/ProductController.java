@@ -21,7 +21,7 @@ public class ProductController {
 
     // API 1: Tạo sản phẩm mới (Nhận JSON Data thuần)
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN_MANAGER')")
     public ResponseEntity<ProductResponse> createProduct(
             @RequestBody ProductRequest request
     ) {

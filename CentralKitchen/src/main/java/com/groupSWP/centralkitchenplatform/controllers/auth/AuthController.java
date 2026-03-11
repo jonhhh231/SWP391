@@ -40,7 +40,7 @@ public class AuthController {
         UserResponse response = UserResponse.builder()
                 .userId(updatedUser.getUserId())
                 .fullName(updatedUser.getFullName())
-                .role(updatedUser.getRole().name())
+                .role(updatedUser.getAccount().getRole().name()) // ĐÃ SỬA DÒNG NÀY
                 .username(principal.getName())
                 .build();
         return ResponseEntity.ok(response);

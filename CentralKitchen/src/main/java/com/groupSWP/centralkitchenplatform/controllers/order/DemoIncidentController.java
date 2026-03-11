@@ -17,7 +17,7 @@ public class DemoIncidentController {
     private final JdbcTemplate jdbcTemplate;
 
     // ✅ Không dùng bảng incidents. Lấy "khiếu nại" từ orders.note
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINATOR')")
     @GetMapping("/pending")
     public ResponseEntity<List<Map<String, Object>>> getPendingIncidents() {
         // 🔥 ĐÃ SỬA: Thêm PARTIAL_RECEIVED vào để nó bắt được các đơn giao thiếu

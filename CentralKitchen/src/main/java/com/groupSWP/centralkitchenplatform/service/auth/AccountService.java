@@ -1,6 +1,5 @@
 package com.groupSWP.centralkitchenplatform.service.auth;
 
-
 import com.groupSWP.centralkitchenplatform.dto.auth.AccountResponse;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
@@ -28,23 +27,6 @@ public class AccountService {
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // Hàm Helper để map Entity sang DTO (giúp code gọn gàng, không bị lặp)
-    private AccountResponse mapToResponse(Account account) {
-        AccountResponse dto = new AccountResponse();
-        dto.setAccountId(account.getAccountId());
-        dto.setUsername(account.getUsername());
-        dto.setRole(account.getRole());
-        dto.setActive(account.isActive()); // Trường này sẽ cho biết là true hay false
-
-        SystemUser systemUser = account.getSystemUser();
-        if (systemUser != null) {
-            dto.setUserId(systemUser.getUserId());
-            dto.setFullName(systemUser.getFullName());
-            dto.setEmail(systemUser.getEmail());
-        }
-        return dto;
-    }
-
     public List<AccountResponse> searchAccountsByFullName(String keyword) {
         // Kiểm tra an toàn: Nếu keyword rỗng, trả về toàn bộ danh sách
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -54,5 +36,28 @@ public class AccountService {
         // Gọi Repository để tìm kiếm và map sang DTO
         List<Account> accounts = accountRepository.searchByFullNameExcludingAdmin(keyword.trim());
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    // Hàm Helper để map Entity sang DTO
+    private AccountResponse mapToResponse(Account account) {
+        AccountResponse dto = new AccountResponse();
+        dto.setAccountId(account.getAccountId());
+        dto.setUsername(account.getUsername());
+
+        // 💡 LƯU Ý Ở ĐÂY:
+        // Nếu trong file AccountResponse.java, 'role' là kiểu Account.Role thì dùng:
+        dto.setRole(account.getRole().name());
+        // Nếu 'role' trong AccountResponse.java là kiểu String thì sửa thành:
+        // dto.setRole(account.getRole().name());
+
+        dto.setActive(account.isActive());
+
+        SystemUser systemUser = account.getSystemUser();
+        if (systemUser != null) {
+            dto.setUserId(systemUser.getUserId());
+            dto.setFullName(systemUser.getFullName());
+            dto.setEmail(systemUser.getEmail());
+        }
+        return dto;
     }
 }

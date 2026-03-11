@@ -1,12 +1,13 @@
 package com.groupSWP.centralkitchenplatform.dto.auth;
 
-import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
+// Sửa import từ SystemUser sang Account
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 
 public record RegisterRequest(
         String username,
         String password,
         String fullName,
-        SystemUser.SystemRole role,
-        String email, //
+        Account.Role role, // ĐÃ SỬA: Dùng enum Role từ class Account
+        String email,
         String storeId
 ) {}

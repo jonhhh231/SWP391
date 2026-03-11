@@ -71,7 +71,8 @@ public class AuthService {
         return AuthResponse.builder()
                 .token(token)
                 .username(account.getUsername())
-                .role(account.getRole())
+                // Lưu ý: Nếu AuthResponse DTO đang nhận String thì dùng account.getRole().name() ở đây
+                .role(account.getRole().name())
                 .message("Login Success")
                 .build();
     }
@@ -92,22 +93,19 @@ public class AuthService {
         // ==========================================
         // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG
         // ==========================================
-        com.groupSWP.centralkitchenplatform.entities.auth.Store store = null; // Khai báo sẵn
+        com.groupSWP.centralkitchenplatform.entities.auth.Store store = null;
 
-        if (request.role() == SystemUser.SystemRole.STORE_MANAGER) {
+        // ĐÃ SỬA: Dùng Account.Role.STORE_MANAGER
+        if (request.role() == Account.Role.STORE_MANAGER) {
 
-            // Luật 1: Phải có mã Cửa hàng
             if (request.storeId() == null || request.storeId().isBlank()) {
                 throw new RuntimeException("Tạo tài khoản Cửa hàng trưởng bắt buộc phải truyền storeId!");
             }
 
-            // Luật 2: Cửa hàng phải tồn tại
             store = storeRepository.findById(request.storeId())
                     .orElseThrow(() -> new RuntimeException("Cửa hàng không tồn tại (Sai storeId)!"));
 
-            // Luật 3: Kiểm tra Cửa hàng này đã có tài khoản Account nào móc vào chưa
             if (store.getAccount() != null) {
-                // 👈 Dùng getName() thay vì getStoreName()
                 throw new RuntimeException("Cửa hàng [" + store.getName() + "] đã có Quản lý rồi! Không thể bổ nhiệm thêm.");
             }
         }
@@ -117,11 +115,11 @@ public class AuthService {
         Account account = new Account();
         account.setUsername(request.username());
         account.setPassword(passwordEncoder.encode(request.password()));
-        account.setRole(request.role().name());
+        // ĐÃ SỬA: Set trực tiếp enum Role vào Entity Account
+        account.setRole(request.role());
 
-        // 👑 NẾU LÀ QUẢN LÝ THÌ GẮN CỬA HÀNG VÀO ACCOUNT LUN TRƯỚC KHI LƯU
         if (store != null) {
-            account.setStore(store); // 👈 Bảng Account giữ khóa nên mình set ở đây!
+            account.setStore(store);
         }
 
         account = accountRepository.save(account);
@@ -131,7 +129,7 @@ public class AuthService {
                 .userId(generateStaffId(request.role()))
                 .fullName(request.fullName())
                 .email(cleanEmail)
-                .role(request.role())
+                // ĐÃ XOÁ: .role(request.role()) vì SystemUser không còn field này nữa
                 .account(account)
                 .build();
 
@@ -141,7 +139,8 @@ public class AuthService {
                 (request.storeId() != null ? " | Đã bổ nhiệm quản lý Cửa hàng: " + request.storeId() : "");
     }
 
-    private String generateStaffId(SystemUser.SystemRole role) {
+    // ĐÃ SỬA: Tham số truyền vào là Account.Role
+    private String generateStaffId(Account.Role role) {
         String prefix = getPrefixByRole(role);
         Optional<String> lastUserId = systemUserRepository.findLastUserIdByRole(role);
         if (lastUserId.isEmpty()) return prefix + "00001";
@@ -156,7 +155,8 @@ public class AuthService {
         }
     }
 
-    private String getPrefixByRole(SystemUser.SystemRole role) {
+    // ĐÃ SỬA: Tham số truyền vào là Account.Role
+    private String getPrefixByRole(Account.Role role) {
         if (role == null) return "USR";
         return switch (role) {
             case ADMIN -> "ADM";
@@ -174,26 +174,18 @@ public class AuthService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         SystemUser profile = account.getSystemUser();
 
-        // 1. Cập nhật Full Name: Dùng hasText() để chặn null, "" (rỗng) hoặc "   " (khoảng trắng)
         if (org.springframework.util.StringUtils.hasText(request.getFullName())) {
             profile.setFullName(request.getFullName().trim());
         }
 
-        // 2. Cập nhật Email kèm chốt chặn kiểm tra trùng lặp
         if (org.springframework.util.StringUtils.hasText(request.getEmail())) {
             String newEmail = request.getEmail().trim();
 
-            // Chỉ kiểm tra trùng lặp nếu người dùng thực sự muốn đổi sang một Email MỚI
             if (!newEmail.equalsIgnoreCase(profile.getEmail())) {
-
-                // Quét trong Database xem có ai đang xài email này chưa
                 boolean isEmailTaken = systemUserRepository.findByEmail(newEmail).isPresent();
                 if (isEmailTaken) {
-                    // Nếu trùng, ném lỗi 409 Conflict ngay lập tức
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Email này đã được sử dụng bởi một tài khoản khác!");
                 }
-
-                // Nếu an toàn, tiến hành cập nhật
                 profile.setEmail(newEmail);
             }
         }
@@ -201,24 +193,14 @@ public class AuthService {
         return systemUserRepository.save(profile);
     }
 
-    // ==========================================
-    // CÁC HÀM QUÊN MẬT KHẨU (ĐÃ ĐƯỢC CHUẨN HÓA)
-    // ==========================================
-
-    // 1. Quên mật khẩu: Kiểm tra email -> Tạo OTP -> Gửi mail
     public void forgotPassword(String email) {
-        // Sử dụng systemUserRepository thay vì userRepository
         SystemUser profile = systemUserRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email không tồn tại trong hệ thống!"));
 
-        // Tạo OTP lưu vào RAM với key là email
         String otp = otpService.generateOtp(email);
-
-        // Gọi hàm của MailService hiện tại bạn đang có
         mailService.sendOtpMail(email, otp);
     }
 
-    // 2. Đặt lại mật khẩu: Kiểm tra OTP -> Đổi mật khẩu -> Xóa OTP
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(String email, String otp, String newPassword) {
         boolean isValid = otpService.validateOtp(email, otp);
@@ -227,21 +209,17 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mã OTP không chính xác hoặc đã hết hạn!");
         }
 
-        // Tìm UserProfile theo email
         SystemUser profile = systemUserRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email không tồn tại!"));
 
-        // Lấy Account liên kết với Profile này để đổi mật khẩu
         Account account = profile.getAccount();
         if (account == null) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Dữ liệu tài khoản bị lỗi, không tìm thấy Account!");
         }
 
-        // Đổi mật khẩu trên bảng Account và lưu lại
         account.setPassword(passwordEncoder.encode(newPassword));
         accountRepository.save(account);
 
-        // Xóa OTP khỏi bộ nhớ để tránh bị dùng lại
         otpService.clearOtp(email);
     }
 

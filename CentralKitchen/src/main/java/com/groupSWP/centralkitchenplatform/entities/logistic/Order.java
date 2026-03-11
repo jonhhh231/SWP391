@@ -5,6 +5,7 @@ import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,20 +45,21 @@ public class Order extends BaseEntity {
     @JoinColumn(name = "shipment_id")
     private Shipment shipment;
 
+    @Column(name = "shipping_start_time")
+    private LocalDateTime shippingStartTime;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
     public enum OrderStatus {
         NEW,
-        AGGREGATED,
-        COOKING,
-        READY_TO_SHIP,
-        SHIPPING,
-        DELIVERED,        // MỚI: Tài xế (Coordinator) giao tới nơi, chờ Store Manager đếm hàng
-        PARTIAL_RECEIVED, // MỚI: Store Manager xác nhận giao tiếu hàng (Tùy chọn, để vứt sang tab Khiếu nại)
-        DONE,
-        CANCELLED
+        PREPARING,        // Bếp đang nấu
+        SHIPPING,         // Đang trên xe giao đến cửa hàng
+        DELIVERED,        // Xe đã tới nơi (Chờ Store Manager đếm hàng)
+        PARTIAL_RECEIVED, // Cửa hàng báo THIẾU HÀNG (Chờ Bếp lên đơn bù)
+        DONE,             // Cửa hàng báo NHẬN ĐỦ
+        CANCELLED,
+        READY_TO_SHIP
     }
     public enum OrderType { STANDARD, URGENT, COMPENSATION }
     public enum DeliveryWindow { MORNING, AFTERNOON }

@@ -21,7 +21,7 @@ public class ConfirmReceiptController {
      */
 
     @PatchMapping("/orders/{orderId}/confirm-receipt")
-    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')")
     public ConfirmReceiptResponse confirmReceipt(
             @PathVariable String orderId,
             @RequestParam(defaultValue = "true") boolean updateStock,
