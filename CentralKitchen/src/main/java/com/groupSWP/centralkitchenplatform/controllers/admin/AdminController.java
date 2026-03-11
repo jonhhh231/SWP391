@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
 
 import java.util.List;
 
@@ -97,4 +98,20 @@ public class AdminController {
     public ResponseEntity<List<AccountResponse>> getInactiveAccounts() {
         return ResponseEntity.ok(accountService.getAccountsByStatus(false));
     }
+
+    /**
+     * API Khóa / Mở khóa tài khoản (Xóa mềm).
+     * <p>
+     * Chuyển đổi trạng thái isActive của tài khoản. Dùng để vô hiệu hóa
+     * nhân sự nghỉ việc mà không làm mất dữ liệu lịch sử của họ trong hệ thống.
+     * </p>
+     *
+     * @param accountId ID của tài khoản cần thao tác.
+     * @return Thông báo trạng thái mới của tài khoản.
+     */
+    @PutMapping("/accounts/{accountId}/status")
+    public ResponseEntity<String> toggleAccountStatus(@PathVariable UUID accountId) {
+        return ResponseEntity.ok(accountService.toggleAccountStatus(accountId));
+    }
+
 }

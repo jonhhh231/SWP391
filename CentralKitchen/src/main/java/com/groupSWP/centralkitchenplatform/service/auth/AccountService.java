@@ -6,6 +6,8 @@ import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.UUID;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -59,5 +61,24 @@ public class AccountService {
             dto.setEmail(systemUser.getEmail());
         }
         return dto;
+    }
+
+    @Transactional
+    public String toggleAccountStatus(UUID accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản trong hệ thống!"));
+
+        // 🛡️ BẢO MẬT: Không cho phép Admin tự khóa chính mình hoặc khóa Admin khác
+        if (account.getRole() == Account.Role.ADMIN) {
+            throw new RuntimeException("Lỗi bảo mật: Không thể khóa/xóa mềm tài khoản cấp ADMIN!");
+        }
+
+        // Đảo ngược trạng thái hiện tại (Đang true thành false, đang false thành true)
+        account.setActive(!account.isActive());
+        accountRepository.save(account);
+
+        return account.isActive() ?
+                "Đã MỞ KHÓA tài khoản " + account.getUsername() + " thành công!" :
+                "Đã KHÓA (Xóa mềm) tài khoản " + account.getUsername() + " thành công!";
     }
 }
