@@ -70,18 +70,22 @@ public class AdminController {
     /**
      * API Thay đổi chức vụ (Role) của tài khoản.
      * <p>Phục vụ nghiệp vụ thăng chức hoặc giáng chức nhân viên.</p>
+     * <p>Đã áp dụng luật nghiệp vụ chặt chẽ: Thăng chức bắt buộc chọn Cửa hàng,
+     * Giáng chức bắt buộc chọn Người thế chỗ.</p>
      *
      * @param accountId ID của tài khoản cần thay đổi (UUID).
      * @param roleName  Tên Role mới (VD: STORE_MANAGER, COORDINATOR...).
-     * @return Thông tin tài khoản sau khi đã được cập nhật Role.
+     * @return Thông báo chi tiết sau khi cập nhật Role và luân chuyển cửa hàng.
      */
     @PatchMapping("/accounts/{accountId}/role")
-    public ResponseEntity<AccountResponse> changeAccountRole(
-            @PathVariable String accountId,
-            @RequestParam String roleName) {
+    public ResponseEntity<String> changeAccountRole( // 🌟 Đã sửa thành String
+                                                     @PathVariable String accountId,
+                                                     @RequestParam String roleName,
+                                                     @RequestParam(required = false) String storeId,
+                                                     @RequestParam(required = false) UUID replacementAccountId) {
 
-        AccountResponse updatedAccount = accountService.changeAccountRole(accountId, roleName);
-        return ResponseEntity.ok(updatedAccount);
+        String message = accountService.changeAccountRole(accountId, roleName, storeId, replacementAccountId);
+        return ResponseEntity.ok(message); // 🌟 Trả về String
     }
 
     /**
@@ -104,14 +108,15 @@ public class AdminController {
 
     /**
      * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
+     * <p>Sử dụng để gán cửa hàng mới hoặc rút nhân sự về dự bị (storeId = null).</p>
      */
     @PatchMapping("/accounts/{accountId}/store")
-    public ResponseEntity<AccountResponse> assignStoreToAccount(
-            @PathVariable String accountId,
-            @RequestParam(required = false) String storeId) {
+    public ResponseEntity<String> assignStoreToAccount( // 🌟 Đã sửa thành String
+                                                        @PathVariable String accountId,
+                                                        @RequestParam(required = false) String storeId) {
 
-        AccountResponse updatedAccount = accountService.assignStoreToAccount(accountId, storeId);
-        return ResponseEntity.ok(updatedAccount);
+        String message = accountService.assignStoreToAccount(accountId, storeId);
+        return ResponseEntity.ok(message); // 🌟 Trả về String
     }
 
     /**
