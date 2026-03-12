@@ -113,4 +113,22 @@ public class AdminController {
         AccountResponse updatedAccount = accountService.assignStoreToAccount(accountId, storeId);
         return ResponseEntity.ok(updatedAccount);
     }
+
+    /**
+     * API Hoán đổi vị trí cửa hàng giữa 2 Quản lý.
+     * <p>
+     * Phục vụ nghiệp vụ luân chuyển chéo: Ông A sang tiệm B, Ông B sang tiệm A.
+     * </p>
+     *
+     * @param accountId1 ID của quản lý thứ 1
+     * @param accountId2 ID của quản lý thứ 2
+     * @return Thông báo kết quả hoán đổi chi tiết
+     */
+    @PutMapping("/accounts/swap-stores")
+    public ResponseEntity<String> swapStoreManagers(
+            @RequestParam UUID accountId1,
+            @RequestParam UUID accountId2) {
+
+        return ResponseEntity.ok(accountService.swapManagers(accountId1, accountId2));
+    }
 }

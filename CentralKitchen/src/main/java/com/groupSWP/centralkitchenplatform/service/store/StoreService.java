@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -77,6 +78,12 @@ public class StoreService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    public List<StoreResponse> getEmptyStores() {
+        return storeRepository.findEmptyStores().stream()
+                .map(this::mapToResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     // ======================================================
     // 🌟 NGHIỆP VỤ 1: THAY ĐỔI / GÁN QUẢN LÝ CỬA HÀNG
     // ======================================================
@@ -112,8 +119,7 @@ public class StoreService {
     }
 
     // ======================================================
-    // 🌟 NGHIỆP VỤ 2: XÓA MỀM CỬA HÀNG (TRƯỜNG HỢP A)
-    // Bắt buộc phải luân chuyển Quản lý sang tiệm khác
+    // 🌟 NGHIỆP VỤ 2: XÓA MỀM CỬA HÀNG
     // ======================================================
     @Transactional
     public String softDeleteStore(String storeId, String transferToStoreId) {
@@ -125,49 +131,50 @@ public class StoreService {
         }
 
         Account currentManager = store.getAccount();
+        Store targetStore = null; // 🌟 Khai báo ở đây để lát xài trong câu thông báo
 
-        // ========================================================
-        // 🌟 NẾU CỬA HÀNG ĐANG CÓ NHÂN VIÊN VÀ NHÂN VIÊN ĐÓ ĐANG ACTIVE
-        // ========================================================
+        // NẾU CỬA HÀNG ĐANG CÓ NHÂN VIÊN VÀ ĐANG ACTIVE
         if (currentManager != null && currentManager.isActive()) {
 
-            // 1. Ép buộc phải chọn 1 cửa hàng để thuyên chuyển ổng đi
             if (transferToStoreId == null || transferToStoreId.trim().isEmpty()) {
-                throw new RuntimeException("Cửa hàng đang có nhân viên quản lý! Vui lòng chọn một Cửa hàng TRỐNG để đẩy nhân viên này qua trước khi đóng cửa.");
+                throw new RuntimeException("Cửa hàng đang có nhân viên quản lý! Vui lòng chọn một Cửa hàng TRỐNG để đẩy nhân viên này qua.");
             }
-
             if (storeId.equals(transferToStoreId)) {
                 throw new RuntimeException("Không thể luân chuyển sang chính cửa hàng đang muốn đóng!");
             }
 
-            Store targetStore = storeRepository.findById(transferToStoreId)
+            targetStore = storeRepository.findById(transferToStoreId)
                     .orElseThrow(() -> new RuntimeException("Cửa hàng đích để luân chuyển không tồn tại!"));
 
-            // 2. Cửa hàng đích phải đang MỞ CỬA
             if (!targetStore.isActive()) {
                 throw new RuntimeException("Cửa hàng đích đang bị Đóng cửa (Inactive), không thể đẩy nhân viên tới!");
             }
-
-            // 3. Cửa hàng đích BẮT BUỘC PHẢI TRỐNG (Chưa có ai quản lý)
             if (targetStore.getAccount() != null) {
                 throw new RuntimeException("Cửa hàng đích ĐÃ CÓ người quản lý rồi! Vui lòng chọn một cửa hàng đang TRỐNG!");
             }
 
-            // 4. LUÂN CHUYỂN AN TOÀN
+            // 🛠️ LUÂN CHUYỂN CHUẨN SÁCH GIÁO KHOA JPA:
+            // 1. Phải tháo chức của người cũ ở tiệm này (Để Java hiểu là 2 đứa đã ly hôn)
+            store.setAccount(null);
+
+            // 2. Cấp hộ khẩu cho người đó sang tiệm mới
             currentManager.setStore(targetStore);
-            // Ép lưu xuống DB luôn để tí nữa đóng cửa tiệm cũ không bị vướng
-            accountRepository.saveAndFlush(currentManager);
+            targetStore.setAccount(currentManager);
+
+            // (Không cần gọi accountRepository.save() ở đây vì @Transactional sẽ tự động lo)
         }
 
-        // ========================================================
-        // 🌟 ĐÓNG CỬA HÀNG (INACTIVE)
-        // ========================================================
+        // ĐÓNG CỬA HÀNG (INACTIVE)
         store.setActive(false);
+
+        // Chỉ gọi save đúng 1 lần duy nhất cho toàn bộ quá trình!
         storeRepository.save(store);
 
-        return currentManager != null ?
-                "Đã ĐÓNG CỬA tiệm " + store.getName() + " và đẩy nhân viên " + currentManager.getUsername() + " sang tiệm mới thành công!" :
-                "Đã ĐÓNG CỬA tiệm " + store.getName() + " thành công!";
+        // 🌟 Trả về thông báo siêu chi tiết
+        return (currentManager != null && targetStore != null) ?
+                "Đã ĐÓNG CỬA tiệm [" + store.getName() + "] (ID: " + store.getStoreId() + "). " +
+                        "Nhân sự [" + currentManager.getUsername() + "] đã được luân chuyển an toàn sang tiệm mới [" + targetStore.getName() + "] (ID: " + targetStore.getStoreId() + ")!" :
+                "Đã ĐÓNG CỬA tiệm [" + store.getName() + "] (ID: " + store.getStoreId() + ") thành công!";
     }
 
 //    @Transactional

@@ -5,8 +5,10 @@ import com.groupSWP.centralkitchenplatform.dto.store.StoreResponse;
 import com.groupSWP.centralkitchenplatform.service.store.StoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -28,6 +30,12 @@ public class StoreController {
     @GetMapping("/all")
     public ResponseEntity<java.util.List<StoreResponse>> getAllStores() {
         return ResponseEntity.ok(storeService.getAllStores());
+    }
+
+    @GetMapping("/empty-stores")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<List<StoreResponse>> getEmptyStores() {
+        return ResponseEntity.ok(storeService.getEmptyStores());
     }
 
     @PutMapping("/{storeId}")

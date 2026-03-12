@@ -112,6 +112,8 @@ public class AccountService {
             throw new RuntimeException("Lỗi bảo mật: Không thể khóa tài khoản cấp ADMIN!");
         }
 
+        String detailedMessage = ""; // 🌟 Biến lưu câu thông báo chi tiết
+
         if (account.isActive()) {
             Store managedStore = account.getStore();
 
@@ -131,19 +133,84 @@ public class AccountService {
                     throw new RuntimeException("Nhân viên thế chỗ hiện đang quản lý một cửa hàng khác. Vui lòng chọn người đang trống việc!");
                 }
 
+                // 4. THAO TÁC LUÂN CHUYỂN AN TOÀN TRÁNH LỖI DUPLICATE:
+                // Bước A: Đá người cũ ra khỏi ghế trước
                 account.setStore(null);
+                managedStore.setAccount(null); // 🛠️ FIX LỖI: Báo cho Cửa hàng biết nó đang bị trống ghế
                 accountRepository.saveAndFlush(account);
 
+                // Bước B: Đôn người mới lên ngồi vào ghế đó
                 replacementAccount.setStore(managedStore);
+                managedStore.setAccount(replacementAccount); // 🛠️ FIX LỖI: Báo cho Cửa hàng biết nó có chủ mới
                 accountRepository.save(replacementAccount);
+
+                // 🌟 Báo cáo chi tiết khi có luân chuyển
+                detailedMessage = "Đã KHÓA (Sa thải) quản lý cũ [" + account.getUsername() + "] (ID: " + account.getAccountId() + "). " +
+                        "Đã bổ nhiệm thành công quản lý mới [" + replacementAccount.getUsername() + "] (ID: " + replacementAccount.getAccountId() + ") " +
+                        "vào tiếp quản cửa hàng [" + managedStore.getName() + "].";
+            } else {
+                detailedMessage = "Đã KHÓA tài khoản [" + account.getUsername() + "] (ID: " + account.getAccountId() + ") thành công!";
             }
+        } else {
+            detailedMessage = "Đã MỞ KHÓA tài khoản [" + account.getUsername() + "] (ID: " + account.getAccountId() + ") thành công!";
         }
 
         account.setActive(!account.isActive());
         accountRepository.save(account);
 
-        return account.isActive() ?
-                "Đã MỞ KHÓA tài khoản " + account.getUsername() :
-                "Đã KHÓA tài khoản " + account.getUsername() + " thành công!";
+        return detailedMessage;
+    }
+
+    // =========================================================================
+    // 🌟 NGHIỆP VỤ HOÁN ĐỔI VỊ TRÍ QUẢN LÝ (SWAP MANAGERS)
+    // =========================================================================
+    @Transactional
+    public String swapManagers(UUID accountId1, UUID accountId2) {
+        if (accountId1.equals(accountId2)) {
+            throw new RuntimeException("Lỗi: Không thể hoán đổi cùng một người!");
+        }
+
+        Account acc1 = accountRepository.findById(accountId1)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản nhân viên thứ 1!"));
+        Account acc2 = accountRepository.findById(accountId2)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản nhân viên thứ 2!"));
+
+        if (!acc1.isActive() || !acc2.isActive()) {
+            throw new RuntimeException("Cả hai tài khoản phải đang hoạt động (Active) mới có thể hoán đổi!");
+        }
+
+        Store store1 = acc1.getStore();
+        Store store2 = acc2.getStore();
+
+        if (store1 == null || store2 == null) {
+            throw new RuntimeException("Cả hai nhân viên đều phải đang quản lý cửa hàng thì mới có thể hoán đổi cho nhau!");
+        }
+
+        // 🛠️ BƯỚC 1: THÁO GHẾ CẢ 2 NGƯỜI RA TRƯỚC (Để tránh lỗi Unique Key)
+        acc1.setStore(null);
+        store1.setAccount(null);
+
+        acc2.setStore(null);
+        store2.setAccount(null);
+
+        // Ép Hibernate nhả dữ liệu ra liền
+        accountRepository.saveAndFlush(acc1);
+        accountRepository.saveAndFlush(acc2);
+
+        // 🛠️ BƯỚC 2: TRÁO ĐỔI HỘ KHẨU (Swap)
+        acc1.setStore(store2);
+        store2.setAccount(acc1);
+
+        acc2.setStore(store1);
+        store1.setAccount(acc2);
+
+        // Lưu lại kết quả cuối cùng
+        accountRepository.save(acc1);
+        accountRepository.save(acc2);
+
+        // 🌟 Trả về thông báo chi tiết
+        return "Đã HOÁN ĐỔI VỊ TRÍ thành công! " +
+                "Quản lý [" + acc1.getUsername() + "] chuyển sang tiệm [" + store2.getName() + "]. " +
+                "Quản lý [" + acc2.getUsername() + "] chuyển sang tiệm [" + store1.getName() + "].";
     }
 }
