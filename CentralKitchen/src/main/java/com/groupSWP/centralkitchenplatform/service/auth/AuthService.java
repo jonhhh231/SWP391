@@ -90,24 +90,23 @@ public class AuthService {
         if (systemUserRepository.findByEmail(cleanEmail).isPresent()) {
             throw new RuntimeException("Email này đã được sử dụng cho một tài khoản khác!");
         }
+
         // ==========================================
-        // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG
+        // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG (ĐÃ MỞ CHỐT CHO PHÉP OPTIONAL)
         // ==========================================
         com.groupSWP.centralkitchenplatform.entities.auth.Store store = null;
 
-        // ĐÃ SỬA: Dùng Account.Role.STORE_MANAGER
         if (request.role() == Account.Role.STORE_MANAGER) {
+            // Nếu CÓ truyền storeId lên thì mới đi tìm và gán cửa hàng
+            if (request.storeId() != null && !request.storeId().isBlank()) {
+                store = storeRepository.findById(request.storeId())
+                        .orElseThrow(() -> new RuntimeException("Cửa hàng không tồn tại (Sai storeId)!"));
 
-            if (request.storeId() == null || request.storeId().isBlank()) {
-                throw new RuntimeException("Tạo tài khoản Cửa hàng trưởng bắt buộc phải truyền storeId!");
+                if (store.getAccount() != null) {
+                    throw new RuntimeException("Cửa hàng [" + store.getName() + "] đã có Quản lý rồi! Không thể bổ nhiệm thêm.");
+                }
             }
-
-            store = storeRepository.findById(request.storeId())
-                    .orElseThrow(() -> new RuntimeException("Cửa hàng không tồn tại (Sai storeId)!"));
-
-            if (store.getAccount() != null) {
-                throw new RuntimeException("Cửa hàng [" + store.getName() + "] đã có Quản lý rồi! Không thể bổ nhiệm thêm.");
-            }
+            // NẾU KHÔNG TRUYỀN: Bỏ qua luôn, không throw lỗi nữa -> Tạo ra "Người rảnh" (Dự bị)
         }
         // ==========================================
 
@@ -115,9 +114,9 @@ public class AuthService {
         Account account = new Account();
         account.setUsername(request.username());
         account.setPassword(passwordEncoder.encode(request.password()));
-        // ĐÃ SỬA: Set trực tiếp enum Role vào Entity Account
         account.setRole(request.role());
 
+        // Nếu có store thì gán, không có thì nó mặc định là null dưới DB
         if (store != null) {
             account.setStore(store);
         }
@@ -129,14 +128,20 @@ public class AuthService {
                 .userId(generateStaffId(request.role()))
                 .fullName(request.fullName())
                 .email(cleanEmail)
-                // ĐÃ XOÁ: .role(request.role()) vì SystemUser không còn field này nữa
                 .account(account)
                 .build();
 
         systemUserRepository.save(userProfile);
 
-        return "Đăng ký thành công! Mã nhân viên: " + userProfile.getUserId() +
-                (request.storeId() != null ? " | Đã bổ nhiệm quản lý Cửa hàng: " + request.storeId() : "");
+        // Đổi câu thông báo một chút cho hợp lý
+        String message = "Đăng ký thành công! Mã nhân viên: " + userProfile.getUserId();
+        if (store != null) {
+            message += " | Đã bổ nhiệm quản lý Cửa hàng: " + store.getName();
+        } else if (request.role() == Account.Role.STORE_MANAGER) {
+            message += " | Nhân sự đang ở trạng thái DỰ BỊ (Chưa gán cửa hàng).";
+        }
+
+        return message;
     }
 
     // ĐÃ SỬA: Tham số truyền vào là Account.Role

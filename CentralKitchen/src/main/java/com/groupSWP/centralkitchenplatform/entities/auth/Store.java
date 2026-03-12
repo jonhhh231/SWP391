@@ -13,7 +13,7 @@ import java.util.List;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Store extends BaseEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+//    @GeneratedValue(strategy = GenerationType.UUID)
     private String storeId; // ST01
     private String name;
     private String address;
@@ -24,7 +24,7 @@ public class Store extends BaseEntity {
 
     private boolean isActive = true;
 
-    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL) //, orphanRemoval = true)
     private Account account;
 
     @OneToMany(mappedBy = "store", cascade = CascadeType.ALL)

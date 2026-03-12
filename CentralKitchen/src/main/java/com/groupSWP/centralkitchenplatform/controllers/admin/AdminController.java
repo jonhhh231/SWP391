@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Controller xử lý các nghiệp vụ quản trị hệ thống dành riêng cho Admin.
@@ -22,7 +23,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-// 🌟 ĐÃ SỬA: Dùng hasAnyAuthority để tránh lỗi 403 ngớ ngẩn do Spring Security tự ghép tiền tố ROLE_
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
@@ -70,37 +70,70 @@ public class AdminController {
     /**
      * API Thay đổi chức vụ (Role) của tài khoản.
      * <p>Phục vụ nghiệp vụ thăng chức hoặc giáng chức nhân viên.</p>
+     * <p>Đã áp dụng luật nghiệp vụ chặt chẽ: Thăng chức bắt buộc chọn Cửa hàng,
+     * Giáng chức bắt buộc chọn Người thế chỗ.</p>
      *
      * @param accountId ID của tài khoản cần thay đổi (UUID).
      * @param roleName  Tên Role mới (VD: STORE_MANAGER, COORDINATOR...).
-     * @return Thông tin tài khoản sau khi đã được cập nhật Role.
+     * @return Thông báo chi tiết sau khi cập nhật Role và luân chuyển cửa hàng.
      */
     @PatchMapping("/accounts/{accountId}/role")
-    public ResponseEntity<AccountResponse> changeAccountRole(
-            @PathVariable String accountId,
-            @RequestParam String roleName) {
+    public ResponseEntity<String> changeAccountRole( // 🌟 Đã sửa thành String
+                                                     @PathVariable String accountId,
+                                                     @RequestParam String roleName,
+                                                     @RequestParam(required = false) String storeId,
+                                                     @RequestParam(required = false) UUID replacementAccountId) {
 
-        AccountResponse updatedAccount = accountService.changeAccountRole(accountId, roleName);
-        return ResponseEntity.ok(updatedAccount);
+        String message = accountService.changeAccountRole(accountId, roleName, storeId, replacementAccountId);
+        return ResponseEntity.ok(message); // 🌟 Trả về String
+    }
+
+    /**
+     * API Khóa / Mở khóa tài khoản (Xóa mềm) kèm luân chuyển nhân sự.
+     */
+    @PutMapping("/accounts/{accountId}/status")
+    public ResponseEntity<String> toggleAccountStatus(
+            @PathVariable UUID accountId,
+            @RequestParam(required = false) UUID replacementAccountId) {
+        return ResponseEntity.ok(accountService.toggleAccountStatus(accountId, replacementAccountId));
+    }
+
+    /**
+     * API Lấy danh sách các Quản lý cửa hàng đang "Trống việc" (Dự bị).
+     */
+    @GetMapping("/list-accounts/free-managers")
+    public ResponseEntity<List<AccountResponse>> getFreeManagers() {
+        return ResponseEntity.ok(accountService.getFreeStoreManagers());
     }
 
     /**
      * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
-     * <p>
-     * Phục vụ nghiệp vụ điều chuyển nhân sự giữa các chi nhánh.
-     * Nếu không truyền storeId, hệ thống sẽ gỡ nhân viên khỏi cửa hàng hiện tại (rút về hội sở).
-     * </p>
-     *
-     * @param accountId ID của tài khoản cần điều chuyển (UUID).
-     * @param storeId   ID của cửa hàng mới (không bắt buộc).
-     * @return Thông tin tài khoản sau khi đã cập nhật nơi làm việc.
+     * <p>Sử dụng để gán cửa hàng mới hoặc rút nhân sự về dự bị (storeId = null).</p>
      */
     @PatchMapping("/accounts/{accountId}/store")
-    public ResponseEntity<AccountResponse> assignStoreToAccount(
-            @PathVariable String accountId,
-            @RequestParam(required = false) String storeId) {
+    public ResponseEntity<String> assignStoreToAccount( // 🌟 Đã sửa thành String
+                                                        @PathVariable String accountId,
+                                                        @RequestParam(required = false) String storeId) {
 
-        AccountResponse updatedAccount = accountService.assignStoreToAccount(accountId, storeId);
-        return ResponseEntity.ok(updatedAccount);
+        String message = accountService.assignStoreToAccount(accountId, storeId);
+        return ResponseEntity.ok(message); // 🌟 Trả về String
+    }
+
+    /**
+     * API Hoán đổi vị trí cửa hàng giữa 2 Quản lý.
+     * <p>
+     * Phục vụ nghiệp vụ luân chuyển chéo: Ông A sang tiệm B, Ông B sang tiệm A.
+     * </p>
+     *
+     * @param accountId1 ID của quản lý thứ 1
+     * @param accountId2 ID của quản lý thứ 2
+     * @return Thông báo kết quả hoán đổi chi tiết
+     */
+    @PutMapping("/accounts/swap-stores")
+    public ResponseEntity<String> swapStoreManagers(
+            @RequestParam UUID accountId1,
+            @RequestParam UUID accountId2) {
+
+        return ResponseEntity.ok(accountService.swapManagers(accountId1, accountId2));
     }
 }
