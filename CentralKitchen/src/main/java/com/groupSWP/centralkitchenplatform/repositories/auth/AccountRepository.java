@@ -19,4 +19,11 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     // Tìm kiếm theo tên gần đúng (không phân biệt hoa thường) và loại trừ ADMIN
     @Query("SELECT a FROM Account a JOIN a.systemUser u WHERE LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) AND a.role != 'ADMIN'")
     List<Account> searchByFullNameExcludingAdmin(@Param("keyword") String keyword);
+
+    // ======================================================
+    // 🌟 TÌM NHÂN VIÊN "DỰ BỊ" (ĐANG RẢNH VIỆC) ĐỂ LÀM NGƯỜI THẾ CHỖ
+    // Điều kiện: Đang Active + Là STORE_MANAGER + Chưa ôm tiệm nào (store IS NULL)
+    // ======================================================
+    @Query("SELECT a FROM Account a WHERE a.isActive = true AND a.role = 'STORE_MANAGER' AND a.store IS NULL")
+    List<Account> findFreeStoreManagers();
 }

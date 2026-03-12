@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Controller xử lý các nghiệp vụ quản trị hệ thống dành riêng cho Admin.
@@ -22,7 +23,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-// 🌟 ĐÃ SỬA: Dùng hasAnyAuthority để tránh lỗi 403 ngớ ngẩn do Spring Security tự ghép tiền tố ROLE_
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
@@ -85,15 +85,25 @@ public class AdminController {
     }
 
     /**
+     * API Khóa / Mở khóa tài khoản (Xóa mềm) kèm luân chuyển nhân sự.
+     */
+    @PutMapping("/accounts/{accountId}/status")
+    public ResponseEntity<String> toggleAccountStatus(
+            @PathVariable UUID accountId,
+            @RequestParam(required = false) UUID replacementAccountId) {
+        return ResponseEntity.ok(accountService.toggleAccountStatus(accountId, replacementAccountId));
+    }
+
+    /**
+     * API Lấy danh sách các Quản lý cửa hàng đang "Trống việc" (Dự bị).
+     */
+    @GetMapping("/list-accounts/free-managers")
+    public ResponseEntity<List<AccountResponse>> getFreeManagers() {
+        return ResponseEntity.ok(accountService.getFreeStoreManagers());
+    }
+
+    /**
      * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
-     * <p>
-     * Phục vụ nghiệp vụ điều chuyển nhân sự giữa các chi nhánh.
-     * Nếu không truyền storeId, hệ thống sẽ gỡ nhân viên khỏi cửa hàng hiện tại (rút về hội sở).
-     * </p>
-     *
-     * @param accountId ID của tài khoản cần điều chuyển (UUID).
-     * @param storeId   ID của cửa hàng mới (không bắt buộc).
-     * @return Thông tin tài khoản sau khi đã cập nhật nơi làm việc.
      */
     @PatchMapping("/accounts/{accountId}/store")
     public ResponseEntity<AccountResponse> assignStoreToAccount(

@@ -26,24 +26,25 @@ public class AccountService {
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // HÀM MỚI: Lấy danh sách theo trạng thái (Active / Inactive)
     public List<AccountResponse> getAccountsByStatus(boolean isActive) {
         List<Account> accounts = accountRepository.findByIsActiveExcludingAdmin(isActive);
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    public List<AccountResponse> getFreeStoreManagers() {
+        return accountRepository.findFreeStoreManagers().stream()
+                .map(this::mapToResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     public List<AccountResponse> searchAccountsByFullName(String keyword) {
-        // Kiểm tra an toàn: Nếu keyword rỗng, trả về toàn bộ danh sách
         if (keyword == null || keyword.trim().isEmpty()) {
             return getAccountsExcludingAdmin();
         }
-
-        // Gọi Repository để tìm kiếm và map sang DTO
         List<Account> accounts = accountRepository.searchByFullNameExcludingAdmin(keyword.trim());
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // Hàm Helper để map Entity sang DTO
     private AccountResponse mapToResponse(Account account) {
         AccountResponse dto = new AccountResponse();
         dto.setAccountId(account.getAccountId());
@@ -51,7 +52,6 @@ public class AccountService {
         dto.setRole(account.getRole().name());
         dto.setActive(account.isActive());
 
-        // Lấy thông tin user
         SystemUser systemUser = account.getSystemUser();
         if (systemUser != null) {
             dto.setUserId(systemUser.getUserId());
@@ -59,27 +59,22 @@ public class AccountService {
             dto.setEmail(systemUser.getEmail());
         }
 
-        // =========================================================
-        // 🌟 BỔ SUNG ĐOẠN NÀY ĐỂ LẤY THÔNG TIN CỬA HÀNG (STORE)
-        // =========================================================
         if (account.getStore() != null) {
-            // Nhờ dòng getStore() này, FetchType.LAZY mới chịu chạy query lấy data
             dto.setStoreName(account.getStore().getName());
-
-            // Nếu AccountResponse của bạn có thêm thuộc tính storeName thì mở comment dòng dưới:
-            // dto.setStoreName(account.getStore().getStoreName());
         }
 
         return dto;
     }
 
+    // =========================================================================
+    // 🔥 CÁC HÀM XỬ LÝ NGHIỆP VỤ NHÂN SỰ
+    // =========================================================================
+
     @Transactional
     public AccountResponse changeAccountRole(String accountId, String newRoleName) {
-        // 1. Tìm tài khoản (Lưu ý: accountId của bạn đang dùng UUID theo hệ thống)
         Account account = accountRepository.findById(UUID.fromString(accountId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản với ID: " + accountId));
 
-        // 2. Chuyển String thành Enum Role (Ví dụ: "STORE_MANAGER")
         try {
             Account.Role newRole = Account.Role.valueOf(newRoleName.toUpperCase());
             account.setRole(newRole);
@@ -87,30 +82,68 @@ public class AccountService {
             throw new RuntimeException("Role không hợp lệ! Vui lòng kiểm tra lại: " + newRoleName);
         }
 
-        // 3. Lưu xuống Database và trả về kết quả
         accountRepository.save(account);
         return mapToResponse(account);
     }
 
     @Transactional
     public AccountResponse assignStoreToAccount(String accountId, String storeId) {
-        // 1. Tìm tài khoản
         Account account = accountRepository.findById(UUID.fromString(accountId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản với ID: " + accountId));
 
-        // 2. Xử lý logic gán cửa hàng
         if (storeId == null || storeId.trim().isEmpty()) {
-            // Nếu không truyền storeId -> Xóa nhân viên khỏi cửa hàng hiện tại (Đưa về hội sở)
             account.setStore(null);
         } else {
-            // Nếu có storeId -> Tìm cửa hàng và gán vào
             Store store = storeRepository.findById(storeId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng với ID: " + storeId));
             account.setStore(store);
         }
 
-        // 3. Lưu xuống DB
         accountRepository.save(account);
         return mapToResponse(account);
+    }
+
+    @Transactional
+    public String toggleAccountStatus(UUID accountId, UUID replacementAccountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản trong hệ thống!"));
+
+        if (account.getRole() == Account.Role.ADMIN) {
+            throw new RuntimeException("Lỗi bảo mật: Không thể khóa tài khoản cấp ADMIN!");
+        }
+
+        if (account.isActive()) {
+            Store managedStore = account.getStore();
+
+            if (managedStore != null) {
+                if (replacementAccountId == null) {
+                    throw new RuntimeException("Nhân viên này đang quản lý cửa hàng '" + managedStore.getName() + "'. Vui lòng chọn một nhân viên khác để THẾ CHỖ trước khi khóa!");
+                }
+
+                Account replacementAccount = accountRepository.findById(replacementAccountId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên thế chỗ!"));
+
+                if (!replacementAccount.isActive()) {
+                    throw new RuntimeException("Nhân viên thế chỗ đang bị khóa (Inactive). Vui lòng chọn nhân viên đang hoạt động!");
+                }
+
+                if (replacementAccount.getStore() != null) {
+                    throw new RuntimeException("Nhân viên thế chỗ hiện đang quản lý một cửa hàng khác. Vui lòng chọn người đang trống việc!");
+                }
+
+                account.setStore(null);
+                accountRepository.saveAndFlush(account);
+
+                replacementAccount.setStore(managedStore);
+                accountRepository.save(replacementAccount);
+            }
+        }
+
+        account.setActive(!account.isActive());
+        accountRepository.save(account);
+
+        return account.isActive() ?
+                "Đã MỞ KHÓA tài khoản " + account.getUsername() :
+                "Đã KHÓA tài khoản " + account.getUsername() + " thành công!";
     }
 }

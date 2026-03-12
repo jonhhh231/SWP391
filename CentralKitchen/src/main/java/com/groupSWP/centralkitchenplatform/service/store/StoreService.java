@@ -2,7 +2,9 @@ package com.groupSWP.centralkitchenplatform.service.store;
 
 import com.groupSWP.centralkitchenplatform.dto.store.StoreRequest;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreResponse;
+import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
+import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import java.util.UUID;
 public class StoreService {
 
     private final StoreRepository storeRepository;
+    private final AccountRepository accountRepository;
 
     @Transactional
     public StoreResponse createStore(StoreRequest request) {
@@ -74,32 +77,109 @@ public class StoreService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    // ======================================================
+    // 🌟 NGHIỆP VỤ 1: THAY ĐỔI / GÁN QUẢN LÝ CỬA HÀNG
+    // ======================================================
     @Transactional
-    public void softDeleteStore(String storeId) { // chưa test
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new RuntimeException("Not found"));
-
-        // 1. Tắt hoạt động cửa hàng
-        store.setActive(false);
-
-        // 2. Tắt luôn hoạt động của nhân viên/account đi kèm
-        if (store.getAccount() != null) {
-            store.getAccount().setActive(false);
-        }
-
-        storeRepository.save(store);
-    }
-
-    @Transactional
-    public void deleteStore(String storeId) {
+    public String changeStoreManager(String storeId, UUID accountId) {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng!"));
 
-        if (store.getOrders() != null && !store.getOrders().isEmpty()) {
-            throw new RuntimeException("Không thể xóa cửa hàng này vì đã có phát sinh đơn hàng! Hãy dùng chức năng 'Khóa' (Soft Delete) thay vì xóa.");
+        Account newManager = accountRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản nhân sự!"));
+
+        if (!newManager.isActive()) {
+            throw new RuntimeException("Tài khoản này đang bị khóa (Inactive), không thể gán làm quản lý!");
         }
-        storeRepository.delete(store);
+
+        // 🌟 Kiểm tra xem người mới có đang trống việc không
+        if (newManager.getStore() != null) {
+            throw new RuntimeException("Tài khoản này hiện đang quản lý cửa hàng '" + newManager.getStore().getName() + "'. Vui lòng chọn nhân sự đang TRỐNG VIỆC!");
+        }
+
+        // 🛠️ BƯỚC FIX LỖI: Tháo "ghế" quản lý của người cũ ra trước (Nếu tiệm đang có người)
+        Account oldManager = store.getAccount();
+        if (oldManager != null) {
+            oldManager.setStore(null); // Tước quyền
+            accountRepository.saveAndFlush(oldManager); // 🔥 Bắt buộc dùng saveAndFlush để DB lập tức nhả cái cờ Unique ra!
+        }
+
+        // Sau khi ghế đã trống, gán cho người mới
+        newManager.setStore(store);
+        accountRepository.save(newManager);
+
+        return "Đã gán tài khoản " + newManager.getUsername() + " làm Quản lý cửa hàng: " + store.getName();
     }
+
+    // ======================================================
+    // 🌟 NGHIỆP VỤ 2: XÓA MỀM CỬA HÀNG (TRƯỜNG HỢP A)
+    // Bắt buộc phải luân chuyển Quản lý sang tiệm khác
+    // ======================================================
+    @Transactional
+    public String softDeleteStore(String storeId, String transferToStoreId) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng!"));
+
+        if (!store.isActive()) {
+            throw new RuntimeException("Cửa hàng này đã được đóng cửa từ trước rồi!");
+        }
+
+        Account currentManager = store.getAccount();
+
+        // ========================================================
+        // 🌟 NẾU CỬA HÀNG ĐANG CÓ NHÂN VIÊN VÀ NHÂN VIÊN ĐÓ ĐANG ACTIVE
+        // ========================================================
+        if (currentManager != null && currentManager.isActive()) {
+
+            // 1. Ép buộc phải chọn 1 cửa hàng để thuyên chuyển ổng đi
+            if (transferToStoreId == null || transferToStoreId.trim().isEmpty()) {
+                throw new RuntimeException("Cửa hàng đang có nhân viên quản lý! Vui lòng chọn một Cửa hàng TRỐNG để đẩy nhân viên này qua trước khi đóng cửa.");
+            }
+
+            if (storeId.equals(transferToStoreId)) {
+                throw new RuntimeException("Không thể luân chuyển sang chính cửa hàng đang muốn đóng!");
+            }
+
+            Store targetStore = storeRepository.findById(transferToStoreId)
+                    .orElseThrow(() -> new RuntimeException("Cửa hàng đích để luân chuyển không tồn tại!"));
+
+            // 2. Cửa hàng đích phải đang MỞ CỬA
+            if (!targetStore.isActive()) {
+                throw new RuntimeException("Cửa hàng đích đang bị Đóng cửa (Inactive), không thể đẩy nhân viên tới!");
+            }
+
+            // 3. Cửa hàng đích BẮT BUỘC PHẢI TRỐNG (Chưa có ai quản lý)
+            if (targetStore.getAccount() != null) {
+                throw new RuntimeException("Cửa hàng đích ĐÃ CÓ người quản lý rồi! Vui lòng chọn một cửa hàng đang TRỐNG!");
+            }
+
+            // 4. LUÂN CHUYỂN AN TOÀN
+            currentManager.setStore(targetStore);
+            // Ép lưu xuống DB luôn để tí nữa đóng cửa tiệm cũ không bị vướng
+            accountRepository.saveAndFlush(currentManager);
+        }
+
+        // ========================================================
+        // 🌟 ĐÓNG CỬA HÀNG (INACTIVE)
+        // ========================================================
+        store.setActive(false);
+        storeRepository.save(store);
+
+        return currentManager != null ?
+                "Đã ĐÓNG CỬA tiệm " + store.getName() + " và đẩy nhân viên " + currentManager.getUsername() + " sang tiệm mới thành công!" :
+                "Đã ĐÓNG CỬA tiệm " + store.getName() + " thành công!";
+    }
+
+//    @Transactional
+//    public void deleteStore(String storeId) {
+//        Store store = storeRepository.findById(storeId)
+//                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng!"));
+//
+//        if (store.getOrders() != null && !store.getOrders().isEmpty()) {
+//            throw new RuntimeException("Không thể xóa cửa hàng này vì đã có phát sinh đơn hàng! Hãy dùng chức năng 'Khóa' (Soft Delete) thay vì xóa.");
+//        }
+//        storeRepository.delete(store);
+//    }
 
     private StoreResponse mapToResponse(Store store) {
         return StoreResponse.builder()
