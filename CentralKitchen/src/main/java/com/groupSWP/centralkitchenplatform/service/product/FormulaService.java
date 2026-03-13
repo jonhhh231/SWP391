@@ -1,31 +1,137 @@
 package com.groupSWP.centralkitchenplatform.service.product;
 
+import com.groupSWP.centralkitchenplatform.dto.formula.FormulaResponse;
+import com.groupSWP.centralkitchenplatform.dto.formula.FormulaUpsertRequest;
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest;
-import com.groupSWP.centralkitchenplatform.entities.kitchen.*;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.FormulaKey;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.product.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
-import org.springframework.transaction.annotation.Transactional;
+import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Service quản lý nghiệp vụ Công thức nấu ăn (Formula / Recipe).
+ * <p>
+ * Lớp này chịu trách nhiệm xử lý mọi thao tác liên quan đến bảng {@link Formula},
+ * bao gồm việc lấy công thức theo sản phẩm, lưu trữ công thức độc lập, và hỗ trợ
+ * lưu trữ công thức đi kèm khi khởi tạo Sản phẩm (Product).
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class FormulaService {
-    private final FormulaRepository formulaRepository;
-    private final IngredientRepository ingredientRepository;
 
+    // Gom chung 3 Repository cần thiết vào một nhà
+    private final FormulaRepository formulaRepo;
+    private final ProductRepository productRepo;
+    private final IngredientRepository ingredientRepo;
+
+    // =========================================================================
+    // PHẦN 1: CÁC HÀM PHỤC VỤ CHO FORMULA CONTROLLER (GỌI ĐỘC LẬP)
+    // =========================================================================
+
+    /**
+     * Lấy chi tiết công thức của một sản phẩm cụ thể.
+     */
+    @Transactional(readOnly = true)
+    public FormulaResponse getFormulaByProduct(String productId) {
+        Product product = productRepo.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm: " + productId));
+
+        List<Formula> formulas = formulaRepo.findByProduct_ProductId(productId);
+
+        return FormulaResponse.builder()
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .ingredients(formulas.stream().map(f ->
+                        FormulaResponse.Item.builder()
+                                .ingredientId(f.getIngredient().getIngredientId())
+                                .ingredientName(f.getIngredient().getName())
+                                .unit(f.getIngredient().getUnit().name()) // LẤY TÊN ENUM RA (VD: "KG", "GRAM")
+                                .amountNeeded(f.getAmountNeeded())
+                                .build()).toList())
+                .build();
+    }
+
+    /**
+     * Thêm mới hoặc Cập nhật (Upsert) toàn bộ công thức cho một sản phẩm.
+     * Cơ chế: Xóa sạch công thức cũ và lưu lại danh sách mới để tránh rác dữ liệu.
+     */
+    @Transactional
+    public void upsertFormula(FormulaUpsertRequest req) {
+        if (req.getProductId() == null || req.getProductId().isBlank()) {
+            throw new IllegalArgumentException("Mã sản phẩm không được để trống");
+        }
+        if (req.getIngredients() == null || req.getIngredients().isEmpty()) {
+            throw new IllegalArgumentException("Nguyên liệu không được rỗng");
+        }
+
+        Product product = productRepo.findById(req.getProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm: " + req.getProductId()));
+
+        // Xoá công thức cũ (replace toàn bộ)
+        formulaRepo.deleteByProduct_ProductId(req.getProductId());
+
+        // 1. TẠO CÁI TÚI RỖNG ĐỂ GOM DATA
+        List<Formula> formulasToSave = new ArrayList<>();
+
+        for (FormulaUpsertRequest.Item item : req.getIngredients()) {
+            if (item.getIngredientId() == null || item.getIngredientId().isBlank()) {
+                throw new IllegalArgumentException("Mã nguyên liệu không được để trống");
+            }
+            if (item.getAmountNeeded() == null || item.getAmountNeeded().signum() <= 0) {
+                throw new IllegalArgumentException("Số lượng cần phải lớn hơn 0");
+            }
+
+            Ingredient ing = ingredientRepo.findById(item.getIngredientId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nguyên liệu: " + item.getIngredientId()));
+
+            Formula f = new Formula();
+            f.setId(new FormulaKey(req.getProductId(), item.getIngredientId()));
+            f.setProduct(product);
+            f.setIngredient(ing);
+            f.setAmountNeeded(item.getAmountNeeded());
+
+            // 2. BỎ VÀO TÚI THAY VÌ LƯU LIỀN
+            formulasToSave.add(f);
+        }
+
+        // 3. LƯU 1 LẦN DUY NHẤT VÀO DATABASE -> SIÊU MƯỢT!
+        formulaRepo.saveAll(formulasToSave);
+    }
+
+    /**
+     * Xóa sạch công thức của một sản phẩm.
+     */
+    @Transactional
+    public void deleteFormula(String productId) {
+        formulaRepo.deleteByProduct_ProductId(productId);
+    }
+
+    // =========================================================================
+    // PHẦN 2: CÁC HÀM HỖ TRỢ CHO PRODUCT SERVICE (LƯU KÈM KHI TẠO PRODUCT)
+    // =========================================================================
+
+    /**
+     * Lưu danh sách nguyên liệu đi kèm khi khởi tạo Sản phẩm mới.
+     */
+    @Transactional
     public void saveFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
         if (ingredientRequests == null || ingredientRequests.isEmpty()) return;
 
         List<Formula> formulaList = ingredientRequests.stream().map(item -> {
-            // Kiểm tra nguyên liệu có tồn tại không
-            Ingredient ingredient = ingredientRepository.findById(item.getIngredientId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu: " + item.getIngredientId()));
+            Ingredient ingredient = ingredientRepo.findById(item.getIngredientId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nguyên liệu: " + item.getIngredientId()));
 
-            // Tạo Entity Formula
             Formula formula = new Formula();
             FormulaKey key = new FormulaKey(product.getProductId(), ingredient.getIngredientId());
 
@@ -37,16 +143,16 @@ public class FormulaService {
             return formula;
         }).collect(Collectors.toList());
 
-        formulaRepository.saveAll(formulaList);
+        formulaRepo.saveAll(formulaList);
     }
 
+    /**
+     * Cập nhật danh sách nguyên liệu khi chỉnh sửa Sản phẩm hiện tại.
+     */
     @Transactional
     public void updateFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
         // 1. Xóa sạch công thức cũ
-        formulaRepository.deleteByProduct_ProductId(product.getProductId());
-
-        // 🌟 THÊM DÒNG NÀY: Ép JPA "Xả bồn cầu" ngay lập tức, xóa hẳn dưới DB rồi mới làm bước tiếp theo
-        formulaRepository.flush();
+        formulaRepo.deleteByProduct_ProductId(product.getProductId());
 
         // 2. Lưu lại cái mới (nếu có)
         if (ingredientRequests != null && !ingredientRequests.isEmpty()) {

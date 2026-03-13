@@ -25,14 +25,16 @@ import java.util.List;
  * Class này chịu trách nhiệm:
  * <ul>
  * <li>Thiết lập bộ lọc bảo mật (Security Filter Chain) cho các HTTP request.</li>
- * <li>Cấu hình phân quyền chi tiết (Role-Based Access Control - RBAC) theo từng endpoint và HttpMethod.</li>
+ * <li>Cấu hình phân quyền chi tiết (Role-Based Access Control - RBAC) theo từng endpoint và {@link HttpMethod}.</li>
  * <li>Quản lý chính sách phiên (Session Policy) theo chuẩn Stateless (phi trạng thái) dành cho JWT.</li>
  * <li>Tích hợp bộ lọc kiểm tra JWT ({@link JwtAuthenticationFilter}) trước khi request đi vào Controller.</li>
  * <li>Cấu hình chính sách CORS để cho phép Frontend giao tiếp an toàn với Backend.</li>
  * </ul>
  * </p>
- * <p><b>Lưu ý an toàn:</b> Mọi thay đổi về đường dẫn (URL) hoặc quyền (Role) tại đây đều ảnh hưởng
- * trực tiếp đến tính bảo mật của hệ thống. Cần đảm bảo quy tắc: "Phân quyền cụ thể đặt trên cùng, phân quyền tổng quát đặt phía dưới".</p>
+ * <p>
+ * <b>Lưu ý an toàn:</b> Mọi thay đổi về đường dẫn (URL) hoặc quyền (Role) tại đây đều ảnh hưởng
+ * trực tiếp đến tính bảo mật của hệ thống. Cần đảm bảo quy tắc: <i>"Phân quyền cụ thể đặt trên cùng, phân quyền tổng quát đặt phía dưới"</i>.
+ * </p>
  */
 @Configuration
 @EnableWebSecurity
@@ -44,9 +46,15 @@ public class SecurityConfig {
 
     /**
      * Định nghĩa chuỗi bộ lọc bảo mật chính (Security Filter Chain).
-     * * @param http Đối tượng {@link HttpSecurity} dùng để cấu hình bảo mật web.
-     * @return {@link SecurityFilterChain} Chuỗi bộ lọc đã được cấu hình hoàn chỉnh.
-     * @throws Exception Bắt các ngoại lệ phát sinh trong quá trình build cấu hình bảo mật.
+     * <p>
+     * Phương thức này thiết lập vô hiệu hóa CSRF (do dùng JWT), định nghĩa cụ thể danh sách
+     * các endpoint được phép truy cập công khai (Public) và các endpoint yêu cầu xác thực,
+     * phân quyền khắt khe theo từng Role của hệ thống.
+     * </p>
+     *
+     * @param http Đối tượng {@link HttpSecurity} dùng để xây dựng cấu hình bảo mật web.
+     * @return {@link SecurityFilterChain} Chuỗi bộ lọc đã được cấu hình hoàn chỉnh để Spring Security áp dụng.
+     * @throws Exception Bắt các ngoại lệ phát sinh trong quá trình khởi tạo cấu hình bảo mật.
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,7 +64,6 @@ public class SecurityConfig {
                         // 1. PUBLIC (Không yêu cầu xác thực - Token không bắt buộc)
                         // =========================================================
                         .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
                         // =========================================================
 
                         // 2. ƯU TIÊN 1: CÁC LUỒNG CỤ THỂ (Phải đặt lên trên cùng để tránh bị đè rule)
@@ -77,17 +84,17 @@ public class SecurityConfig {
                                 "/api/categories", "/api/categories/**",
                                 "/api/ingredients", "/api/ingredients/**",
                                 "/api/manager/conversions/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
                         // Giới hạn thao tác Sửa (PUT)
                         .requestMatchers(HttpMethod.PUT,
                                 "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/manager/conversions/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                        .hasAnyRole("ADMIN",  "MANAGER",  "KITCHEN_MANAGER")
 
                         // Giới hạn thao tác Xóa (DELETE)
                         .requestMatchers(HttpMethod.DELETE,
                                 "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/manager/conversions/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
                         // =========================================================
                         // 3. ƯU TIÊN 2: CÁC LUỒNG TỔNG QUÁT (Dùng /** để bao quát các prefix)
@@ -98,17 +105,17 @@ public class SecurityConfig {
 
                         // Khu vực dành cho MANAGER (Các luồng Conversions ngoại lệ đã được xử lý phía trên)
                         .requestMatchers("/api/manager/**", "/api/orders/**", "/api/recipes/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER")
 
                         // Quản lý nghiệp vụ Cửa hàng (Stores CRUD) - Không bao gồm quyền GET (đã cho phép all ở trên)
                         .requestMatchers(HttpMethod.POST, "/api/stores", "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+                        .hasAnyRole("ADMIN",  "MANAGER")
 
                         .requestMatchers(HttpMethod.PUT, "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER")
 
                         .requestMatchers(HttpMethod.DELETE, "/api/stores/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER")
 
                         // Khu vực dành cho LOGISTICS / COORDINATOR
                         .requestMatchers("/api/logistics/**", "/api/shipments/**")
@@ -116,22 +123,22 @@ public class SecurityConfig {
 
                         // Khu vực dành cho KITCHEN MANAGER (Quản lý Bếp trung tâm)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER","KITCHEN_MANAGER")
 
                         // Khu vực dành cho STORE MANAGER (Quản lý Cửa hàng lẻ)
                         .requestMatchers("/api/store/**")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "STORE_MANAGER", "ROLE_STORE_MANAGER")
+                        .hasAnyRole("ADMIN","MANAGER", "STORE_MANAGER")
 
                         // 1. Quyền cho Kitchen Manager (hoặc Admin/Manager) đổi trạng thái Đang chuẩn bị / Đang giao
                         .requestMatchers(HttpMethod.POST,
                                 "/api/orders/delivery/*/preparing",
                                 "/api/orders/delivery/*/shipping")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "MANAGER", "ROLE_MANAGER", "KITCHEN_MANAGER", "ROLE_KITCHEN_MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
 
                         // 2. Quyền cho Store Manager (hoặc Admin) xác nhận Đã nhận hàng
                         .requestMatchers(HttpMethod.POST,
                                 "/api/orders/delivery/*/confirm-receipt")
-                        .hasAnyAuthority("ADMIN", "ROLE_ADMIN", "STORE_MANAGER", "ROLE_STORE_MANAGER")
+                        .hasAnyRole("ADMIN", "STORE_MANAGER")
 
                         // Mọi endpoint khác không khai báo ở trên đều yêu cầu phải có Token hợp lệ
                         .anyRequest().authenticated()
@@ -146,9 +153,13 @@ public class SecurityConfig {
 
     /**
      * Cấu hình chính sách CORS (Cross-Origin Resource Sharing).
+     * <p>
      * Cho phép các ứng dụng Frontend (ví dụ: ReactJS chạy trên localhost:3000)
-     * được phép gọi API đến Backend mà không bị trình duyệt chặn lại.
-     * * @return {@link CorsConfigurationSource} Nguồn cung cấp cấu hình CORS cho Spring Security.
+     * được phép gọi API đến Backend mà không bị cơ chế bảo mật của trình duyệt chặn lại.
+     * Thiết lập rõ ràng các Origin, Method và Header được phép giao tiếp.
+     * </p>
+     *
+     * @return {@link CorsConfigurationSource} Đối tượng chứa nguồn cung cấp cấu hình CORS cho Spring Security.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -170,9 +181,13 @@ public class SecurityConfig {
 
     /**
      * Khởi tạo Bean PasswordEncoder dùng để mã hóa mật khẩu.
+     * <p>
      * Sử dụng thuật toán BCrypt (chuẩn công nghiệp hiện tại) để băm (hash) mật khẩu
-     * một chiều, giúp bảo vệ dữ liệu người dùng ngay cả khi Database bị lộ.
-     * * @return {@link PasswordEncoder} Đối tượng hỗ trợ encode và match mật khẩu.
+     * một chiều. Thuật toán này tự động sinh ra muối (salt) ngẫu nhiên, giúp bảo vệ
+     * dữ liệu người dùng an toàn tuyệt đối ngay cả khi Database bị rò rỉ.
+     * </p>
+     *
+     * @return {@link PasswordEncoder} Đối tượng hỗ trợ mã hóa (encode) và xác thực (matches) mật khẩu.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {

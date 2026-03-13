@@ -1,4 +1,4 @@
-package com.groupSWP.centralkitchenplatform.dto.recipe;
+package com.groupSWP.centralkitchenplatform.dto.formula;
 
 import lombok.Data;
 
@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class RecipeUpsertRequest {
+public class FormulaUpsertRequest {
     private String productId;
     private List<Item> ingredients;
 

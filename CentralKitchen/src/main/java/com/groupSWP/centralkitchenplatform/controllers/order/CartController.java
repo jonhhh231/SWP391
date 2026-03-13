@@ -12,6 +12,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 
+/**
+ * Controller quản lý luồng Giỏ hàng (Cart) dành riêng cho Cửa hàng trưởng.
+ * <p>
+ * Lớp này xử lý các thao tác tương tác với giỏ hàng nháp trước khi chốt thành đơn đặt hàng (Order) chính thức.
+ * Các chức năng bao gồm: Thêm món, xem giỏ hàng, cập nhật số lượng, xóa món và thanh toán (Checkout).
+ * Mọi thao tác đều được gắn liền với danh tính người dùng (thông qua {@link Principal}).
+ * </p>
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/store/cart")
@@ -23,6 +31,14 @@ public class CartController {
     // =======================================================
     // 1. API THÊM MÓN VÀO GIỎ HÀNG
     // =======================================================
+    /**
+     * API Thêm sản phẩm vào giỏ hàng.
+     * <p>Nhận thông tin mã sản phẩm và số lượng từ client, sau đó lưu vào giỏ hàng nháp của người dùng.</p>
+     *
+     * @param principal "Thẻ căn cước" trích xuất từ Token, chứa username của Cửa hàng trưởng.
+     * @param request   Payload chứa productId và quantity cần thêm.
+     * @return Phản hồi HTTP 200 kèm thông báo thành công hoặc 400 nếu có lỗi nghiệp vụ (hết hàng, mã sai...).
+     */
     @PostMapping("/add")
     public ResponseEntity<?> addToCart(
             Principal principal,
@@ -43,6 +59,17 @@ public class CartController {
     // =======================================================
     // 2. API CHỐT ĐƠN (CHECKOUT TỪ GIỎ NHÁP)
     // =======================================================
+    /**
+     * API Chốt đơn hàng (Checkout).
+     * <p>
+     * Chuyển đổi toàn bộ dữ liệu từ giỏ hàng nháp hiện tại thành một Đơn đặt hàng (Order) chính thức,
+     * đồng thời xóa/làm sạch giỏ hàng sau khi chốt thành công.
+     * </p>
+     *
+     * @param principal Danh tính của Cửa hàng trưởng đang thao tác.
+     * @param request   Payload chứa các cấu hình đơn hàng (như loại đơn, ghi chú...).
+     * @return Phản hồi HTTP 200 chứa đối tượng {@link OrderResponse} (Thông tin đơn hàng vừa tạo).
+     */
     @PostMapping("/checkout")
     public ResponseEntity<?> checkout(
             Principal principal,
@@ -64,6 +91,13 @@ public class CartController {
     // =======================================================
     // 3. API XEM GIỎ HÀNG
     // =======================================================
+    /**
+     * API Xem chi tiết giỏ hàng hiện tại.
+     * <p>Truy xuất danh sách các món đang nằm trong giỏ hàng cùng với tổng số lượng, tổng tiền (nếu có).</p>
+     *
+     * @param principal Danh tính người dùng.
+     * @return Phản hồi HTTP 200 chứa đối tượng {@link CartResponse} với danh sách item bên trong.
+     */
     @GetMapping
     public ResponseEntity<?> getCart(Principal principal) {
         try {
@@ -82,6 +116,14 @@ public class CartController {
     // =======================================================
     // 4. API CẬP NHẬT SỐ LƯỢNG MÓN
     // =======================================================
+    /**
+     * API Cập nhật số lượng của một món hàng đã có trong giỏ.
+     * <p>Dùng khi Cửa hàng trưởng muốn tăng/giảm số lượng trực tiếp trong màn hình xem giỏ hàng.</p>
+     *
+     * @param principal Danh tính người dùng.
+     * @param request   Payload tái sử dụng lại AddToCartRequest chứa productId và quantity mới.
+     * @return Phản hồi HTTP 200 kèm thông báo đã cập nhật thành công.
+     */
     @PutMapping("/update")
     public ResponseEntity<?> updateCartItem(
             Principal principal,
@@ -102,6 +144,13 @@ public class CartController {
     // =======================================================
     // 5. API XÓA MÓN KHỎI GIỎ HÀNG
     // =======================================================
+    /**
+     * API Xóa một sản phẩm cụ thể khỏi giỏ hàng.
+     *
+     * @param principal Danh tính người dùng.
+     * @param productId Mã sản phẩm cần loại bỏ khỏi giỏ.
+     * @return Phản hồi HTTP 200 kèm thông báo xóa thành công.
+     */
     @DeleteMapping("/remove/{productId}")
     public ResponseEntity<?> removeCartItem(
             Principal principal,
