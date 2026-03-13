@@ -40,11 +40,13 @@ public class FormulaService {
         formulaRepository.saveAll(formulaList);
     }
 
-    // 👇 THÊM HÀM NÀY
     @Transactional
     public void updateFormulas(Product product, List<ProductRequest.Formula> ingredientRequests) {
         // 1. Xóa sạch công thức cũ
         formulaRepository.deleteByProduct_ProductId(product.getProductId());
+
+        // 🌟 THÊM DÒNG NÀY: Ép JPA "Xả bồn cầu" ngay lập tức, xóa hẳn dưới DB rồi mới làm bước tiếp theo
+        formulaRepository.flush();
 
         // 2. Lưu lại cái mới (nếu có)
         if (ingredientRequests != null && !ingredientRequests.isEmpty()) {
