@@ -26,6 +26,7 @@ import java.util.Map;
  * quyền truy cập tối thiểu từ cấp độ {@code COORDINATOR} trở lên.
  * </p>
  */
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
 @RestController
 @RequestMapping("/api/logistics/orders")
 @RequiredArgsConstructor
@@ -44,7 +45,7 @@ public class LogisticsController {
      *
      * @return Phản hồi HTTP 200 chứa danh sách các đơn hàng (Mã đơn, Tên cửa hàng, Loại đơn, Trạng thái).
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+
     @GetMapping("/ready")
     public ResponseEntity<List<Map<String, Object>>> getReadyOrders() {
         return ResponseEntity.ok(logisticsService.getReadyOrders());
@@ -59,7 +60,7 @@ public class LogisticsController {
      *
      * @return Phản hồi HTTP 200 chứa danh sách chuyến xe đang chạy (Mã xe, Tên tài xế, Biển số, Trạng thái).
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+
     @GetMapping("/active")
     public ResponseEntity<List<Map<String, Object>>> getActiveShipments() {
         return ResponseEntity.ok(logisticsService.getActiveShipments());
@@ -75,7 +76,7 @@ public class LogisticsController {
      * @param shipmentId Mã định danh của chuyến xe (Shipment ID).
      * @return Phản hồi HTTP 200 chứa danh sách chi tiết các mặt hàng trên xe.
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+
     @GetMapping("/{shipmentId}/details")
     public ResponseEntity<List<Map<String, Object>>> getShipmentDetails(@PathVariable String shipmentId) {
         return ResponseEntity.ok(logisticsService.getShipmentDetails(shipmentId));
@@ -95,7 +96,7 @@ public class LogisticsController {
      * Ví dụ: {@code {"orderIds": ["ORD-001", "ORD-002"]}}.
      * @return Phản hồi HTTP 200 thông báo tạo chuyến xe thành công kèm tin nhắn xác nhận.
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+
     @PostMapping("/manual-allocate")
     public ResponseEntity<Map<String, String>> allocateManualRoutes(@RequestBody Map<String, List<String>> payload) {
         List<String> orderIds = payload.get("orderIds");
@@ -115,7 +116,6 @@ public class LogisticsController {
      *
      * @return Phản hồi HTTP 200 chứa danh sách lịch sử chuyến xe, sắp xếp theo thời gian mới nhất.
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
     @GetMapping("/history")
     public ResponseEntity<List<Map<String, Object>>> getCompletedShipments() {
         return ResponseEntity.ok(logisticsService.getCompletedShipments());
@@ -131,7 +131,7 @@ public class LogisticsController {
      *
      * @return Phản hồi HTTP 200 chứa danh sách ID, Username và Role của các nhân sự khả dụng.
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER', 'COORDINATOR', 'ROLE_COORDINATOR')")
+
     @GetMapping("/coordinators-list")
     public ResponseEntity<List<Map<String, Object>>> getCoordinatorAccounts() {
         return ResponseEntity.ok(logisticsService.getCoordinatorAccounts());

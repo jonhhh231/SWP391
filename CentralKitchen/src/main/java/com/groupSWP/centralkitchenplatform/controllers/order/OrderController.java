@@ -33,7 +33,7 @@ import java.util.List;
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
 // 🔥 ĐÃ FIX LỖI 403: Chuyển sang hasAnyAuthority để bao trọn mọi trường hợp Token
-@PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 public class OrderController {
 
     private final OrderService orderService;
