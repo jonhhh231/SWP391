@@ -9,6 +9,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Controller quản lý luồng vận hành giao nhận hàng hóa (Logistics & Shipment).
+ * <p>
+ * Lớp này xử lý vòng đời của một chuyến xe giao hàng, bao gồm:
+ * Gán tài xế -> Xác nhận đến nơi -> Cửa hàng kiểm đếm -> Xử lý đền bù (nếu có).
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/shipments")
 @RequiredArgsConstructor
@@ -16,6 +23,14 @@ public class ShipmentController {
 
     private final ShipmentService shipmentService;
 
+    /**
+     * API Gán tài xế cho chuyến xe.
+     * <p>Được sử dụng bởi Điều phối viên hoặc Quản lý để bắt đầu tiến trình giao hàng.</p>
+     *
+     * @param shipmentId Mã chuyến xe cần gán tài xế.
+     * @param payload    Bao gồm chuỗi accountId của tài xế.
+     * @return Phản hồi HTTP 200 kèm thông báo thành công hoặc 400 nếu có lỗi nghiệp vụ.
+     */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
     @PostMapping("/{shipmentId}/assign")
     public ResponseEntity<?> assignDriver(@PathVariable String shipmentId, @RequestBody Map<String, String> payload) {
@@ -33,9 +48,14 @@ public class ShipmentController {
         }
     }
 
-    // =========================================================================
-    // 2. API BỊ THIẾU: TÀI XẾ BÁO ĐÃ TỚI NƠI
-    // =========================================================================
+
+    /**
+     * API Xác nhận tài xế đã đến cửa hàng.
+     * <p>Chuyển trạng thái chuyến xe sang DELIVERED để Cửa hàng trưởng có thể tiến hành kiểm tra.</p>
+     *
+     * @param shipmentId Mã chuyến xe.
+     * @return Phản hồi HTTP 200 kèm thông báo thành công hoặc 400 nếu có lỗi nghiệp vụ.
+     */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
     @PostMapping("/{shipmentId}/delivered")
     public ResponseEntity<?> markAsDelivered(@PathVariable String shipmentId) {
@@ -47,9 +67,15 @@ public class ShipmentController {
         }
     }
 
-    // =========================================================================
-    // 3. STORE MANAGER: CHỐT HÀNG (Đã đổi sang hasAnyAuthority)
-    // =========================================================================
+
+    /**
+     * API Cửa hàng trưởng chốt số lượng hàng thực nhận.
+     * <p>Nếu nhận đủ, đơn hàng hoàn tất. Nếu thiếu/hỏng, ghi nhận sự cố để xử lý đền bù.</p>
+     *
+     * @param shipmentId Mã chuyến xe.
+     * @param request    Danh sách chi tiết các món bị báo cáo thiếu hoặc hỏng (nếu có).
+     * @return Phản hồi HTTP 200 kèm thông báo kết quả kiểm hàng hoặc 400 nếu có lỗi.
+     */
     @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/report")
     public ResponseEntity<?> reportReceivedShipment(
@@ -64,9 +90,13 @@ public class ShipmentController {
         }
     }
 
-    // =========================================================================
-    // 4. KITCHEN MANAGER: TẠO ĐƠN BÙ (Đã đổi sang hasAnyAuthority)
-    // =========================================================================
+    /**
+     * API Bếp trung tâm xác nhận sự cố và lên đơn giao bù.
+     * <p>Tạo một chuyến xe mới (REPLACEMENT) mang theo số lượng hàng bị thiếu để giao lại cho cửa hàng.</p>
+     *
+     * @param shipmentId Mã chuyến xe gốc bị thiếu hàng.
+     * @return Phản hồi HTTP 200 thông báo mã chuyến bù mới được tạo hoặc 400 nếu có lỗi.
+     */
     @PreAuthorize("hasAnyRole('KITCHEN_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/resolve-replacement")
     public ResponseEntity<?> resolveAndCreateReplacement(@PathVariable String shipmentId) {
