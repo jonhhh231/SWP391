@@ -3,9 +3,11 @@ package com.groupSWP.centralkitchenplatform.service.product;
 import com.groupSWP.centralkitchenplatform.dto.product.ProductRequest;
 import com.groupSWP.centralkitchenplatform.dto.product.ProductResponse;
 import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.product.Category;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.product.CategoryRepository;
+import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final FormulaService formulaService;
     private final CategoryRepository categoryRepository;
+    private final IngredientRepository ingredientRepository; // 👇 THÊM DÒNG NÀY ĐỂ MÓC GIÁ NGUYÊN LIỆU (UNIT COST)
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
@@ -43,12 +47,16 @@ public class ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-        // 2. Khởi tạo Entity Product
+// 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
+        BigDecimal autoCalculatedCost = calculateCostPriceAndValidate(request.getIngredients(), request.getSellingPrice());
+
+        // Khởi tạo Entity Product
         Product product = Product.builder()
-                .productId(request.getProductId()) // Yên tâm xài mã FE truyền lên vì đã check trùng rồi!
+                .productId(request.getProductId())
                 .productName(request.getProductName())
                 .category(category)
                 .sellingPrice(request.getSellingPrice())
+                .costPrice(autoCalculatedCost) // 🌟 NHÉT GIÁ VỐN TỰ ĐỘNG VÀO ĐÂY!
                 .baseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()))
                 .isActive(true)
                 .build();
@@ -72,7 +80,14 @@ public class ProductService {
         // 2. Cập nhật thông tin cơ bản nếu có truyền lên
         if (request != null) {
             if (request.getProductName() != null) existingProduct.setProductName(request.getProductName());
-            if (request.getSellingPrice() != null) existingProduct.setSellingPrice(request.getSellingPrice());
+
+            // 🌟 Lấy giá bán sẽ dùng để check (Giá mới nếu có truyền, không thì xài giá cũ)
+            BigDecimal sellingPriceToCheck = request.getSellingPrice() != null ? request.getSellingPrice() : existingProduct.getSellingPrice();
+
+            if (request.getSellingPrice() != null) {
+                existingProduct.setSellingPrice(request.getSellingPrice());
+            }
+
             if (request.getBaseUnit() != null && !request.getBaseUnit().trim().isEmpty()) {
                 existingProduct.setBaseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()));
             }
@@ -84,12 +99,36 @@ public class ProductService {
                         .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại: " + request.getCategoryId()));
                 existingProduct.setCategory(category);
             }
+
+            // =========================================================================
+            // 🌟 XỬ LÝ NGHIỆP VỤ TÍNH LẠI GIÁ VỐN (COST PRICE) & CHECK TỈ LỆ VÀNG
+            // =========================================================================
+            if (request.getIngredients() != null) {
+                // TRƯỜNG HỢP 1: Có gửi kèm Cập nhật Công thức mới -> Tính toán lại giá vốn từ đầu
+                BigDecimal newCostPrice = calculateCostPriceAndValidate(request.getIngredients(), sellingPriceToCheck);
+                existingProduct.setCostPrice(newCostPrice);
+            }
+            else if (request.getSellingPrice() != null && existingProduct.getCostPrice() != null) {
+                // TRƯỜNG HỢP 2: KHÔNG gửi công thức, CHỈ đổi Giá bán -> Lấy giá vốn CŨ ra check luật F&B
+                BigDecimal currentCost = existingProduct.getCostPrice();
+
+                // Trạm 2: Check lỗ
+                if (sellingPriceToCheck.compareTo(currentCost) <= 0) {
+                    throw new RuntimeException("CẢNH BÁO LỖ VỐN: Giá bán mới cập nhật (" + sellingPriceToCheck + ") đang THẤP HƠN hoặc BẰNG Giá vốn hiện tại (" + currentCost + ")!");
+                }
+
+                // Trạm 3: Check Tỉ lệ vàng (Food Cost % <= 40%)
+                BigDecimal foodCostPercentage = currentCost.divide(sellingPriceToCheck, 4, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
+                if (foodCostPercentage.compareTo(new BigDecimal("40")) > 0) {
+                    throw new RuntimeException("CẢNH BÁO TỈ LỆ VÀNG: Với giá bán mới này, giá vốn sẽ chiếm tới " + foodCostPercentage.setScale(2, java.math.RoundingMode.HALF_UP) + "% (Vượt mức 40% cho phép)!");
+                }
+            }
         }
 
-        // 👉 ĐIỂM FIX LỖI: Chuyển lệnh save() lên TRƯỚC khi update công thức
+        // 👉 ĐIỂM FIX LỖI TỪ TRƯỚC: Chuyển lệnh save() lên TRƯỚC khi update công thức
         Product updatedProduct = productRepository.save(existingProduct);
 
-        // 👉 ĐIỂM FIX LỖI: Update công thức cho Product ĐÃ ĐƯỢC SAVE
+        // 👉 ĐIỂM FIX LỖI TỪ TRƯỚC: Update công thức cho Product ĐÃ ĐƯỢC SAVE
         if (request != null && request.getIngredients() != null) {
             formulaService.updateFormulas(updatedProduct, request.getIngredients());
         }
@@ -145,5 +184,57 @@ public class ProductService {
                 .isActive(product.isActive())
                 // .imageUrl(product.getImageUrl()) // Bạn có thể xóa dòng này nếu DTO cũng đã bỏ field imageUrl
                 .build();
+    }
+
+    // ====================================================================
+    // 🌟 HÀM TỰ ĐỘNG TÍNH GIÁ VỐN (COST PRICE) DỰA TRÊN CÔNG THỨC (BOM)
+    // ====================================================================
+    private BigDecimal calculateCostPriceAndValidate(List<ProductRequest.Formula> formulas, BigDecimal sellingPrice) {
+        if (formulas == null || formulas.isEmpty()) {
+            return BigDecimal.ZERO; // Không có công thức thì vốn = 0
+        }
+
+        BigDecimal totalCost = BigDecimal.ZERO;
+
+        for (ProductRequest.Formula item : formulas) {
+            // 🛑 TRẠM 1: Chống nhập số âm hoặc bằng 0
+            if (item.getAmountNeeded() == null || item.getAmountNeeded().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Định lượng của nguyên liệu (amountNeeded) bắt buộc phải lớn hơn 0!");
+            }
+
+            Ingredient ingredient = ingredientRepository.findById(item.getIngredientId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy Nguyên liệu với ID: " + item.getIngredientId()));
+
+            BigDecimal unitCost = ingredient.getUnitCost();
+            if (unitCost == null) {
+                throw new RuntimeException("Nguyên liệu [" + ingredient.getName() + "] chưa được cập nhật đơn giá (unitCost). Không thể tính giá vốn!");
+            }
+
+            // Tính tiền từng món: Định lượng (amountNeeded) * Đơn giá (unitCost)
+            BigDecimal itemCost = unitCost.multiply(item.getAmountNeeded());
+            totalCost = totalCost.add(itemCost);
+        }
+
+        // ==========================================
+        // 🛑 TRẠM KIỂM SOÁT NGHIỆP VỤ F&B (FOOD COST)
+        // ==========================================
+        if (sellingPrice != null && totalCost.compareTo(BigDecimal.ZERO) > 0) {
+
+            // 🛑 TRẠM 2: Giá bán phải lớn hơn giá vốn (Chống lỗ sặc máu)
+            if (sellingPrice.compareTo(totalCost) <= 0) {
+                throw new RuntimeException("CẢNH BÁO LỖ VỐN: Giá bán (" + sellingPrice + ") đang THẤP HƠN hoặc BẰNG Giá vốn (" + totalCost + ")! Vui lòng tăng giá bán hoặc giảm định lượng.");
+            }
+
+            // 🛑 TRẠM 3: Kiểm soát Tỉ lệ Vàng (Food Cost không quá 40%)
+            // Tính phần trăm: (Giá Vốn / Giá Bán) * 100
+            BigDecimal foodCostPercentage = totalCost.divide(sellingPrice, 4, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
+
+            if (foodCostPercentage.compareTo(new BigDecimal("40")) > 0) {
+                throw new RuntimeException("CẢNH BÁO TỈ LỆ VÀNG: Giá vốn đang chiếm tới " + foodCostPercentage.setScale(2, java.math.RoundingMode.HALF_UP) + "% giá bán. " +
+                        "Nguyên tắc F&B không được vượt quá 40% để đảm bảo chi phí vận hành. Giá vốn hiện tại: " + totalCost);
+            }
+        }
+
+        return totalCost;
     }
 }
