@@ -1,12 +1,15 @@
 package com.groupSWP.centralkitchenplatform.service.product; // Đổi lại package nếu bạn lưu ở thư mục khác
 
+import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
+import com.groupSWP.centralkitchenplatform.dto.product.IngredientRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -27,34 +30,55 @@ public class IngredientService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu với ID: " + id));
     }
 
-    // THÊM MỚI
+    // ==========================================
+    // 🌟 THÊM MỚI (Dùng DTO hứng data bảo mật)
+    // ==========================================
     @Transactional
-    public Ingredient createIngredient(Ingredient ingredient) {
-        // Có thể thêm logic kiểm tra trùng tên ở đây trước khi save
-        log.info("Đang tạo mới nguyên liệu...");
+    public Ingredient createIngredient(IngredientRequest request) {
+        log.info("Đang tạo mới nguyên liệu: {}", request.getName());
+
+        // 🛑 Lỗ hổng A đã vá: Chặn giá trị <= 0 ở tầng Service cho chắc cốp
+        if (request.getUnitCost().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Lỗi: Đơn giá (unitCost) phải lớn hơn 0!");
+        }
+
+        Ingredient ingredient = new Ingredient();
+        ingredient.setName(request.getName());
+        ingredient.setUnit(UnitType.valueOf(request.getUnit().toUpperCase()));
+        ingredient.setUnitCost(request.getUnitCost());
+        ingredient.setMinThreshold(request.getMinThreshold());
+
+        // Mặc định lúc mới tạo thì tồn kho = 0 (Chỉ có nhập kho mới được tăng số này lên)
+        ingredient.setKitchenStock(BigDecimal.ZERO);
+
         return ingredientRepository.save(ingredient);
     }
 
-    // CẬP NHẬT (UPDATE)
+    // ==========================================
+    // 🌟 CẬP NHẬT (Dùng DTO hứng data bảo mật)
+    // ==========================================
     @Transactional
-    public Ingredient updateIngredient(String id, Ingredient ingredientDetails) {
+    public Ingredient updateIngredient(String id, IngredientRequest request) {
         Ingredient existingIngredient = getIngredientById(id);
 
-        // Cập nhật các trường cơ bản dựa theo Entity của bạn
-        if (ingredientDetails.getName() != null) {
-            existingIngredient.setName(ingredientDetails.getName());
-        }
-        if (ingredientDetails.getKitchenStock() != null) {
-            existingIngredient.setKitchenStock(ingredientDetails.getKitchenStock());
-        }
-        if (ingredientDetails.getUnit() != null) {
-            existingIngredient.setUnit(ingredientDetails.getUnit());
-        }
-        if (ingredientDetails.getUnitCost() != null) {
-            existingIngredient.setUnitCost(ingredientDetails.getUnitCost());
-        }
-        if (ingredientDetails.getMinThreshold() != null) {
-            existingIngredient.setMinThreshold(ingredientDetails.getMinThreshold());
+        if (request != null) {
+            if (request.getName() != null) existingIngredient.setName(request.getName());
+
+            if (request.getUnit() != null) {
+                existingIngredient.setUnit(UnitType.valueOf(request.getUnit().toUpperCase()));
+            }
+
+            if (request.getUnitCost() != null) {
+                // 🛑 Gác cổng: Cập nhật giá cũng phải > 0
+                if (request.getUnitCost().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new RuntimeException("Lỗi: Đơn giá (unitCost) cập nhật phải lớn hơn 0!");
+                }
+                existingIngredient.setUnitCost(request.getUnitCost());
+            }
+
+            if (request.getMinThreshold() != null) {
+                existingIngredient.setMinThreshold(request.getMinThreshold());
+            }
         }
 
         log.info("Đã cập nhật nguyên liệu ID: {}", id);
