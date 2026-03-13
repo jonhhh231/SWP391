@@ -13,11 +13,27 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controller quản lý luồng Đơn hàng (Order Management) dành riêng cho cấp Quản lý (Admin/Manager).
+ * <p>
+ * Lớp này cung cấp các API mang tính chất "đặc quyền", cho phép Quản lý hệ thống có thể:
+ * <ul>
+ * <li>Tạo đơn hàng đặt hộ cho một Cửa hàng (Store) bất kỳ.</li>
+ * <li>Tra cứu lịch sử đơn hàng của mọi cửa hàng trong hệ thống (không bị giới hạn dữ liệu).</li>
+ * <li>Xem chi tiết hoặc can thiệp hủy đơn hàng nếu cần thiết.</li>
+ * </ul>
+ * </p>
+ * <p>
+ * <b>Phân quyền:</b> Toàn bộ class này được bảo vệ nghiêm ngặt, chỉ cho phép tài khoản
+ * mang quyền {@code ADMIN} hoặc {@code MANAGER} truy cập.
+ * </p>
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+// 🔥 ĐÃ FIX LỖI 403: Chuyển sang hasAnyAuthority để bao trọn mọi trường hợp Token
+@PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN', 'MANAGER', 'ROLE_MANAGER')")
 public class OrderController {
 
     private final OrderService orderService;
@@ -25,6 +41,19 @@ public class OrderController {
     // =======================================================
     // 1. MANAGER TẠO ĐƠN GIÚP CỬA HÀNG (Cần truyền storeId)
     // =======================================================
+
+    /**
+     * API Tạo đơn hàng Tiêu chuẩn (Standard Order) đặt hộ Cửa hàng.
+     * <p>
+     * Dùng trong trường hợp Cửa hàng trưởng gặp sự cố không thể tự đặt hàng,
+     * Quản lý hội sở sẽ dùng API này để khởi tạo đơn hàng thay cho họ.
+     * Bắt buộc phải truyền mã cửa hàng ({@code storeId}) trong payload.
+     * </p>
+     *
+     * @param request Payload chứa danh sách món, số lượng và {@code storeId} của cửa hàng cần đặt.
+     * @return Phản hồi HTTP 200 chứa thông tin đơn hàng vừa được tạo.
+     * @throws IllegalArgumentException nếu thiếu thông tin {@code storeId}.
+     */
     @PostMapping("/standard")
     public ResponseEntity<OrderResponse> createStandardOrder(@RequestBody OrderRequest request) {
         if (request.getStoreId() == null || request.getStoreId().isEmpty()) {
@@ -35,6 +64,17 @@ public class OrderController {
         return ResponseEntity.ok(orderService.createOrder(request, false));
     }
 
+    /**
+     * API Tạo đơn hàng Khẩn cấp (Urgent Order) đặt hộ Cửa hàng.
+     * <p>
+     * Tương tự đơn tiêu chuẩn nhưng luồng xử lý sẽ ưu tiên đẩy nhanh tốc độ chuẩn bị
+     * tại Bếp trung tâm. Phục vụ các trường hợp cửa hàng bị cháy hàng đột xuất.
+     * </p>
+     *
+     * @param request Payload chứa danh sách món, số lượng và {@code storeId}.
+     * @return Phản hồi HTTP 200 chứa thông tin đơn hàng khẩn cấp vừa được tạo.
+     * @throws IllegalArgumentException nếu thiếu thông tin {@code storeId}.
+     */
     @PostMapping("/urgent")
     public ResponseEntity<OrderResponse> createUrgentOrder(@RequestBody OrderRequest request) {
         if (request.getStoreId() == null || request.getStoreId().isEmpty()) {
@@ -48,6 +88,18 @@ public class OrderController {
     // =======================================================
     // 2. MANAGER XEM LỊCH SỬ ĐƠN (Của 1 tiệm cụ thể)
     // =======================================================
+
+    /**
+     * API Tra cứu lịch sử toàn bộ đơn hàng của một cửa hàng cụ thể.
+     * <p>
+     * Quản lý có thể chọn một cửa hàng từ giao diện để xem chi tiết tình hình đặt hàng
+     * của cửa hàng đó qua các thời kỳ. Nếu không truyền tham số {@code storeId},
+     * hệ thống sẽ tự động chặn lại với lỗi HTTP 400.
+     * </p>
+     *
+     * @param storeId Mã định danh của Cửa hàng (truyền qua Query Parameter).
+     * @return Phản hồi HTTP 200 chứa danh sách lịch sử đơn hàng của cửa hàng đó.
+     */
     @GetMapping("/history")
     public ResponseEntity<List<OrderHistoryResponse>> getOrderHistory(
             @RequestParam(required = true) String storeId) {
@@ -60,6 +112,17 @@ public class OrderController {
     // =======================================================
     // 3. MANAGER XEM CHI TIẾT BẤT KỲ ĐƠN NÀO
     // =======================================================
+
+    /**
+     * API Xem chi tiết một đơn hàng cụ thể.
+     * <p>
+     * Nhờ đặc quyền của Quản lý, API này có thể truy xuất bất kỳ mã đơn hàng ({@code orderId}) nào
+     * trong toàn bộ hệ thống mà không bị giới hạn bởi phạm vi dữ liệu như phía Cửa hàng trưởng.
+     * </p>
+     *
+     * @param orderId Mã đơn hàng cần xem chi tiết.
+     * @return Phản hồi HTTP 200 chứa danh sách các mặt hàng, trạng thái và tổng tiền của đơn.
+     */
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderDetailResponse> getOrderDetail(@PathVariable String orderId) {
         log.info("Manager/Admin đang xem chi tiết đơn hàng {}", orderId);
@@ -71,6 +134,18 @@ public class OrderController {
     // =======================================================
     // 4. MANAGER HỦY BẤT KỲ ĐƠN NÀO (NẾU CÒN MỚI)
     // =======================================================
+
+    /**
+     * API Hủy bỏ một đơn hàng.
+     * <p>
+     * Cho phép Quản lý can thiệp đình chỉ một đơn hàng. Thông thường, nghiệp vụ này
+     * chỉ được phép thực hiện khi đơn hàng còn ở trạng thái "Mới" (NEW), chưa được
+     * Bếp trung tâm bắt tay vào chế biến.
+     * </p>
+     *
+     * @param orderId Mã đơn hàng cần hủy.
+     * @return Phản hồi HTTP 200 kèm thông báo quá trình hủy đơn thành công.
+     */
     @PutMapping("/{orderId}/cancel")
     public ResponseEntity<String> cancelOrder(@PathVariable String orderId) {
         log.info("Manager/Admin đang thực hiện hủy đơn hàng {}", orderId);
