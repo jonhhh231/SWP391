@@ -17,18 +17,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KitchenController {
 
-    // --- KHAI BÁO CÁC SERVICE TRÊN CÙNG CHO CHUẨN FORM ---
     private final ProductionService productionService;
-    private final OrderService orderService; // Thêm OrderService để gọi hàm gom đơn
+    private final OrderService orderService;
 
     @GetMapping("/orders")
-    @PreAuthorize("hasRole('KITCHEN_MANAGER')") // Chỉ Quản lý bếp mới được xem
+    @PreAuthorize("hasRole('KITCHEN_MANAGER')")
     public ResponseEntity<?> getKitchenOrders() {
         return ResponseEntity.ok("Danh sách đơn hàng của Bếp Trung Tâm");
     }
 
     @DeleteMapping("/formula/{id}")
-    @PreAuthorize("hasRole('ADMIN')") // Chỉ Admin mới được xóa công thức nấu ăn
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteFormula(@PathVariable Long id) {
         return ResponseEntity.ok("Đã xóa công thức");
     }
@@ -39,72 +38,105 @@ public class KitchenController {
     }
 
     // =====================================================================
-    // API MỚI: TỔNG HỢP ĐƠN HÀNG (AGGREGATION)
+    // 1. GOM ĐƠN (AGGREGATION) - XEM TRƯỚC DANH SÁCH
     // =====================================================================
     @GetMapping("/aggregation")
     public ResponseEntity<List<KitchenAggregationResponse>> getPendingAggregation() {
-
-        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
         org.springframework.security.core.Authentication authentication =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
         String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
 
-        // --- 2. KIỂM TRA QUYỀN (Bảo mật: Chỉ Bếp và Manager được xem) ---
         if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
                 && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
             throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền xem danh sách tổng hợp!");
         }
 
-        // --- 3. GỌI SERVICE LẤY DANH SÁCH TỔNG HỢP ---
         List<KitchenAggregationResponse> response = orderService.getPendingProductionAggregation();
-
         return ResponseEntity.ok(response);
     }
 
-    // API: POST /api/kitchen/aggregation/confirm
-    // Mục đích: Bếp trưởng bấm chốt sổ -> Gom đơn -> Trừ kho -> Đổi trạng thái đơn hàng
+    // =====================================================================
+    // 2. CHỐT SỔ GOM ĐƠN -> ĐẺ RA MẺ NẤU "PLANNED" (KHO VẪN AN TOÀN)
+    // =====================================================================
     @PostMapping("/aggregation/confirm")
     public ResponseEntity<String> confirmProduction() {
-
-        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
         org.springframework.security.core.Authentication authentication =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
         String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
 
-        // --- 2. KIỂM TRA QUYỀN (Vẫn gắt như cũ) ---
         if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
                 && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
             throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền chốt nấu!");
         }
 
-        // --- 3. BÓP CÒ CHỐT NẤU ---
         orderService.confirmProductionAndAggregateOrders();
 
-        return ResponseEntity.ok("Đã chốt nấu thành công! Toàn bộ đơn hàng đã chuyển sang trạng thái AGGREGATED và đã trừ kho nguyên liệu!");
+        // 🌟 MỚI: Đã đổi câu thông báo cho chuẩn UX (Không lừa người dùng là đã trừ kho nữa)
+        return ResponseEntity.ok("Đã chốt sổ gom đơn thành công! Hệ thống đã tạo danh sách các lệnh sản xuất (PLANNED) cho Bếp. Vui lòng bấm 'Bắt đầu nấu' để xuất kho!");
     }
 
     // =====================================================================
-    // API: GET /api/kitchen/productions/active
-    // Mục đích: Xem danh sách các mẻ đang chờ nấu hoặc đang nấu
+    // 3. XEM DANH SÁCH CÁC MẺ ĐANG CHỜ NẤU HOẶC ĐANG NẤU
     // =====================================================================
     @GetMapping("/productions/active")
     public ResponseEntity<List<ProductionResponse>> getActiveProductions() {
-
-        // --- 1. LẤY THÔNG TIN NGƯỜI ĐANG ĐĂNG NHẬP ---
         org.springframework.security.core.Authentication authentication =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-
         String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
 
-        // --- 2. KIỂM TRA QUYỀN (Bảo mật: Chỉ Bếp và Manager được xem) ---
         if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
                 && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
             throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền xem danh sách mẻ nấu!");
         }
 
-        // --- 3. GỌI SERVICE LẤY DANH SÁCH ---
         return ResponseEntity.ok(productionService.getActiveProductionRuns());
+    }
+
+    // =========================================================================
+    // 4. API BẮT ĐẦU NẤU 1 MẺ (TRỪ KHO 1 MÓN)
+    // =========================================================================
+    @PutMapping("/productions/{runId}/status")
+    public ResponseEntity<ProductionResponse> changeProductionStatus(
+            @PathVariable String runId,
+            @RequestParam com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun.ProductionStatus status) {
+
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
+                && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền đổi trạng thái mẻ nấu!");
+        }
+
+        ProductionResponse response = productionService.changeProductionStatus(runId, status);
+        return ResponseEntity.ok(response);
+    }
+
+    // =========================================================================
+    // 🌟 5. VŨ KHÍ BÍ MẬT: NẤU HÀNG LOẠT (BULK UPDATE) -> BẤM 1 NÚT TRỪ KHO 50 MÓN
+    // =========================================================================
+    @PutMapping("/productions/status/bulk")
+    public ResponseEntity<List<ProductionResponse>> changeBulkProductionStatus(
+            @RequestBody List<String> runIds, // FE gửi lên mảng ["RUN-1", "RUN-2"]
+            @RequestParam com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun.ProductionStatus status) {
+
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        if (!currentRole.equals("KITCHEN_MANAGER") && !currentRole.equals("ROLE_KITCHEN_MANAGER")
+                && !currentRole.equals("MANAGER") && !currentRole.equals("ROLE_MANAGER")) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền đổi trạng thái mẻ nấu hàng loạt!");
+        }
+
+        // Chạy vòng lặp gọi lại hàm trừ kho cực xịn cho từng ID
+        List<ProductionResponse> updatedRuns = new java.util.ArrayList<>();
+        for (String runId : runIds) {
+            ProductionResponse response = productionService.changeProductionStatus(runId, status);
+            updatedRuns.add(response);
+        }
+
+        return ResponseEntity.ok(updatedRuns);
     }
 }
