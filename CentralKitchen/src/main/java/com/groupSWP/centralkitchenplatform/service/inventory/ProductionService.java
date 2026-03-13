@@ -45,7 +45,7 @@ public class ProductionService {
 
         String generatedRunId = "RUN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        // 1. Khởi tạo mẻ nấu (Chưa có giá vốn)
+        // 1. Chỉ khởi tạo Kế hoạch mẻ nấu (PLANNED) - CHƯA TRỪ KHO VÀ CHƯA TÍNH TIỀN
         ProductionRun run = new ProductionRun();
         run.setRunId(generatedRunId);
         run.setProduct(product);
@@ -59,43 +59,66 @@ public class ProductionService {
 
         ProductionRun savedRun = productionRunRepository.save(run);
 
-        BigDecimal totalProductionCost = BigDecimal.ZERO;
+        // 👉 ĐIỂM ĂN TIỀN: Đã gỡ bỏ vòng lặp trừ kho ở đây. Kế hoạch chỉ là kế hoạch, hàng trong kho vẫn nguyên si!
 
-        // 2. Duyệt qua từng nguyên liệu trong công thức để trừ kho
-        for (Formula formula : product.getFormulas()) {
-            Ingredient ingredient = formula.getIngredient();
+        return mapToResponse(savedRun);
+    }
 
-            // Theo thiết kế: amountNeeded đã là ĐƠN VỊ GỐC (Base Unit)
-            BigDecimal amountPerUnit = formula.getAmountNeeded();
+    // =========================================================================
+    // 🌟 API MỚI: CHUYỂN TRẠNG THÁI MẺ NẤU (BẤM NÚT "NẤU" THÌ MỚI TRỪ KHO)
+    // =========================================================================
+    @Transactional
+    public ProductionResponse changeProductionStatus(String runId, ProductionRun.ProductionStatus newStatus) {
+        ProductionRun run = productionRunRepository.findById(runId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy mẻ nấu ID: " + runId));
 
-            // Tính tổng lượng nguyên liệu cần thiết cho toàn bộ mẻ nấu này
-            BigDecimal totalNeeded = amountPerUnit.multiply(request.getQuantity());
+        ProductionRun.ProductionStatus oldStatus = run.getStatus();
 
-            BigDecimal currentStock = ingredient.getKitchenStock() != null ? ingredient.getKitchenStock() : BigDecimal.ZERO;
-
-            // Chốt chặn an toàn: Kiểm tra kho trước khi trừ
-            if (currentStock.compareTo(totalNeeded) < 0) {
-                throw new RuntimeException("Không đủ nguyên liệu: " + ingredient.getName() +
-                        ". Cần: " + totalNeeded + " " + ingredient.getUnit() +
-                        ", Hiện có: " + currentStock);
-            }
-
-            // Gọi hàm trừ kho FIFO và lấy về tổng giá vốn của lượng nguyên liệu bị trừ
-            BigDecimal ingredientCost = deductIngredientWithFIFO(ingredient, totalNeeded, savedRun);
-            totalProductionCost = totalProductionCost.add(ingredientCost);
+        if (oldStatus == newStatus) {
+            return mapToResponse(run);
         }
 
-        // 3. Cập nhật lại giá vốn tổng cho mẻ nấu
-        savedRun.setTotalCostAtProduction(totalProductionCost);
-        productionRunRepository.save(savedRun);
+        // 🌟 KỊCH BẢN: Đổi từ PLANNED (Kế hoạch) sang COOKING (Đang nấu) hoặc COMPLETED -> CHÍNH THỨC TRỪ KHO!
+        if (oldStatus == ProductionRun.ProductionStatus.PLANNED &&
+                (newStatus == ProductionRun.ProductionStatus.COOKING || newStatus == ProductionRun.ProductionStatus.COMPLETED)) {
 
-        return ProductionResponse.builder()
-                .runId(savedRun.getRunId())
-                .productName(product.getProductName())
-                .plannedQty(savedRun.getPlannedQty())
-                .status(savedRun.getStatus().name())
-                .productionDate(savedRun.getProductionDate())
-                .build();
+            BigDecimal totalProductionCost = BigDecimal.ZERO;
+            Product product = run.getProduct();
+
+            // Lôi công thức ra và bắt đầu TRỪ KHO FIFO
+            for (Formula formula : product.getFormulas()) {
+                Ingredient ingredient = formula.getIngredient();
+
+                // Tính tổng lượng nguyên liệu cần thiết cho toàn bộ mẻ nấu này
+                BigDecimal totalNeeded = formula.getAmountNeeded().multiply(run.getPlannedQty());
+
+                BigDecimal currentStock = ingredient.getKitchenStock() != null ? ingredient.getKitchenStock() : BigDecimal.ZERO;
+
+                // Chốt chặn an toàn: Kiểm tra kho trước khi trừ
+                if (currentStock.compareTo(totalNeeded) < 0) {
+                    throw new RuntimeException("Không đủ nguyên liệu: " + ingredient.getName() +
+                            ". Cần: " + totalNeeded + " " + ingredient.getUnit() +
+                            ", Hiện có: " + currentStock);
+                }
+
+                // Chạy hàm FIFO trừ kho và tính tiền
+                BigDecimal ingredientCost = deductIngredientWithFIFO(ingredient, totalNeeded, run);
+                totalProductionCost = totalProductionCost.add(ingredientCost);
+            }
+
+            // Ghi nhận giá vốn thực tế vào mẻ nấu
+            run.setTotalCostAtProduction(totalProductionCost);
+        }
+
+        // Chặn lùi trạng thái (Đã nấu rồi thì không được lùi về Kế hoạch để tránh lỗi kho kép)
+        if (oldStatus == ProductionRun.ProductionStatus.COOKING && newStatus == ProductionRun.ProductionStatus.PLANNED) {
+            throw new RuntimeException("Mẻ nấu đang diễn ra (COOKING), không thể lùi về trạng thái Kế Hoạch (PLANNED)!");
+        }
+
+        run.setStatus(newStatus);
+        ProductionRun savedRun = productionRunRepository.save(run);
+
+        return mapToResponse(savedRun);
     }
 
     public List<ProductionResponse> getActiveProductionRuns() {
@@ -104,18 +127,22 @@ public class ProductionService {
                 ProductionRun.ProductionStatus.COOKING
         );
         List<ProductionRun> activeRuns = productionRunRepository.findByStatusInOrderByProductionDateDesc(activeStatuses);
-        return activeRuns.stream().map(run -> ProductionResponse.builder()
+        return activeRuns.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
+    private ProductionResponse mapToResponse(ProductionRun run) {
+        return ProductionResponse.builder()
                 .runId(run.getRunId())
                 .productName(run.getProduct().getProductName())
                 .plannedQty(run.getPlannedQty())
                 .status(run.getStatus().name())
                 .productionDate(run.getProductionDate())
-                .build()
-        ).collect(Collectors.toList());
+                .build();
     }
 
     // =========================================================================
-    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH - CÓ GHI LOG OBJECT VÀ TÍNH GIÁ VỐN)
+    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH - GIỮ NGUYÊN 100% CODE CỦA SẾP)
     // =========================================================================
     private BigDecimal deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, ProductionRun run) {
         BigDecimal remainingToDeduct = quantityNeeded;

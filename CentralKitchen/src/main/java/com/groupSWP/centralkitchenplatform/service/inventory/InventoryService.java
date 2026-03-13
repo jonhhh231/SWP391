@@ -85,7 +85,8 @@ public class InventoryService {
             // 👉 ĐIỂM FIX THEO Ý SẾP: itemReq.getImportPrice() đang là TỔNG TIỀN của dòng nhập này
             BigDecimal lineTotal = itemReq.getImportPrice();
             // 👉 CHIA NGƯỢC: Lấy Tổng tiền / Tổng số lượng gốc = Giá của 1 Đơn Vị Gốc
-            BigDecimal baseUnitCost = lineTotal.divide(baseQuantity, 2, RoundingMode.HALF_UP);
+            // 🌟 FIX LỖI TIỀN LẺ: Chia lấy 4 số thập phân để đảm bảo chính xác tuyệt đối khi nhân ngược lại
+            BigDecimal baseUnitCost = lineTotal.divide(baseQuantity, 4, RoundingMode.HALF_UP);
 
             // 🔥 ĐIỂM ĂN TIỀN LÀ ĐÂY: Thêm remainingQuantity để FIFO có data mà trừ!
             ImportItem importItem = ImportItem.builder()
