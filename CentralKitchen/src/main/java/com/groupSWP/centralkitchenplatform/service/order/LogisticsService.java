@@ -20,7 +20,7 @@ public class LogisticsService {
 
     public List<Map<String, Object>> getReadyOrders() {
         // 🔥 Đã FIX LỖI: Dùng JOIN để lấy tên thật của cửa hàng thay vì hiển thị mã ID
-        String sql = "SELECT o.order_id, s.store_name, o.order_type, o.status " +
+        String sql = "SELECT o.order_id, s.name, o.order_type, o.status " +
                 "FROM orders o " +
                 "JOIN stores s ON o.store_id = s.store_id " +
                 "WHERE o.status = 'READY_TO_SHIP' AND o.shipment_id IS NULL";
