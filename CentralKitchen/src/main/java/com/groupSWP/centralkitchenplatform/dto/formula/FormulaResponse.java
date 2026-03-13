@@ -1,4 +1,4 @@
-package com.groupSWP.centralkitchenplatform.dto.recipe;
+package com.groupSWP.centralkitchenplatform.dto.formula;
 
 import lombok.Builder;
 import lombok.Data;
@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 @Builder
-public class RecipeResponse {
+public class FormulaResponse {
     private String productId;
     private String productName;
     private List<Item> ingredients;
