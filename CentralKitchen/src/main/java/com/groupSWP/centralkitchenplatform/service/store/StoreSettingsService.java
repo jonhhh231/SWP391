@@ -38,10 +38,13 @@ public class StoreSettingsService {
         storeRepository.save(store);
     }
 
+    // Sửa chữ 'username' thành 'storeId'
     @Transactional
-    public void updateStatus(String username, Boolean isActive) { // Đổi StoreStatusRequest thành Boolean
-        Store store = storeRepository.findByAccount_Username(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng cho user: " + username));
+    public void updateStatus(String storeId, Boolean isActive) {
+
+        // 🌟 TÌM CỬA HÀNG THEO STORE ID (Chứ không tìm theo Username nữa)
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng với mã: " + storeId));
 
         store.setActive(isActive);
         storeRepository.save(store);
