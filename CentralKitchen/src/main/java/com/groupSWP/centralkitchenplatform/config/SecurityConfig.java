@@ -63,7 +63,7 @@ public class SecurityConfig {
                         // =========================================================
                         // 1. PUBLIC (Không yêu cầu xác thực - Token không bắt buộc)
                         // =========================================================
-                        .requestMatchers("/api/auth/login", "/api/auth/verify-otp").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/verify-otp","/api/auth/forgot-password").permitAll()
                         // =========================================================
 
                         // 2. ƯU TIÊN 1: CÁC LUỒNG CỤ THỂ (Phải đặt lên trên cùng để tránh bị đè rule)
