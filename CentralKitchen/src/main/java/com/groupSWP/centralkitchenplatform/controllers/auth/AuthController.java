@@ -117,6 +117,7 @@ public class AuthController {
      */
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+        System.out.println("Mật khẩu mới nhận được: " + request.newPassword());
         authService.resetPassword(request.email(), request.otp(), request.newPassword());
         return ResponseEntity.ok("Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.");
     }
