@@ -43,13 +43,20 @@ public class StoreSettingsController {
 
     /**
      * API: Bật/Tắt trạng thái hoạt động (Mở/Đóng cửa trên Web/App)
-     * Primary Actor: STORE_MANAGER
+     * Primary Actor: ADMIN
+     * Chỉnh lại 1 chút chỗ này để tránh bị thằng quản lý cửa hàng
+     * sáng nắng chiều mưa
      */
-    @PutMapping("/status")
-    @PreAuthorize("hasRole('STORE_MANAGER')") // 🔥 Đã sửa thành hasRole
-    public ResponseEntity<String> updateStatus(Principal principal, @RequestBody StoreStatusRequest request) {
-        storeSettingsService.updateStatus(principal.getName(), request.getIsActive());
+    @PutMapping("/{storeId}/active")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> updateStatus(
+            @PathVariable String storeId, // Lấy ID tiệm từ đường dẫn
+            @RequestBody com.groupSWP.centralkitchenplatform.dto.store.StoreStatusRequest request) {
+
+        // Truyền ID xuống Service
+        storeSettingsService.updateStatus(storeId, request.getIsActive());
+
         String statusMsg = request.getIsActive() ? "MỞ CỬA" : "ĐÓNG CỬA";
-        return ResponseEntity.ok("Trạng thái hiện tại: " + statusMsg);
+        return ResponseEntity.ok("Cửa hàng " + storeId + " trạng thái hiện tại: " + statusMsg);
     }
 }
