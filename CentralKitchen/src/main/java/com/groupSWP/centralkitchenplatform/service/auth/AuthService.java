@@ -50,6 +50,8 @@ public class AuthService {
         return AuthResponse.builder()
                 .username(account.getUsername())
                 .message("OTP_REQUIRED")
+                // 🌟 THÊM ĐÚNG 1 DÒNG NÀY VÀO LÀ XONG
+                .fullName(profile.getFullName())
                 .build();
     }
 
@@ -74,6 +76,7 @@ public class AuthService {
                 // Lưu ý: Nếu AuthResponse DTO đang nhận String thì dùng account.getRole().name() ở đây
                 .role(account.getRole().name())
                 .message("Login Success")
+                .fullName(account.getSystemUser().getFullName())
                 .build();
     }
 
