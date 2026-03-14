@@ -37,7 +37,6 @@ public class ShipmentService {
     private final ShipmentDetailRepository shipmentDetailRepository;
     private final OrderRepository orderRepository;
     private final AccountRepository accountRepository;
-    // 🔥 ĐÃ THÊM: Repository quản lý Kho
     private final StockRepository stockRepository;
 
     @Transactional
@@ -196,6 +195,11 @@ public class ShipmentService {
         Shipment shipment = shipmentRepository.findById(shipmentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe: " + shipmentId));
 
+        // làm chốt không cho assign lại khi đã được giao thành công
+        if (shipment.getStatus() != Shipment.ShipmentStatus.PENDING) {
+            throw new RuntimeException("Lỗi: Chỉ có thể gán tài xế cho chuyến xe đang ở trạng thái PENDING (Chờ xuất phát)!");
+        }
+
         Account driver = accountRepository.findById(UUID.fromString(accountId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản tài xế!"));
 
@@ -203,8 +207,10 @@ public class ShipmentService {
         shipment.setDriverName(driver.getUsername());
         shipment.setVehiclePlate(null);
 
+        // Chuyển trạng thái xe sang đang giao
         shipment.setStatus(Shipment.ShipmentStatus.SHIPPING);
 
+        // Chuyển đồng loạt các đơn hàng trên xe sang đang giao
         if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
             LocalDateTime now = LocalDateTime.now();
             shipment.getOrders().forEach(order -> {
