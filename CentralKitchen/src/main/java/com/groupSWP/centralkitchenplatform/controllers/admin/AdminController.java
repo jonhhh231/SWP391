@@ -63,9 +63,6 @@ public class AdminController {
         return ResponseEntity.ok(accountService.getAccountsByStatus(false));
     }
 
-    // =========================================================================
-    // 🔥 CÁC NGHIỆP VỤ NHÂN SỰ MỚI (THĂNG CHỨC & CHUYỂN CÔNG TÁC)
-    // =========================================================================
 
     /**
      * API Thay đổi chức vụ (Role) của tài khoản.

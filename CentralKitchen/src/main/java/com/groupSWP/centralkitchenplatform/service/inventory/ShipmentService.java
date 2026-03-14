@@ -259,8 +259,10 @@ public class ShipmentService {
             throw new RuntimeException("Có đơn hàng không hợp lệ (đã được gán xe hoặc chưa ở trạng thái READY_TO_SHIP)!");
         }
 
+        String timeStamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMddHHmmssSSS"));
+
         Shipment manualShipment = Shipment.builder()
-                .shipmentId("MAN-" + System.currentTimeMillis() % 10000)
+                .shipmentId("MAN-" + timeStamp)
                 .shipmentType(Shipment.ShipmentType.MAIN_ROUTE)
                 .status(Shipment.ShipmentStatus.PENDING)
                 .shipmentDetails(new ArrayList<>())

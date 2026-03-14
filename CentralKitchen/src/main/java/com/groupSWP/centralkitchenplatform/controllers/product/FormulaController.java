@@ -73,7 +73,6 @@ public class FormulaController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @DeleteMapping("/{productId}")
     public ResponseEntity<String> deleteFormula(@PathVariable String productId) {
-        // Đã sửa recipeService -> formulaService và deleteRecipe -> deleteFormula
         formulaService.deleteFormula(productId);
         return ResponseEntity.ok("Xóa công thức thành công");
     }

@@ -164,8 +164,15 @@ public class ProductService {
 
         Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size, sort);
 
+        // =========================================================
+        // 🌟 ĐIỂM CHỐT CHẶN (BẢO VỆ MENU)
+        // Nếu Frontend không truyền trạng thái (isActive = null),
+        // ta bắt buộc ép nó thành TRUE để tự động ẨN các món đã bị xóa mềm.
+        // =========================================================
+        Boolean finalIsActive = (isActive == null) ? true : isActive;
+
         Specification<Product> spec = ProductSpecification.filterProducts(
-                keyword, category, isActive, minPrice, maxPrice
+                keyword, category, finalIsActive, minPrice, maxPrice
         );
 
         Page<Product> productPage = productRepository.findAll(spec, pageable);
