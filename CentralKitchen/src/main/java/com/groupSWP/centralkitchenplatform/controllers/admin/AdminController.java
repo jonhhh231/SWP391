@@ -2,6 +2,7 @@ package com.groupSWP.centralkitchenplatform.controllers.admin;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.AccountResponse;
 import com.groupSWP.centralkitchenplatform.dto.auth.RegisterRequest;
+import com.groupSWP.centralkitchenplatform.dto.auth.UpdateAccountRequest;
 import com.groupSWP.centralkitchenplatform.service.auth.AccountService;
 import com.groupSWP.centralkitchenplatform.service.auth.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +64,6 @@ public class AdminController {
         return ResponseEntity.ok(accountService.getAccountsByStatus(false));
     }
 
-
     /**
      * API Thay đổi chức vụ (Role) của tài khoản.
      * <p>Phục vụ nghiệp vụ thăng chức hoặc giáng chức nhân viên.</p>
@@ -75,14 +75,14 @@ public class AdminController {
      * @return Thông báo chi tiết sau khi cập nhật Role và luân chuyển cửa hàng.
      */
     @PatchMapping("/accounts/{accountId}/role")
-    public ResponseEntity<String> changeAccountRole( // 🌟 Đã sửa thành String
-                                                     @PathVariable String accountId,
-                                                     @RequestParam String roleName,
-                                                     @RequestParam(required = false) String storeId,
-                                                     @RequestParam(required = false) UUID replacementAccountId) {
+    public ResponseEntity<String> changeAccountRole(
+            @PathVariable String accountId,
+            @RequestParam String roleName,
+            @RequestParam(required = false) String storeId,
+            @RequestParam(required = false) UUID replacementAccountId) {
 
         String message = accountService.changeAccountRole(accountId, roleName, storeId, replacementAccountId);
-        return ResponseEntity.ok(message); // 🌟 Trả về String
+        return ResponseEntity.ok(message);
     }
 
     /**
@@ -108,12 +108,12 @@ public class AdminController {
      * <p>Sử dụng để gán cửa hàng mới hoặc rút nhân sự về dự bị (storeId = null).</p>
      */
     @PatchMapping("/accounts/{accountId}/store")
-    public ResponseEntity<String> assignStoreToAccount( // 🌟 Đã sửa thành String
-                                                        @PathVariable String accountId,
-                                                        @RequestParam(required = false) String storeId) {
+    public ResponseEntity<String> assignStoreToAccount(
+            @PathVariable String accountId,
+            @RequestParam(required = false) String storeId) {
 
         String message = accountService.assignStoreToAccount(accountId, storeId);
-        return ResponseEntity.ok(message); // 🌟 Trả về String
+        return ResponseEntity.ok(message);
     }
 
     /**
@@ -132,5 +132,26 @@ public class AdminController {
             @RequestParam UUID accountId2) {
 
         return ResponseEntity.ok(accountService.swapManagers(accountId1, accountId2));
+    }
+
+    /**
+     * API Cập nhật thông tin hồ sơ của tài khoản (Profile Update).
+     * <p>
+     * Cho phép Admin sửa đổi thông tin cá nhân của nhân sự (Họ tên, Email)
+     * hoặc đặt lại mật khẩu (Reset Password) nếu nhân sự quên.
+     * Các thông tin như Role, Store, Status đã được quản lý bởi các API chuyên biệt khác.
+     * </p>
+     *
+     * @param accountId ID của tài khoản cần sửa.
+     * @param request   Payload chứa thông tin cần cập nhật.
+     * @return Thông báo cập nhật thành công.
+     */
+    @PutMapping("/accounts/{accountId}")
+    public ResponseEntity<String> updateAccountInfo(
+            @PathVariable String accountId,
+            @RequestBody UpdateAccountRequest request) { // 🌟 Đã mở comment
+
+        String message = accountService.updateAccountInfo(accountId, request);
+        return ResponseEntity.ok(message);
     }
 }
