@@ -146,12 +146,12 @@ public class AdminController {
      * @param request   Payload chứa thông tin cần cập nhật.
      * @return Thông báo cập nhật thành công.
      */
-    @PutMapping("/accounts/{accountId}")
-    public ResponseEntity<String> updateAccountInfo(
+    @PatchMapping("/accounts/{accountId}/email")
+    public ResponseEntity<String> updateAccountEmail(
             @PathVariable String accountId,
             @RequestBody UpdateAccountRequest request) { // 🌟 Đã mở comment
 
-        String message = accountService.updateAccountInfo(accountId, request);
+        String message = accountService.updateAccountEmail(accountId, request);
         return ResponseEntity.ok(message);
     }
 }
