@@ -114,7 +114,15 @@ public class FormulaService {
      */
     @Transactional
     public void deleteFormula(String productId) {
+        // 1. Xóa sạch các thành phần nguyên liệu của công thức cũ
         formulaRepo.deleteByProduct_ProductId(productId);
+
+        // 2. Xóa mềm (Ẩn) Sản phẩm ra khỏi danh sách kinh doanh
+        Product product = productRepo.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm cần xóa!"));
+
+        product.setActive(false); // Tắt cờ hoạt động
+        productRepo.save(product);
     }
 
     // =========================================================================

@@ -21,4 +21,5 @@ public interface ProductRepository extends JpaRepository<Product, String>, JpaSp
     // 👉 THÊM HÀM MỚI NÀY: Lấy Product KÈM THEO toàn bộ Formulas và Ingredient của nó
     @EntityGraph(attributePaths = {"formulas", "formulas.ingredient"})
     Optional<Product> findById(String id);
+    List<Product> findByIsActiveTrue();
 }
