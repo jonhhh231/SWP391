@@ -7,5 +7,6 @@ public record AuthResponse(
         String token,
         String username,
         String role,
-        String message // CẦN THÊM DÒNG NÀY VÀO ĐÂY
+        String message ,
+        String fullName
 ) {}
