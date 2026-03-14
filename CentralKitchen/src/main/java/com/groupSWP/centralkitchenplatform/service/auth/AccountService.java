@@ -320,42 +320,34 @@ public class AccountService {
     // 🌟 NGHIỆP VỤ CẬP NHẬT THÔNG TIN HỒ SƠ (ĐỔI TÊN, EMAIL, PASSWORD)
     // =========================================================================
     @Transactional(rollbackFor = Exception.class)
-    public String updateAccountInfo(String accountId, UpdateAccountRequest request) {
+    public String updateAccountEmail(String accountId, UpdateAccountRequest request) {
         // 1. Tìm Account
         Account account = accountRepository.findById(UUID.fromString(accountId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản với ID: " + accountId));
 
-        // 2. Lấy hồ sơ (SystemUser) ra để sửa
+        // 2. Lấy hồ sơ (SystemUser)
         SystemUser profile = account.getSystemUser();
         if (profile == null) {
             throw new RuntimeException("Tài khoản này chưa có hồ sơ nhân sự (SystemUser)!");
         }
 
-        // 3. Cập nhật Họ tên (nếu có truyền lên)
-        if (request.getFullName() != null && !request.getFullName().isBlank()) {
-            profile.setFullName(request.getFullName().trim());
+        // 3. Kiểm tra và Cập nhật Email
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new RuntimeException("Vui lòng nhập Email mới cần cập nhật!");
         }
 
-        // 4. Cập nhật Email (nếu có và phải check trùng lặp)
-        if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            String cleanEmail = request.getEmail().trim();
-            // Kiểm tra xem email mới này có bị ai khác dùng chưa (loại trừ chính mình)
-            Optional<SystemUser> existingEmailUser = systemUserRepository.findByEmail(cleanEmail);
-            if (existingEmailUser.isPresent() && !existingEmailUser.get().getUserId().equals(profile.getUserId())) {
-                throw new RuntimeException("Email này đã được sử dụng cho một tài khoản khác!");
-            }
-            profile.setEmail(cleanEmail);
+        String cleanEmail = request.getEmail().trim();
+
+        // Kiểm tra xem email mới này có bị ai khác dùng chưa (loại trừ chính mình)
+        Optional<SystemUser> existingEmailUser = systemUserRepository.findByEmail(cleanEmail);
+        if (existingEmailUser.isPresent() && !existingEmailUser.get().getUserId().equals(profile.getUserId())) {
+            throw new RuntimeException("Lỗi: Email [" + cleanEmail + "] đã được sử dụng cho một tài khoản khác!");
         }
 
-        // 5. Đặt lại Mật khẩu (nếu Admin có nhập password mới)
-        if (request.getNewPassword() != null && !request.getNewPassword().isBlank()) {
-            account.setPassword(passwordEncoder.encode(request.getNewPassword()));
-            accountRepository.save(account); // Lưu account vì đổi password
-        }
-
-        // 6. Lưu lại hồ sơ
+        // Lưu email mới
+        profile.setEmail(cleanEmail);
         systemUserRepository.save(profile);
 
-        return "Đã cập nhật thông tin tài khoản [" + account.getUsername() + "] thành công!";
+        return "Đã cập nhật Email mới thành công cho tài khoản [" + account.getUsername() + "]!";
     }
 }
