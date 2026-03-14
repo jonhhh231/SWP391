@@ -1,16 +1,20 @@
 package com.groupSWP.centralkitchenplatform.service.auth;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.AccountResponse;
+import com.groupSWP.centralkitchenplatform.dto.auth.UpdateAccountRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
+import com.groupSWP.centralkitchenplatform.repositories.auth.SystemUserRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -20,6 +24,8 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final StoreRepository storeRepository;
+    private final SystemUserRepository systemUserRepository; 
+    private final PasswordEncoder passwordEncoder; 
 
     public List<AccountResponse> getAccountsExcludingAdmin() {
         List<Account> accounts = accountRepository.findAllExcludingAdmin();
@@ -30,12 +36,6 @@ public class AccountService {
         List<Account> accounts = accountRepository.findByIsActiveExcludingAdmin(isActive);
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
-
-//    public List<AccountResponse> getFreeStoreManagers() {
-//        return accountRepository.findFreeStoreManagers().stream()
-//                .map(this::mapToResponse)
-//                .collect(java.util.stream.Collectors.toList());
-//    }
 
     public List<AccountResponse> searchAccountsByFullName(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -137,7 +137,7 @@ public class AccountService {
 
                     thongBao = "Đã chuyển công tác tài khoản [" + account.getUsername() + "] sang [" + newRole + "]. " +
                             "Đã bàn giao tiệm [" + managedStore.getName() + "] cho quản lý mới [" + replacementAccount.getUsername() + "].";
-                }
+                } 
                 // NẾU KHÔNG CÓ NGƯỜI THẾ CHỖ (Luật mới giải cứu FE)
                 else {
                     thongBao = "Đã chuyển chức vụ [" + account.getUsername() + "] sang [" + newRole + "]. " +
@@ -293,6 +293,7 @@ public class AccountService {
             throw new RuntimeException("Cả hai nhân viên đều phải đang quản lý cửa hàng thì mới có thể hoán đổi cho nhau!");
         }
 
+        // BƯỚC 1: THÁO GHẾ CẢ 2 NGƯỜI RA TRƯỚC
         acc1.setStore(null);
         store1.setAccount(null);
         acc2.setStore(null);
@@ -300,6 +301,7 @@ public class AccountService {
         accountRepository.saveAndFlush(acc1);
         accountRepository.saveAndFlush(acc2);
 
+        // BƯỚC 2: TRÁO ĐỔI HỘ KHẨU
         acc1.setStore(store2);
         store2.setAccount(acc1);
         acc2.setStore(store1);
@@ -311,5 +313,40 @@ public class AccountService {
         return "Đã HOÁN ĐỔI VỊ TRÍ thành công! " +
                 "Quản lý [" + acc1.getUsername() + "] chuyển sang tiệm [" + store2.getName() + "]. " +
                 "Quản lý [" + acc2.getUsername() + "] chuyển sang tiệm [" + store1.getName() + "].";
+    }
+
+    // =========================================================================
+    // 🌟 NGHIỆP VỤ CẬP NHẬT THÔNG TIN HỒ SƠ (ĐỔI TÊN, EMAIL, PASSWORD)
+    // =========================================================================
+    @Transactional(rollbackFor = Exception.class)
+    public String updateAccountEmail(String accountId, UpdateAccountRequest request) {
+        // 1. Tìm Account
+        Account account = accountRepository.findById(UUID.fromString(accountId))
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản với ID: " + accountId));
+
+        // 2. Lấy hồ sơ (SystemUser)
+        SystemUser profile = account.getSystemUser();
+        if (profile == null) {
+            throw new RuntimeException("Tài khoản này chưa có hồ sơ nhân sự (SystemUser)!");
+        }
+
+        // 3. Kiểm tra và Cập nhật Email
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new RuntimeException("Vui lòng nhập Email mới cần cập nhật!");
+        }
+
+        String cleanEmail = request.getEmail().trim();
+
+        // Kiểm tra xem email mới này có bị ai khác dùng chưa (loại trừ chính mình)
+        Optional<SystemUser> existingEmailUser = systemUserRepository.findByEmail(cleanEmail);
+        if (existingEmailUser.isPresent() && !existingEmailUser.get().getUserId().equals(profile.getUserId())) {
+            throw new RuntimeException("Lỗi: Email [" + cleanEmail + "] đã được sử dụng cho một tài khoản khác!");
+        }
+
+        // Lưu email mới
+        profile.setEmail(cleanEmail);
+        systemUserRepository.save(profile);
+
+        return "Đã cập nhật Email mới thành công cho tài khoản [" + account.getUsername() + "]!";
     }
 }
