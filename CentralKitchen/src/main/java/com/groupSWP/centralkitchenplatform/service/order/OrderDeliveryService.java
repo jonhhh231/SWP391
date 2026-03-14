@@ -21,9 +21,33 @@ public class OrderDeliveryService {
     public void markAsPreparing(String orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng!"));
+
+        // 🔥 GUARDRAIL: Chỉ đơn mới (NEW/PENDING) mới được mang đi nấu
+        if (order.getStatus() != Order.OrderStatus.NEW) {
+            throw new RuntimeException("Lỗi: Chỉ có thể nấu các đơn hàng mới (NEW hoặc PENDING)!");
+        }
+
         order.setStatus(Order.OrderStatus.PREPARING);
         orderRepository.save(order);
         log.info("Kitchen Manager đã cập nhật đơn {} sang PREPARING", orderId);
+    }
+
+    // =======================================================
+    // 🌟 ĐÃ THÊM: HÀM MỚI ĐỂ FIX LỖI "Cannot resolve method"
+    // =======================================================
+    @Transactional
+    public void markAsReadyToShip(String orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng!"));
+
+        // 🔥 GUARDRAIL: Đang nấu (PREPARING) thì mới được bấm Nấu xong
+        if (order.getStatus() != Order.OrderStatus.PREPARING) {
+            throw new RuntimeException("Lỗi: Chỉ có thể xác nhận nấu xong khi đơn hàng đang ở trạng thái Đang chuẩn bị (PREPARING)!");
+        }
+
+        order.setStatus(Order.OrderStatus.READY_TO_SHIP);
+        orderRepository.save(order);
+        log.info("Kitchen Manager đã cập nhật đơn {} sang READY_TO_SHIP. Đã đẩy sang màn hình của Điều phối viên!", orderId);
     }
 
     // 2. KITCHEN MANAGER: Đánh dấu đang giao (Bắt đầu đếm ngược 6 tiếng)

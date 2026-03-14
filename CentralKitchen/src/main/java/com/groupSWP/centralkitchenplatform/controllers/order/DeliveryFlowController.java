@@ -34,10 +34,28 @@ public class DeliveryFlowController {
      * @param orderId Mã đơn hàng cần cập nhật trạng thái.
      * @return Phản hồi HTTP 200 kèm thông báo đã cập nhật thành công.
      */
-    @PreAuthorize("hasAnyRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','KITCHEN_MANAGER')")
     @PostMapping("/{orderId}/preparing")
     public ResponseEntity<?> setPreparing(@PathVariable String orderId) {
         deliveryService.markAsPreparing(orderId);
         return ResponseEntity.ok(Map.of("message", "Đã cập nhật trạng thái: Đang chuẩn bị"));
     }
-}
+
+    /**
+     * API Cập nhật trạng thái đơn hàng thành "Sẵn sàng giao" (READY_TO_SHIP).
+     * <p>
+     * Bếp trưởng bấm nút này khi món ăn đã nấu xong và đóng gói hoàn tất.
+     * Lúc này, đơn hàng sẽ chính thức xuất hiện trên màn hình của Điều phối viên (Logistics)
+     * để chờ được gép vào xe và đi giao.
+     * </p>
+     *
+     * @param orderId Mã đơn hàng đã hoàn tất khâu chuẩn bị.
+     * @return Phản hồi HTTP 200 xác nhận đơn hàng đã sẵn sàng lên xe.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PostMapping("/{orderId}/ready")
+    public ResponseEntity<?> setReadyToShip(@PathVariable String orderId) {
+        // Gọi xuống tầng Service để xử lý logic đổi trạng thái
+        deliveryService.markAsReadyToShip(orderId);
+        return ResponseEntity.ok(Map.of("message", "Đã nấu xong! Đơn hàng đang chờ xe tới lấy (READY_TO_SHIP)."));
+    }}
