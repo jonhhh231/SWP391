@@ -31,11 +31,11 @@ public class AccountService {
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    public List<AccountResponse> getFreeStoreManagers() {
-        return accountRepository.findFreeStoreManagers().stream()
-                .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
-    }
+//    public List<AccountResponse> getFreeStoreManagers() {
+//        return accountRepository.findFreeStoreManagers().stream()
+//                .map(this::mapToResponse)
+//                .collect(java.util.stream.Collectors.toList());
+//    }
 
     public List<AccountResponse> searchAccountsByFullName(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -67,11 +67,11 @@ public class AccountService {
     }
 
     // =========================================================================
-    // 🔥 CÁC HÀM XỬ LÝ NGHIỆP VỤ NHÂN SỰ
+    // 🔥 CÁC HÀM XỬ LÝ NGHIỆP VỤ NHÂN SỰ (ĐÃ NỚI LỎNG CHO FE)
     // =========================================================================
 
     // ======================================================
-    // 🛠️ ĐỔI ROLE (Có thông báo chi tiết)
+    // 🛠️ ĐỔI ROLE (Tự do, có cảnh báo thiếu quản lý)
     // ======================================================
     @Transactional
     public String changeAccountRole(String accountId, String newRoleName, String storeId, UUID replacementAccountId) {
@@ -90,56 +90,61 @@ public class AccountService {
             return "Chức vụ không thay đổi, tài khoản [" + account.getUsername() + "] vẫn là " + oldRole;
         }
 
-        String thongBao = ""; // 🌟 Biến lưu câu thông báo
+        String thongBao = "";
 
-        // 🛑 LUẬT 1: LÊN LÀM QUẢN LÝ (Promote)
+        // 🛑 LUẬT 1: LÊN LÀM QUẢN LÝ (Cho phép làm Quân dự bị nếu FE không truyền storeId)
         if (newRole == Account.Role.STORE_MANAGER) {
-            if (storeId == null || storeId.trim().isEmpty()) {
-                throw new RuntimeException("Nghiệp vụ bắt buộc: Khi thăng chức lên Cửa hàng trưởng, BẮT BUỘC phải chọn một Cửa hàng (storeId) để bổ nhiệm!");
-            }
-            Store newStore = storeRepository.findById(storeId)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng với ID: " + storeId));
+            if (storeId != null && !storeId.trim().isEmpty()) {
+                Store newStore = storeRepository.findById(storeId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy cửa hàng với ID: " + storeId));
 
-            if (newStore.getAccount() != null) {
-                throw new RuntimeException("Cửa hàng này ĐÃ CÓ người quản lý! Vui lòng chọn cửa hàng đang trống.");
-            }
+                if (newStore.getAccount() != null) {
+                    throw new RuntimeException("Cửa hàng này ĐÃ CÓ người quản lý! Vui lòng chọn cửa hàng đang trống.");
+                }
 
-            account.setStore(newStore);
-            newStore.setAccount(account);
-            thongBao = "Đã THĂNG CHỨC tài khoản [" + account.getUsername() + "] lên làm Cửa hàng trưởng và giao tiếp quản tiệm [" + newStore.getName() + "].";
+                account.setStore(newStore);
+                newStore.setAccount(account);
+                thongBao = "Đã THĂNG CHỨC tài khoản [" + account.getUsername() + "] lên làm Cửa hàng trưởng và giao tiếp quản tiệm [" + newStore.getName() + "].";
+            } else {
+                // FE không truyền Store -> Thành quân dự bị
+                thongBao = "Đã THĂNG CHỨC tài khoản [" + account.getUsername() + "] lên làm Cửa hàng trưởng (Trạng thái: Quân dự bị, chưa có cửa hàng).";
+            }
         }
-        // 🛑 LUẬT 2: GIÁNG CHỨC / ĐỔI NGÀNH (Demote)
+        // 🛑 LUẬT 2: GIÁNG CHỨC / ĐỔI NGÀNH TỪ STORE_MANAGER (Cho phép rút người tự do)
         else if (oldRole == Account.Role.STORE_MANAGER) {
             Store managedStore = account.getStore();
 
             if (managedStore != null) {
-                if (replacementAccountId == null) {
-                    throw new RuntimeException("Tài khoản này đang quản lý cửa hàng [" + managedStore.getName() + "]. BẮT BUỘC phải chọn người thế chỗ trước khi chuyển chức vụ!");
-                }
-
-                Account replacementAccount = accountRepository.findById(replacementAccountId)
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân sự thế chỗ!"));
-
-                if (!replacementAccount.isActive() || replacementAccount.getRole() != Account.Role.STORE_MANAGER) {
-                    throw new RuntimeException("Người thế chỗ phải đang Hoạt động (Active) và phải mang chức vụ Quản lý (STORE_MANAGER)!");
-                }
-                if (replacementAccount.getStore() != null) {
-                    throw new RuntimeException("Người thế chỗ hiện đang quản lý một cửa hàng khác. Vui lòng chọn người đang trống việc!");
-                }
-
-                // Luân chuyển an toàn
+                // Rút ghế quản lý cũ
                 account.setStore(null);
                 managedStore.setAccount(null);
-                accountRepository.saveAndFlush(account);
 
-                replacementAccount.setStore(managedStore);
-                managedStore.setAccount(replacementAccount);
-                accountRepository.save(replacementAccount);
+                // NẾU CÓ NGƯỜI THẾ CHỖ (FE truyền lên)
+                if (replacementAccountId != null) {
+                    Account replacementAccount = accountRepository.findById(replacementAccountId)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân sự thế chỗ!"));
 
-                thongBao = "Đã CHUYỂN CÔNG TÁC tài khoản [" + account.getUsername() + "] sang bộ phận [" + newRole + "]. " +
-                        "Đồng thời bàn giao thành công tiệm [" + managedStore.getName() + "] cho quản lý mới [" + replacementAccount.getUsername() + "].";
+                    if (!replacementAccount.isActive() || replacementAccount.getRole() != Account.Role.STORE_MANAGER) {
+                        throw new RuntimeException("Người thế chỗ phải đang Hoạt động và mang chức vụ Cửa hàng trưởng!");
+                    }
+                    if (replacementAccount.getStore() != null) {
+                        throw new RuntimeException("Người thế chỗ hiện đang quản lý một cửa hàng khác!");
+                    }
+
+                    replacementAccount.setStore(managedStore);
+                    managedStore.setAccount(replacementAccount);
+                    accountRepository.save(replacementAccount);
+
+                    thongBao = "Đã chuyển công tác tài khoản [" + account.getUsername() + "] sang [" + newRole + "]. " +
+                            "Đã bàn giao tiệm [" + managedStore.getName() + "] cho quản lý mới [" + replacementAccount.getUsername() + "].";
+                }
+                // NẾU KHÔNG CÓ NGƯỜI THẾ CHỖ (Luật mới giải cứu FE)
+                else {
+                    thongBao = "Đã chuyển chức vụ [" + account.getUsername() + "] sang [" + newRole + "]. " +
+                            "⚠️ CẢNH BÁO: Cửa hàng [" + managedStore.getName() + "] hiện đang thiếu Quản lý!";
+                }
             } else {
-                thongBao = "Đã đổi chức vụ của quân dự bị [" + account.getUsername() + "] từ Quản lý sang [" + newRole + "].";
+                thongBao = "Đã chuyển đổi chức vụ của quân dự bị [" + account.getUsername() + "] sang [" + newRole + "].";
             }
         }
         // 🛑 LUẬT 3: ĐỔI ROLE BÌNH THƯỜNG KHÁC
@@ -150,11 +155,66 @@ public class AccountService {
         account.setRole(newRole);
         accountRepository.save(account);
 
-        return thongBao; // 🌟 Trả về tiếng Việt
+        return thongBao;
     }
 
     // ======================================================
-    // 🛠️ GÁN/THÁO CỬA HÀNG (Có thông báo chi tiết)
+    // 🛠️ KHÓA/MỞ KHÓA TÀI KHOẢN (Cho phép khóa rút người tự do)
+    // ======================================================
+    @Transactional
+    public String toggleAccountStatus(UUID accountId, UUID replacementAccountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản trong hệ thống!"));
+
+        if (account.getRole() == Account.Role.ADMIN) {
+            throw new RuntimeException("Lỗi bảo mật: Không thể khóa tài khoản cấp ADMIN!");
+        }
+
+        String detailedMessage = "";
+
+        if (account.isActive()) { // NẾU ĐANG HOẠT ĐỘNG -> TIẾN HÀNH KHÓA
+            Store managedStore = account.getStore();
+
+            if (managedStore != null) {
+                // Tháo ghế
+                account.setStore(null);
+                managedStore.setAccount(null);
+                accountRepository.saveAndFlush(account);
+
+                if (replacementAccountId != null) {
+                    Account replacementAccount = accountRepository.findById(replacementAccountId)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên thế chỗ!"));
+
+                    if (!replacementAccount.isActive() || replacementAccount.getStore() != null) {
+                        throw new RuntimeException("Người thế chỗ phải đang hoạt động và chưa quản lý tiệm nào!");
+                    }
+
+                    replacementAccount.setStore(managedStore);
+                    managedStore.setAccount(replacementAccount);
+                    accountRepository.save(replacementAccount);
+
+                    detailedMessage = "Đã KHÓA quản lý cũ [" + account.getUsername() + "]. " +
+                            "Đã bổ nhiệm quản lý mới [" + replacementAccount.getUsername() + "] vào tiệm [" + managedStore.getName() + "].";
+                } else {
+                    // LUẬT MỚI: Khóa nhưng không ai thế chỗ
+                    detailedMessage = "Đã KHÓA tài khoản [" + account.getUsername() + "]. " +
+                            "⚠️ CẢNH BÁO: Cửa hàng [" + managedStore.getName() + "] hiện đang hoạt động nhưng THIẾU QUẢN LÝ!";
+                }
+            } else {
+                detailedMessage = "Đã KHÓA tài khoản [" + account.getUsername() + "] thành công!";
+            }
+        } else {
+            detailedMessage = "Đã MỞ KHÓA tài khoản [" + account.getUsername() + "] thành công!";
+        }
+
+        account.setActive(!account.isActive());
+        accountRepository.save(account);
+
+        return detailedMessage;
+    }
+
+    // ======================================================
+    // 🛠️ GÁN/THÁO CỬA HÀNG (Cảnh báo thiếu quản lý)
     // ======================================================
     @Transactional
     public String assignStoreToAccount(String accountId, String storeId) {
@@ -166,16 +226,17 @@ public class AccountService {
         }
 
         Store oldStore = account.getStore();
-        String thongBao = ""; // 🌟 Biến lưu câu thông báo
+        String thongBao = "";
 
         // NẾU THÁO CỬA HÀNG (Rút về dự bị)
         if (storeId == null || storeId.trim().isEmpty()) {
             if (oldStore != null) {
                 oldStore.setAccount(null);
                 account.setStore(null);
-                thongBao = "Đã RÚT QUẢN LÝ [" + account.getUsername() + "] khỏi tiệm [" + oldStore.getName() + "]. Nhân sự này hiện đang chờ phân công mới (Quân dự bị).";
+                thongBao = "Đã RÚT QUẢN LÝ [" + account.getUsername() + "] khỏi tiệm. " +
+                        "⚠️ CẢNH BÁO: Cửa hàng [" + oldStore.getName() + "] hiện đang THIẾU QUẢN LÝ!";
             } else {
-                thongBao = "Tài khoản [" + account.getUsername() + "] hiện tại đã là Quân dự bị rồi, không có cửa hàng nào để rút!";
+                thongBao = "Tài khoản [" + account.getUsername() + "] hiện tại đã là Quân dự bị rồi!";
             }
         }
         // NẾU GÁN VÀO CỬA HÀNG MỚI
@@ -191,7 +252,8 @@ public class AccountService {
                 oldStore.setAccount(null);
                 account.setStore(null);
                 accountRepository.saveAndFlush(account);
-                thongBao = "Đã LUÂN CHUYỂN quản lý [" + account.getUsername() + "] từ tiệm [" + oldStore.getName() + "] sang tiếp quản tiệm MỚI [" + newStore.getName() + "].";
+                thongBao = "Đã luân chuyển quản lý [" + account.getUsername() + "] sang tiệm [" + newStore.getName() + "]. " +
+                        "⚠️ CẢNH BÁO: Cửa hàng cũ [" + oldStore.getName() + "] hiện đang THIẾU QUẢN LÝ!";
             } else if (oldStore == null) {
                 thongBao = "Đã BỔ NHIỆM quản lý dự bị [" + account.getUsername() + "] vào tiếp quản tiệm [" + newStore.getName() + "].";
             } else {
@@ -203,69 +265,11 @@ public class AccountService {
         }
 
         accountRepository.save(account);
-        return thongBao; // 🌟 Trả về tiếng Việt
-    }
-
-    @Transactional
-    public String toggleAccountStatus(UUID accountId, UUID replacementAccountId) {
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản trong hệ thống!"));
-
-        if (account.getRole() == Account.Role.ADMIN) {
-            throw new RuntimeException("Lỗi bảo mật: Không thể khóa tài khoản cấp ADMIN!");
-        }
-
-        String detailedMessage = ""; // 🌟 Biến lưu câu thông báo chi tiết
-
-        if (account.isActive()) {
-            Store managedStore = account.getStore();
-
-            if (managedStore != null) {
-                if (replacementAccountId == null) {
-                    throw new RuntimeException("Nhân viên này đang quản lý cửa hàng '" + managedStore.getName() + "'. Vui lòng chọn một nhân viên khác để THẾ CHỖ trước khi khóa!");
-                }
-
-                Account replacementAccount = accountRepository.findById(replacementAccountId)
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên thế chỗ!"));
-
-                if (!replacementAccount.isActive()) {
-                    throw new RuntimeException("Nhân viên thế chỗ đang bị khóa (Inactive). Vui lòng chọn nhân viên đang hoạt động!");
-                }
-
-                if (replacementAccount.getStore() != null) {
-                    throw new RuntimeException("Nhân viên thế chỗ hiện đang quản lý một cửa hàng khác. Vui lòng chọn người đang trống việc!");
-                }
-
-                // 4. THAO TÁC LUÂN CHUYỂN AN TOÀN TRÁNH LỖI DUPLICATE:
-                // Bước A: Đá người cũ ra khỏi ghế trước
-                account.setStore(null);
-                managedStore.setAccount(null); // 🛠️ FIX LỖI: Báo cho Cửa hàng biết nó đang bị trống ghế
-                accountRepository.saveAndFlush(account);
-
-                // Bước B: Đôn người mới lên ngồi vào ghế đó
-                replacementAccount.setStore(managedStore);
-                managedStore.setAccount(replacementAccount); // 🛠️ FIX LỖI: Báo cho Cửa hàng biết nó có chủ mới
-                accountRepository.save(replacementAccount);
-
-                // 🌟 Báo cáo chi tiết khi có luân chuyển
-                detailedMessage = "Đã KHÓA (Sa thải) quản lý cũ [" + account.getUsername() + "] (ID: " + account.getAccountId() + "). " +
-                        "Đã bổ nhiệm thành công quản lý mới [" + replacementAccount.getUsername() + "] (ID: " + replacementAccount.getAccountId() + ") " +
-                        "vào tiếp quản cửa hàng [" + managedStore.getName() + "].";
-            } else {
-                detailedMessage = "Đã KHÓA tài khoản [" + account.getUsername() + "] (ID: " + account.getAccountId() + ") thành công!";
-            }
-        } else {
-            detailedMessage = "Đã MỞ KHÓA tài khoản [" + account.getUsername() + "] (ID: " + account.getAccountId() + ") thành công!";
-        }
-
-        account.setActive(!account.isActive());
-        accountRepository.save(account);
-
-        return detailedMessage;
+        return thongBao;
     }
 
     // =========================================================================
-    // 🌟 NGHIỆP VỤ HOÁN ĐỔI VỊ TRÍ QUẢN LÝ (SWAP MANAGERS)
+    // 🌟 NGHIỆP VỤ HOÁN ĐỔI VỊ TRÍ QUẢN LÝ (SWAP MANAGERS) - GIỮ NGUYÊN
     // =========================================================================
     @Transactional
     public String swapManagers(UUID accountId1, UUID accountId2) {
@@ -289,29 +293,21 @@ public class AccountService {
             throw new RuntimeException("Cả hai nhân viên đều phải đang quản lý cửa hàng thì mới có thể hoán đổi cho nhau!");
         }
 
-        // 🛠️ BƯỚC 1: THÁO GHẾ CẢ 2 NGƯỜI RA TRƯỚC (Để tránh lỗi Unique Key)
         acc1.setStore(null);
         store1.setAccount(null);
-
         acc2.setStore(null);
         store2.setAccount(null);
-
-        // Ép Hibernate nhả dữ liệu ra liền
         accountRepository.saveAndFlush(acc1);
         accountRepository.saveAndFlush(acc2);
 
-        // 🛠️ BƯỚC 2: TRÁO ĐỔI HỘ KHẨU (Swap)
         acc1.setStore(store2);
         store2.setAccount(acc1);
-
         acc2.setStore(store1);
         store1.setAccount(acc2);
 
-        // Lưu lại kết quả cuối cùng
         accountRepository.save(acc1);
         accountRepository.save(acc2);
 
-        // 🌟 Trả về thông báo chi tiết
         return "Đã HOÁN ĐỔI VỊ TRÍ thành công! " +
                 "Quản lý [" + acc1.getUsername() + "] chuyển sang tiệm [" + store2.getName() + "]. " +
                 "Quản lý [" + acc2.getUsername() + "] chuyển sang tiệm [" + store1.getName() + "].";

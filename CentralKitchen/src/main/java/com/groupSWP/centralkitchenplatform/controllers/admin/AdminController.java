@@ -98,10 +98,10 @@ public class AdminController {
     /**
      * API Lấy danh sách các Quản lý cửa hàng đang "Trống việc" (Dự bị).
      */
-    @GetMapping("/list-accounts/free-managers")
-    public ResponseEntity<List<AccountResponse>> getFreeManagers() {
-        return ResponseEntity.ok(accountService.getFreeStoreManagers());
-    }
+//    @GetMapping("/list-accounts/free-managers")
+//    public ResponseEntity<List<AccountResponse>> getFreeManagers() {
+//        return ResponseEntity.ok(accountService.getFreeStoreManagers());
+//    }
 
     /**
      * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
