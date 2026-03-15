@@ -20,8 +20,13 @@ public class UnitConversionController {
     private final UnitConversionService conversionService;
     private final IngredientRepository ingredientRepository;
 
-    // API Tạo Quy đổi mới
-    // POST /api/manager/conversions
+    /**
+     * API Tạo hệ số quy đổi đơn vị mới.
+     * <p>Thiết lập công thức quy đổi từ một đơn vị mua hàng/sử dụng về đơn vị cơ sở lưu kho.</p>
+     *
+     * @param request Payload chứa ID nguyên liệu, đơn vị mới và hệ số nhân.
+     * @return Phản hồi HTTP 200 chứa thông tin hệ số quy đổi vừa tạo.
+     */
     @PostMapping
     public ResponseEntity<?> createConversion(@RequestBody ConversionRequest request) {
         try {
@@ -32,8 +37,15 @@ public class UnitConversionController {
         }
     }
 
-    // API Test tính toán
-    // GET /api/manager/conversions/calculate?ingredientId=...&unit=...&quantity=...
+    /**
+     * API Test tính toán quy đổi đơn vị.
+     * <p>Dùng để mô phỏng và kiểm tra xem hệ số quy đổi đã cấu hình chính xác chưa.</p>
+     *
+     * @param ingredientId Mã định danh nguyên liệu.
+     * @param unit         Tên đơn vị cần quy đổi (chuỗi Enum).
+     * @param quantity     Số lượng cần tính toán.
+     * @return Phản hồi HTTP 200 chứa kết quả tính toán cuối cùng (dạng số thực).
+     */
     @GetMapping("/calculate")
     public ResponseEntity<?> calculateConversion(
             @RequestParam String ingredientId,
@@ -41,35 +53,38 @@ public class UnitConversionController {
             @RequestParam BigDecimal quantity
     ) {
         try {
-            // 1. Lấy thông tin nguyên liệu
             Ingredient ingredient = ingredientRepository.findById(ingredientId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu!"));
 
-            // 2. Parse đơn vị từ String sang Enum
             UnitType inputUnit = UnitType.valueOf(unit);
-
-            // 3. Gọi Service tính toán
             BigDecimal result = conversionService.convertToBaseUnit(ingredient, inputUnit, quantity);
 
-            return ResponseEntity.ok(result); // Trả về số đã tính (VD: 100)
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    // ==========================================================
-    // CÁC API MỚI THÊM: READ - UPDATE - DELETE
-    // ==========================================================
-
-    // API 1: Lấy danh sách quy đổi của 1 nguyên liệu (Dành cho Frontend làm Dropdown)
-    // GET /api/manager/conversions/ingredient/{ingredientId}
+    /**
+     * API Lấy danh sách quy đổi của một nguyên liệu.
+     * <p>Phục vụ Frontend đổ dữ liệu vào các Dropdown lựa chọn đơn vị khi nhập/xuất kho.</p>
+     *
+     * @param ingredientId Mã định danh nguyên liệu.
+     * @return Phản hồi HTTP 200 chứa danh sách các công thức quy đổi tương ứng.
+     */
     @GetMapping("/ingredient/{ingredientId}")
     public ResponseEntity<?> getConversionsByIngredient(@PathVariable String ingredientId) {
         return ResponseEntity.ok(conversionService.getConversionsByIngredient(ingredientId));
     }
 
-    // API 2: Cập nhật hệ số quy đổi
-    // PUT /api/manager/conversions/{id}?newFactor=25
+    /**
+     * API Cập nhật hệ số quy đổi.
+     * <p>Cho phép tinh chỉnh lại hệ số nhân của một công thức quy đổi hiện có.</p>
+     *
+     * @param id        Mã định danh của công thức quy đổi.
+     * @param newFactor Hệ số nhân mới cần cập nhật.
+     * @return Phản hồi HTTP 200 chứa thông tin quy đổi sau khi cập nhật.
+     */
     @PutMapping("/{id}")
     public ResponseEntity<?> updateConversion(
             @PathVariable Long id,
@@ -83,8 +98,12 @@ public class UnitConversionController {
         }
     }
 
-    // API 3: Xóa quy đổi
-    // DELETE /api/manager/conversions/{id}
+    /**
+     * API Xóa cấu hình quy đổi đơn vị.
+     *
+     * @param id Mã định danh của công thức quy đổi cần xóa.
+     * @return Phản hồi HTTP 200 kèm thông báo thành công.
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteConversion(@PathVariable Long id) {
         try {
@@ -94,5 +113,4 @@ public class UnitConversionController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-
 }

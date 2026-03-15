@@ -24,6 +24,14 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Service quản lý các nghiệp vụ Sản xuất (Production Management) tại Bếp Trung Tâm.
+ * <p>
+ * Đảm nhiệm việc khởi tạo kế hoạch nấu ăn (Planned Runs), theo dõi trạng thái chế biến,
+ * và đặc biệt là xử lý thuật toán trừ kho vật lý tự động dựa trên phương pháp FIFO
+ * (First In, First Out) để tính toán chính xác chi phí giá vốn của từng mẻ nấu.
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class ProductionService {
@@ -34,6 +42,17 @@ public class ProductionService {
     private final ImportItemRepository importItemRepository;
     private final InventoryLogRepository inventoryLogRepository;
 
+    /**
+     * Khởi tạo Kế hoạch mẻ nấu (Production Run).
+     * <p>
+     * Lưu ý quan trọng: API này chỉ khởi tạo mẻ nấu ở trạng thái PLANNED (Lên kế hoạch).
+     * Tại thời điểm này, nguyên liệu trong kho vật lý CHƯA bị trừ và chi phí CHƯA được tính toán.
+     * </p>
+     *
+     * @param request Payload chứa Mã món ăn và Số lượng cần nấu.
+     * @return Đối tượng {@link ProductionResponse} chứa thông tin Kế hoạch mẻ nấu vừa tạo.
+     * @throws RuntimeException Nếu món ăn không tồn tại hoặc chưa được cài đặt công thức (BOM).
+     */
     @Transactional
     public ProductionResponse createProductionRun(ProductionRequest request) {
         Product product = productRepository.findById(request.getProductId())
@@ -64,9 +83,19 @@ public class ProductionService {
         return mapToResponse(savedRun);
     }
 
-    // =========================================================================
-    // 🌟 API MỚI: CHUYỂN TRẠNG THÁI MẺ NẤU (BẤM NÚT "NẤU" THÌ MỚI TRỪ KHO)
-    // =========================================================================
+    /**
+     * Thay đổi trạng thái mẻ nấu và Kích hoạt thuật toán Trừ kho.
+     * <p>
+     * Khi mẻ nấu chuyển từ PLANNED sang COOKING (hoặc COMPLETED), hệ thống sẽ
+     * kích hoạt cơ chế duyệt qua công thức sản phẩm, kiểm tra tồn kho và gọi thuật toán
+     * FIFO để trừ thực tế từng lô nguyên liệu, đồng thời tính toán giá vốn mẻ nấu.
+     * </p>
+     *
+     * @param runId     Mã định danh của mẻ nấu.
+     * @param newStatus Trạng thái đích muốn chuyển sang.
+     * @return DTO chứa thông tin mẻ nấu sau khi cập nhật.
+     * @throws RuntimeException Nếu không đủ nguyên liệu hoặc vi phạm luồng trạng thái (Lùi bước).
+     */
     @Transactional
     public ProductionResponse changeProductionStatus(String runId, ProductionRun.ProductionStatus newStatus) {
         ProductionRun run = productionRunRepository.findById(runId)
@@ -121,6 +150,12 @@ public class ProductionService {
         return mapToResponse(savedRun);
     }
 
+    /**
+     * Lấy danh sách các mẻ nấu đang ở trạng thái Hoạt động.
+     * <p>Truy xuất các mẻ đang chờ nấu (PLANNED) hoặc đang nấu (COOKING).</p>
+     *
+     * @return Danh sách DTO các mẻ nấu hiện hành.
+     */
     public List<ProductionResponse> getActiveProductionRuns() {
         List<ProductionRun.ProductionStatus> activeStatuses = Arrays.asList(
                 ProductionRun.ProductionStatus.PLANNED,
@@ -130,7 +165,9 @@ public class ProductionService {
         return activeRuns.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
+    /**
+     * Hàm Helper: Chuyển đổi Entity ProductionRun sang DTO.
+     */
     private ProductionResponse mapToResponse(ProductionRun run) {
         return ProductionResponse.builder()
                 .runId(run.getRunId())
@@ -142,8 +179,21 @@ public class ProductionService {
     }
 
     // =========================================================================
-    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH - GIỮ NGUYÊN 100% CODE CỦA SẾP)
+    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH)
     // =========================================================================
+    /**
+     * Thuật toán trừ kho FIFO (First In, First Out) và tính giá vốn.
+     * <p>
+     * Quét qua các lô hàng nhập cũ nhất của nguyên liệu này. Lô nào hết trước sẽ trừ lô đó,
+     * thiếu thì trừ tiếp vào lô sau. Đồng thời nhân với giá nhập thực tế của từng lô
+     * để ra được tổng chi phí xuất kho chuẩn xác đến từng đồng.
+     * </p>
+     *
+     * @param ingredient     Thực thể Nguyên liệu cần trừ.
+     * @param quantityNeeded Tổng số lượng cần trừ.
+     * @param run            Kế hoạch mẻ nấu đang thực hiện (Dùng để ghi Log).
+     * @return Tổng chi phí (Giá vốn) của lượng nguyên liệu bị trừ.
+     */
     private BigDecimal deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, ProductionRun run) {
         BigDecimal remainingToDeduct = quantityNeeded;
         BigDecimal totalIngredientCost = BigDecimal.ZERO;

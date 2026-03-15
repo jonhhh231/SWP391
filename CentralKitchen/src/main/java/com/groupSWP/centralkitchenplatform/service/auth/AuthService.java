@@ -2,6 +2,7 @@ package com.groupSWP.centralkitchenplatform.service.auth;
 
 import com.groupSWP.centralkitchenplatform.dto.auth.*;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
+import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.auth.SystemUserRepository;
@@ -12,10 +13,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils; // 🌟 Đã rút gọn FQN
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
+/**
+ * Service xử lý các nghiệp vụ Định danh và Xác thực (Authentication).
+ * <p>
+ * Đảm nhiệm vòng đời đăng nhập, cấp phát token JWT, xác thực 2 bước (2FA) qua OTP,
+ * cũng như các chức năng quên mật khẩu, cập nhật hồ sơ cá nhân và đăng xuất.
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -30,6 +39,13 @@ public class AuthService {
 
     private final StoreRepository storeRepository;
 
+    /**
+     * Xử lý đăng nhập bước 1: Kiểm tra thông tin tài khoản và gửi OTP.
+     *
+     * @param request Payload chứa Username và Password.
+     * @return Đối tượng AuthResponse yêu cầu xác thực OTP (OTP_REQUIRED).
+     * @throws ResponseStatusException nếu sai tài khoản, mật khẩu hoặc thiếu email.
+     */
     public AuthResponse login(AuthRequest request) {
         Account account = accountRepository.findByUsername(request.username())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
@@ -55,6 +71,13 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Xử lý đăng nhập bước 2: Xác thực mã OTP và cấp phát JWT Token.
+     *
+     * @param username Tên đăng nhập của tài khoản.
+     * @param otp      Mã OTP 6 số nhận được qua email.
+     * @return Đối tượng AuthResponse chứa JWT Token để sử dụng các API khác.
+     */
     public AuthResponse verifyOtp(String username, String otp) {
         if (!otpService.validateOtp(username, otp)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mã OTP không chính xác hoặc đã hết hạn!");
@@ -80,13 +103,23 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Đăng ký và cấp phát tài khoản mới cho nhân sự hệ thống.
+     * <p>
+     * Xử lý logic gán Cửa hàng (Store) nếu nhân sự mang chức vụ Cửa hàng trưởng.
+     * Tự động sinh mã nhân viên (Staff ID) theo chức vụ tương ứng.
+     * </p>
+     *
+     * @param request Payload chứa thông tin tài khoản mới (Username, Password, Role, Email, FullName...).
+     * @return Chuỗi thông báo kết quả đăng ký thành công.
+     */
     @Transactional(rollbackFor = Exception.class)
     public String register(RegisterRequest request) {
         // 1. Kiểm tra Username trùng lặp
         if (accountRepository.findByUsername(request.username()).isPresent()) {
             throw new RuntimeException("Username này đã tồn tại trong hệ thống!");
         }
-        if (!org.springframework.util.StringUtils.hasText(request.email())) {
+        if (!StringUtils.hasText(request.email())) { // 🌟 Đã tối ưu FQN
             throw new RuntimeException("Email không được để trống! Cần có email hợp lệ để nhận mã OTP.");
         }
         String cleanEmail = request.email().trim();
@@ -97,7 +130,7 @@ public class AuthService {
         // ==========================================
         // 🛑 TRẠM KIỂM SOÁT VÀ TÌM CỬA HÀNG (ĐÃ MỞ CHỐT CHO PHÉP OPTIONAL)
         // ==========================================
-        com.groupSWP.centralkitchenplatform.entities.auth.Store store = null;
+        Store store = null; // 🌟 Đã tối ưu FQN
 
         if (request.role() == Account.Role.STORE_MANAGER) {
             // Nếu CÓ truyền storeId lên thì mới đi tìm và gán cửa hàng
@@ -147,6 +180,13 @@ public class AuthService {
         return message;
     }
 
+    /**
+     * Tự động sinh mã nhân viên (User ID) dựa trên chức vụ (Role).
+     * <p>Ví dụ: KITCHEN_MANAGER -> KIT00001</p>
+     *
+     * @param role Chức vụ của nhân sự mới.
+     * @return Chuỗi mã nhân viên duy nhất.
+     */
     // ĐÃ SỬA: Tham số truyền vào là Account.Role
     private String generateStaffId(Account.Role role) {
         String prefix = getPrefixByRole(role);
@@ -163,6 +203,12 @@ public class AuthService {
         }
     }
 
+    /**
+     * Lấy tiền tố mã nhân viên dựa theo chức vụ.
+     *
+     * @param role Chức vụ của nhân sự.
+     * @return Chuỗi tiền tố 3 ký tự (VD: ADM, MNG, STR...).
+     */
     // ĐÃ SỬA: Tham số truyền vào là Account.Role
     private String getPrefixByRole(Account.Role role) {
         if (role == null) return "USR";
@@ -176,17 +222,25 @@ public class AuthService {
         };
     }
 
+    /**
+     * Cập nhật thông tin hồ sơ cá nhân (Tên, Email).
+     * <p>Kiểm tra chặt chẽ để đảm bảo Email mới không bị trùng lặp trong hệ thống.</p>
+     *
+     * @param currentUsername Tên đăng nhập của người dùng hiện tại (lấy từ Token).
+     * @param request         Payload chứa thông tin cần cập nhật.
+     * @return Đối tượng SystemUser chứa thông tin hồ sơ đã được lưu mới.
+     */
     @Transactional
     public SystemUser updateProfile(String currentUsername, UpdateProfileRequest request) {
         Account account = accountRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         SystemUser profile = account.getSystemUser();
 
-        if (org.springframework.util.StringUtils.hasText(request.getFullName())) {
+        if (StringUtils.hasText(request.getFullName())) { // 🌟 Đã tối ưu FQN
             profile.setFullName(request.getFullName().trim());
         }
 
-        if (org.springframework.util.StringUtils.hasText(request.getEmail())) {
+        if (StringUtils.hasText(request.getEmail())) { // 🌟 Đã tối ưu FQN
             String newEmail = request.getEmail().trim();
 
             if (!newEmail.equalsIgnoreCase(profile.getEmail())) {
@@ -201,6 +255,12 @@ public class AuthService {
         return systemUserRepository.save(profile);
     }
 
+    /**
+     * Khởi tạo luồng Quên mật khẩu.
+     * <p>Kiểm tra email và gửi mã OTP xác thực qua email cho người dùng.</p>
+     *
+     * @param email Địa chỉ email của tài khoản cần khôi phục.
+     */
     public void forgotPassword(String email) {
         SystemUser profile = systemUserRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email không tồn tại trong hệ thống!"));
@@ -209,6 +269,14 @@ public class AuthService {
         mailService.sendOtpMail(email, otp);
     }
 
+    /**
+     * Xác nhận đổi mật khẩu mới thông qua mã OTP.
+     * <p>Mật khẩu mới sẽ được mã hóa (Bcrypt) trước khi lưu vào Database.</p>
+     *
+     * @param email       Địa chỉ email của tài khoản.
+     * @param otp         Mã OTP xác thực.
+     * @param newPassword Mật khẩu mới cần thiết lập.
+     */
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(String email, String otp, String newPassword) {
         boolean isValid = otpService.validateOtp(email, otp);
@@ -231,6 +299,11 @@ public class AuthService {
         otpService.clearOtp(email);
     }
 
+    /**
+     * Xóa thông tin phiên đăng nhập (Active Token) của người dùng.
+     *
+     * @param username Tên đăng nhập của người dùng cần đăng xuất.
+     */
     @Transactional
     public void logout(String username) {
         accountRepository.findByUsername(username).ifPresent(account -> {

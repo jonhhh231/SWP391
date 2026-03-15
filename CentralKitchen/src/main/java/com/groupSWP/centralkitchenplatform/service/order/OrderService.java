@@ -1,10 +1,13 @@
 package com.groupSWP.centralkitchenplatform.service.order;
 
+import com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse; // 🌟 Thêm import
+import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest; // 🌟 Thêm import
 import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
+import com.groupSWP.centralkitchenplatform.entities.cart.CartItem; // 🌟 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey;
@@ -23,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap; // 🌟 Thêm import
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,15 +52,15 @@ public class OrderService {
         LocalTime STANDARD_CUTOFF = systemConfigService.getLocalTimeConfig("STANDARD_CUTOFF_TIME", "13:00");
         BigDecimal URGENT_SURCHARGE = systemConfigService.getBigDecimalConfig("URGENT_SURCHARGE", "100000");
 
-        if (now.isBefore(OPEN_TIME)) {
-            throw new RuntimeException("Hệ thống chưa mở cửa (" + OPEN_TIME + " AM mới nhận đơn nha Sếp)!");
-        }
-        if (isUrgent && now.isAfter(URGENT_CUTOFF)) {
-            throw new RuntimeException("Đã quá " + URGENT_CUTOFF + " AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
-        }
-        if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) {
-            throw new RuntimeException("Đã quá " + STANDARD_CUTOFF + " PM, vui lòng chờ mai đặt đơn THƯỜNG Sếp nhé!");
-        }
+//        if (now.isBefore(OPEN_TIME)) {
+//            throw new RuntimeException("Hệ thống chưa mở cửa (" + OPEN_TIME + " AM mới nhận đơn nha Sếp)!");
+//        }
+//        if (isUrgent && now.isAfter(URGENT_CUTOFF)) {
+//            throw new RuntimeException("Đã quá " + URGENT_CUTOFF + " AM, Bếp ngưng nhận đơn GẤP rồi ạ!");
+//        }
+//        if (!isUrgent && now.isAfter(STANDARD_CUTOFF)) {
+//            throw new RuntimeException("Đã quá " + STANDARD_CUTOFF + " PM, vui lòng chờ mai đặt đơn THƯỜNG Sếp nhé!");
+//        }
 
         Order order = new Order();
         order.setStore(store);
@@ -133,7 +137,7 @@ public class OrderService {
     // 2. TẠO ĐƠN TRỰC TIẾP TỪ GIỎ HÀNG (TỪ API STORE)
     // =========================================================================
     @Transactional(rollbackFor = Exception.class)
-    public OrderResponse createOrderFromCart(Store store, List<com.groupSWP.centralkitchenplatform.entities.cart.CartItem> cartItems, String note, boolean isUrgent) {
+    public OrderResponse createOrderFromCart(Store store, List<CartItem> cartItems, String note, boolean isUrgent) {
 
         // GỌI HÀM HELPER ĐỂ KHỞI TẠO
         Order order = initializeOrder(store, isUrgent, note);
@@ -141,7 +145,7 @@ public class OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (com.groupSWP.centralkitchenplatform.entities.cart.CartItem cItem : cartItems) {
+        for (CartItem cItem : cartItems) {
             Product product = cItem.getProduct();
 
             OrderItem orderItem = new OrderItem();
@@ -206,7 +210,7 @@ public class OrderService {
                         .totalAmount(order.getTotalAmount())
                         .createdAt(order.getCreatedAt())
                         .build())
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
     public OrderDetailResponse getOrderDetail(String orderId) {
@@ -221,7 +225,7 @@ public class OrderService {
                         .price(item.getPriceAtOrder())
                         .lineTotal(item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity())))
                         .build())
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
 
         return OrderDetailResponse.builder()
                 .orderId(order.getOrderId())
@@ -251,17 +255,17 @@ public class OrderService {
         orderRepository.save(order);
     }
 
-    public java.util.List<com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> getPendingProductionAggregation() {
-        java.util.List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
-        java.util.Map<String, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse> aggregationMap = new java.util.HashMap<>();
+    public List<KitchenAggregationResponse> getPendingProductionAggregation() {
+        List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
+        Map<String, KitchenAggregationResponse> aggregationMap = new HashMap<>();
 
         for (Order order : pendingOrders) {
-            for (com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem item : order.getOrderItems()) {
+            for (OrderItem item : order.getOrderItems()) {
                 String productId = item.getProduct().getProductId();
                 if (aggregationMap.containsKey(productId)) {
                     aggregationMap.get(productId).setTotalQuantity(aggregationMap.get(productId).getTotalQuantity() + item.getQuantity());
                 } else {
-                    aggregationMap.put(productId, com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse.builder()
+                    aggregationMap.put(productId, KitchenAggregationResponse.builder()
                             .productId(productId)
                             .productName(item.getProduct().getProductName())
                             .totalQuantity(item.getQuantity())
@@ -269,29 +273,32 @@ public class OrderService {
                 }
             }
         }
-        return new java.util.ArrayList<>(aggregationMap.values());
+        return new ArrayList<>(aggregationMap.values());
     }
 
     @Transactional
     public void confirmProductionAndAggregateOrders() {
-        java.util.List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
+        List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
         if (pendingOrders.isEmpty()) throw new RuntimeException("Không có đơn hàng mới nào để chốt nấu!");
 
-        java.util.Map<String, Integer> productQuantities = new java.util.HashMap<>();
+        Map<String, Integer> productQuantities = new HashMap<>();
         for (Order order : pendingOrders) {
-            for (com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem item : order.getOrderItems()) {
+            for (OrderItem item : order.getOrderItems()) {
                 productQuantities.put(item.getProduct().getProductId(), productQuantities.getOrDefault(item.getProduct().getProductId(), 0) + item.getQuantity());
             }
         }
 
-        for (java.util.Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
-            com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest request = new com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest();
+        for (Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
+            ProductionRequest request = new ProductionRequest();
             request.setProductId(entry.getKey());
-            request.setQuantity(new java.math.BigDecimal(entry.getValue()));
+            request.setQuantity(new BigDecimal(entry.getValue()));
             productionService.createProductionRun(request);
         }
 
-        for (Order order : pendingOrders) order.setStatus(Order.OrderStatus.SHIPPING);
+        // 🔥 FIX LOGIC: Đổi về sang READY_TO_SHIP ngay!
+        for (Order order : pendingOrders) {
+            order.setStatus(Order.OrderStatus.READY_TO_SHIP);
+        }
         orderRepository.saveAll(pendingOrders);
     }
 }

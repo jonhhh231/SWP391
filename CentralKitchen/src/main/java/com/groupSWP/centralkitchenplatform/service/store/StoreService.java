@@ -12,7 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors; // 🌟 Đã gom import lên đây
 
+/**
+ * Service quản lý vòng đời Cửa hàng (Store Management).
+ * <p>
+ * Chịu trách nhiệm tạo mới, cập nhật thông tin cửa hàng, và đặc biệt là xử lý
+ * các nghiệp vụ luân chuyển nhân sự (gán quản lý, đóng cửa hàng, chuyển công tác).
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class StoreService {
@@ -20,6 +28,13 @@ public class StoreService {
     private final StoreRepository storeRepository;
     private final AccountRepository accountRepository;
 
+    /**
+     * Khởi tạo Cửa hàng mới.
+     * <p>Tự động sinh mã Cửa hàng (Store ID) và thiết lập trạng thái mặc định là Active.</p>
+     *
+     * @param request Payload chứa thông tin cửa hàng mới.
+     * @return DTO chứa thông tin Cửa hàng vừa tạo.
+     */
     @Transactional
     public StoreResponse createStore(StoreRequest request) {
 
@@ -43,6 +58,13 @@ public class StoreService {
         return mapToResponse(savedStore);
     }
 
+    /**
+     * Cập nhật thông tin chi tiết Cửa hàng.
+     *
+     * @param storeId Mã định danh Cửa hàng cần sửa.
+     * @param request Payload chứa các thông tin thay đổi.
+     * @return DTO chứa thông tin Cửa hàng sau cập nhật.
+     */
     @Transactional
     public StoreResponse updateStore(String storeId, StoreRequest request) {
 
@@ -72,21 +94,29 @@ public class StoreService {
     // ======================================================
     // LẤY DANH SÁCH TẤT CẢ CỬA HÀNG (API: /all)
     // ======================================================
-    public java.util.List<StoreResponse> getAllStores() {
+    public List<StoreResponse> getAllStores() { // 🌟 Đã tối ưu FQN
         return storeRepository.findAll().stream()
                 .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList()); // 🌟 Đã tối ưu FQN
     }
 
     public List<StoreResponse> getEmptyStores() {
         return storeRepository.findEmptyStores().stream()
                 .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList()); // 🌟 Đã tối ưu FQN
     }
 
     // ======================================================
     // 🌟 NGHIỆP VỤ 1: THAY ĐỔI / GÁN QUẢN LÝ CỬA HÀNG
     // ======================================================
+    /**
+     * Bổ nhiệm Quản lý cho Cửa hàng.
+     * <p>Xử lý việc tháo quyền quản lý của người cũ (nếu có) trước khi bổ nhiệm người mới.</p>
+     *
+     * @param storeId   Mã Cửa hàng.
+     * @param accountId Mã Tài khoản nhân sự được bổ nhiệm.
+     * @return Thông báo kết quả bổ nhiệm.
+     */
     @Transactional
     public String changeStoreManager(String storeId, UUID accountId) {
         Store store = storeRepository.findById(storeId)
@@ -121,6 +151,14 @@ public class StoreService {
     // ======================================================
     // 🌟 NGHIỆP VỤ 2: XÓA MỀM CỬA HÀNG
     // ======================================================
+    /**
+     * Xóa mềm (Vô hiệu hóa) Cửa hàng và xử lý luân chuyển nhân sự.
+     * <p>Đảm bảo Cửa hàng trưởng cũ không bị "mất việc" bằng cách ép luân chuyển sang tiệm mới.</p>
+     *
+     * @param storeId           Mã Cửa hàng cần đóng.
+     * @param transferToStoreId Mã Cửa hàng đích để luân chuyển Quản lý cũ sang.
+     * @return Thông báo kết quả đóng cửa và luân chuyển.
+     */
     @Transactional
     public String softDeleteStore(String storeId, String transferToStoreId) {
         Store store = storeRepository.findById(storeId)

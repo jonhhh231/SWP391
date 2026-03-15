@@ -18,25 +18,50 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Service xử lý các nghiệp vụ quản lý Tài khoản và Luân chuyển nhân sự.
+ * <p>
+ * Đảm nhiệm các chức năng tra cứu nhân viên, thay đổi chức vụ (Role),
+ * khóa/mở khóa tài khoản và đặc biệt là xử lý các quy tắc nghiệp vụ phức tạp
+ * khi tháo/lắp Quản lý cho các Cửa hàng.
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class AccountService {
 
     private final AccountRepository accountRepository;
     private final StoreRepository storeRepository;
-    private final SystemUserRepository systemUserRepository; 
-    private final PasswordEncoder passwordEncoder; 
+    private final SystemUserRepository systemUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Lấy danh sách toàn bộ tài khoản trong hệ thống (Loại trừ ADMIN).
+     *
+     * @return Danh sách {@link AccountResponse} của các nhân sự.
+     */
     public List<AccountResponse> getAccountsExcludingAdmin() {
         List<Account> accounts = accountRepository.findAllExcludingAdmin();
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Lọc danh sách tài khoản theo trạng thái hoạt động (Loại trừ ADMIN).
+     *
+     * @param isActive Trạng thái cần lọc (true: Đang hoạt động, false: Đã khóa).
+     * @return Danh sách {@link AccountResponse} tương ứng.
+     */
     public List<AccountResponse> getAccountsByStatus(boolean isActive) {
         List<Account> accounts = accountRepository.findByIsActiveExcludingAdmin(isActive);
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Tra cứu tài khoản theo Tên hiển thị (Hỗ trợ tìm kiếm tương đối).
+     *
+     * @param keyword Từ khóa tìm kiếm (Tên nhân sự).
+     * @return Danh sách {@link AccountResponse} phù hợp với từ khóa.
+     */
     public List<AccountResponse> searchAccountsByFullName(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return getAccountsExcludingAdmin();
@@ -45,6 +70,9 @@ public class AccountService {
         return accounts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Hàm Helper: Chuyển đổi Entity Account sang DTO AccountResponse.
+     */
     private AccountResponse mapToResponse(Account account) {
         AccountResponse dto = new AccountResponse();
         dto.setAccountId(account.getAccountId());
@@ -70,9 +98,19 @@ public class AccountService {
     // 🔥 CÁC HÀM XỬ LÝ NGHIỆP VỤ NHÂN SỰ (ĐÃ NỚI LỎNG CHO FE)
     // =========================================================================
 
-    // ======================================================
-    // 🛠️ ĐỔI ROLE (Tự do, có cảnh báo thiếu quản lý)
-    // ======================================================
+    /**
+     * Thay đổi chức vụ (Role) của một tài khoản.
+     * <p>
+     * Xử lý các quy tắc luân chuyển phức tạp: Thăng chức lên Quản lý cửa hàng,
+     * Giáng chức/Chuyển công tác (Có/Không có người thế chỗ).
+     * </p>
+     *
+     * @param accountId            Mã tài khoản cần đổi Role.
+     * @param newRoleName          Tên Role mới.
+     * @param storeId              (Tùy chọn) Mã cửa hàng nếu thăng chức lên Quản lý.
+     * @param replacementAccountId (Tùy chọn) Mã tài khoản thế chỗ nếu rút Quản lý cũ.
+     * @return Chuỗi thông báo chi tiết về kết quả luân chuyển.
+     */
     @Transactional
     public String changeAccountRole(String accountId, String newRoleName, String storeId, UUID replacementAccountId) {
         Account account = accountRepository.findById(UUID.fromString(accountId))
@@ -137,7 +175,7 @@ public class AccountService {
 
                     thongBao = "Đã chuyển công tác tài khoản [" + account.getUsername() + "] sang [" + newRole + "]. " +
                             "Đã bàn giao tiệm [" + managedStore.getName() + "] cho quản lý mới [" + replacementAccount.getUsername() + "].";
-                } 
+                }
                 // NẾU KHÔNG CÓ NGƯỜI THẾ CHỖ (Luật mới giải cứu FE)
                 else {
                     thongBao = "Đã chuyển chức vụ [" + account.getUsername() + "] sang [" + newRole + "]. " +
@@ -158,9 +196,17 @@ public class AccountService {
         return thongBao;
     }
 
-    // ======================================================
-    // 🛠️ KHÓA/MỞ KHÓA TÀI KHOẢN (Cho phép khóa rút người tự do)
-    // ======================================================
+    /**
+     * Khóa hoặc Mở khóa tài khoản (Soft Delete).
+     * <p>
+     * Nếu tài khoản bị khóa đang là Quản lý cửa hàng, hệ thống sẽ thực hiện tháo ghế
+     * và cho phép bổ nhiệm quản lý thế chỗ ngay lập tức.
+     * </p>
+     *
+     * @param accountId            Mã tài khoản cần khóa/mở khóa.
+     * @param replacementAccountId (Tùy chọn) Mã tài khoản thế chỗ nếu người bị khóa là Quản lý.
+     * @return Chuỗi thông báo chi tiết về quá trình xử lý.
+     */
     @Transactional
     public String toggleAccountStatus(UUID accountId, UUID replacementAccountId) {
         Account account = accountRepository.findById(accountId)
@@ -213,9 +259,13 @@ public class AccountService {
         return detailedMessage;
     }
 
-    // ======================================================
-    // 🛠️ GÁN/THÁO CỬA HÀNG (Cảnh báo thiếu quản lý)
-    // ======================================================
+    /**
+     * Gán hoặc Tháo Cửa hàng của một tài khoản STORE_MANAGER.
+     *
+     * @param accountId Mã tài khoản Quản lý.
+     * @param storeId   Mã cửa hàng (Nếu null hoặc rỗng -> Tháo cửa hàng hiện tại để rút về dự bị).
+     * @return Chuỗi thông báo chi tiết luân chuyển.
+     */
     @Transactional
     public String assignStoreToAccount(String accountId, String storeId) {
         Account account = accountRepository.findById(UUID.fromString(accountId))
@@ -268,9 +318,14 @@ public class AccountService {
         return thongBao;
     }
 
-    // =========================================================================
-    // 🌟 NGHIỆP VỤ HOÁN ĐỔI VỊ TRÍ QUẢN LÝ (SWAP MANAGERS) - GIỮ NGUYÊN
-    // =========================================================================
+    /**
+     * Hoán đổi vị trí cửa hàng giữa 2 Cửa hàng trưởng.
+     * <p>Xử lý luân chuyển chéo an toàn trong cùng một giao dịch (Transaction).</p>
+     *
+     * @param accountId1 Mã tài khoản Quản lý thứ 1.
+     * @param accountId2 Mã tài khoản Quản lý thứ 2.
+     * @return Chuỗi thông báo hoán đổi thành công.
+     */
     @Transactional
     public String swapManagers(UUID accountId1, UUID accountId2) {
         if (accountId1.equals(accountId2)) {
@@ -315,9 +370,14 @@ public class AccountService {
                 "Quản lý [" + acc2.getUsername() + "] chuyển sang tiệm [" + store1.getName() + "].";
     }
 
-    // =========================================================================
-    // 🌟 NGHIỆP VỤ CẬP NHẬT THÔNG TIN HỒ SƠ (ĐỔI TÊN, EMAIL, PASSWORD)
-    // =========================================================================
+    /**
+     * Cập nhật thông tin Email của tài khoản.
+     * <p>Đảm bảo email mới không bị trùng lặp với người khác trong hệ thống.</p>
+     *
+     * @param accountId Mã tài khoản cần cập nhật.
+     * @param request   Payload chứa địa chỉ Email mới.
+     * @return Chuỗi thông báo cập nhật thành công.
+     */
     @Transactional(rollbackFor = Exception.class)
     public String updateAccountEmail(String accountId, UpdateAccountRequest request) {
         // 1. Tìm Account
