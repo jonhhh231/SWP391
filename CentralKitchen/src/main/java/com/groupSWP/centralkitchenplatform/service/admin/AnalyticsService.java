@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets; // 🌟 Thêm import này
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -32,43 +33,50 @@ public class AnalyticsService {
     private final ProductionRunRepository productionRunRepository;
 
     // =======================================================================
-    // 🌟 HÀM CHÍNH: LẤY BÁO CÁO DASHBOARD THEO KHOẢNG THỜI GIAN ĐỘNG
+    // 1. LẤY BÁO CÁO DASHBOARD THEO KHOẢNG THỜI GIAN ĐỘNG
     // =======================================================================
+    /**
+     * Lấy dữ liệu tổng hợp cho trang chủ Dashboard (Hỗ trợ lọc theo ngày).
+     *
+     * @param startDate Ngày bắt đầu.
+     * @param endDate   Ngày kết thúc.
+     * @return Đối tượng DashboardSummary chứa các chỉ số tổng quan và biểu đồ.
+     */
     public DashboardSummary getDashboardStats(LocalDateTime startDate, LocalDateTime endDate) {
 
-        // 1. TÍNH TOÁN KHOẢNG THỜI GIAN KỲ TRƯỚC (Để so sánh)
+        // 1. Tính toán khoảng thời gian kỳ trước để đối chiếu tăng trưởng
         long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
         LocalDateTime previousStartDate = startDate.minusDays(daysBetween + 1);
         LocalDateTime previousEndDate = startDate.minusNanos(1);
 
-        log.info("📊 Đang xuất báo cáo từ {} đến {} (So sánh với {} đến {})",
+        log.info("Đang xuất báo cáo từ {} đến {} (So sánh với {} đến {})",
                 startDate.toLocalDate(), endDate.toLocalDate(),
                 previousStartDate.toLocalDate(), previousEndDate.toLocalDate());
 
-        // 2. LẤY DỮ LIỆU ĐƠN HÀNG (Kỳ này & Kỳ trước)
+        // 2. Lấy dữ liệu đơn hàng (Kỳ này & Kỳ trước)
         List<Order> currentOrders = orderRepository.findValidOrdersBetweenDates(startDate, endDate);
         List<Order> previousOrders = orderRepository.findValidOrdersBetweenDates(previousStartDate, previousEndDate);
 
-        // 3. TÍNH TOÁN CÁC CHỈ SỐ XUẤT KHO (Đã đổi tên chuẩn nghiệp vụ)
+        // 3. Tính toán các chỉ số xuất kho
         BigDecimal currentExportValue = calculateTotal(currentOrders);
         BigDecimal previousExportValue = calculateTotal(previousOrders);
         long currentOrderCount = currentOrders.size();
         long previousOrderCount = previousOrders.size();
 
-        // 4. LẤY TOP 5 SẢN PHẨM (Xuất kho & Hao hụt) - Dùng Pageable để giới hạn 5 dòng
+        // 4. Lấy Top 5 sản phẩm (Xuất kho & Hao hụt)
         Pageable top5 = PageRequest.of(0, 5);
         List<ProductReportDto> topExported = orderRepository.findTopExportedProducts(startDate, endDate, top5);
         List<ProductReportDto> topWasted = productionRunRepository.findTopWastedProductsInKitchen(startDate, endDate, top5);
 
-        // Tính nhẩm tổng thiệt hại hao hụt từ danh sách Top
+        // Tính tổng tiền hao hụt từ danh sách Top
         BigDecimal currentWastageValue = topWasted.stream()
                 .map(ProductReportDto::getTotalValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 5. VẼ BIỂU ĐỒ (Nhóm đơn hàng theo ngày)
+        // 5. Gom nhóm đơn hàng theo ngày để vẽ biểu đồ
         List<ChartDataPoint> trend = buildChartTrend(currentOrders, startDate, endDate);
 
-        // 6. ĐÓNG GÓI VÀO MÂM CỖ TRẢ VỀ CHO FRONTEND
+        // 6. Xây dựng đối tượng phản hồi
         return DashboardSummary.builder()
                 .totalExportValue(buildMetric(currentExportValue, previousExportValue))
                 .totalOrders(buildMetric(BigDecimal.valueOf(currentOrderCount), BigDecimal.valueOf(previousOrderCount)))
@@ -80,17 +88,15 @@ public class AnalyticsService {
     }
 
     // =======================================================================
-    // 🛠️ CÁC HÀM PHỤ TRỢ XỬ LÝ SỐ LIỆU (HELPER METHODS)
+    // 2. CÁC HÀM PHỤ TRỢ XỬ LÝ SỐ LIỆU (HELPER METHODS)
     // =======================================================================
 
-    // Hàm tính tổng tiền các đơn hàng
     private BigDecimal calculateTotal(List<Order> orders) {
         return orders.stream()
                 .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    // Hàm vũ khí: Tính phần trăm tăng trưởng và gắn cờ xu hướng (UP/DOWN/FLAT)
     private ComparisonMetric buildMetric(BigDecimal current, BigDecimal previous) {
         double growth = 0.0;
         String trend = "FLAT";
@@ -110,14 +116,12 @@ public class AnalyticsService {
         return ComparisonMetric.builder()
                 .currentValue(current)
                 .previousValue(previous)
-                .growthPercentage(Math.abs(growth)) // Lấy số dương cho phần trăm
+                .growthPercentage(Math.abs(growth))
                 .trend(trend)
                 .build();
     }
 
-    // Hàm nhào nặn dữ liệu biểu đồ
     private List<ChartDataPoint> buildChartTrend(List<Order> orders, LocalDateTime start, LocalDateTime end) {
-        // Nhóm đơn hàng theo Ngày
         Map<LocalDate, List<Order>> ordersGroupedByDate = orders.stream()
                 .collect(Collectors.groupingBy(o -> o.getCreatedAt().toLocalDate()));
 
@@ -125,7 +129,7 @@ public class AnalyticsService {
         LocalDate currentDate = start.toLocalDate();
         LocalDate endDateLocal = end.toLocalDate();
 
-        // Chạy vòng lặp từ ngày bắt đầu đến ngày kết thúc để đảm bảo không bị thiếu ngày nào (dù ngày đó không có đơn)
+        // Chạy vòng lặp từ ngày bắt đầu đến kết thúc để điền đủ dữ liệu các ngày trống
         while (!currentDate.isAfter(endDateLocal)) {
             List<Order> dailyOrders = ordersGroupedByDate.getOrDefault(currentDate, new ArrayList<>());
             long dailyCount = dailyOrders.size();
@@ -138,21 +142,26 @@ public class AnalyticsService {
     }
 
     // =======================================================================
-    // 🌟 HÀM MỚI: XUẤT FILE BÁO CÁO EXCEL (CSV)
+    // 3. XUẤT FILE BÁO CÁO EXCEL (CSV)
     // =======================================================================
+    /**
+     * Xuất dữ liệu thống kê ra file định dạng CSV.
+     *
+     * @param startDate Ngày bắt đầu.
+     * @param endDate   Ngày kết thúc.
+     * @return Mảng byte chứa nội dung file CSV.
+     */
     public byte[] exportDashboardToCsv(LocalDateTime startDate, LocalDateTime endDate) {
-        // 1. Lấy lại toàn bộ số liệu y chang API getDashboardStats nãy mình làm
         DashboardSummary summary = getDashboardStats(startDate, endDate);
 
-        // 2. Dùng StringBuilder để "vẽ" ra nội dung file CSV (Các cột cách nhau bằng dấu phẩy)
         StringBuilder csv = new StringBuilder();
 
-        // --- PHẦN 1: HEADER (BOM để Excel hiểu tiếng Việt UTF-8) ---
+        // Header (BOM để Excel hiển thị đúng tiếng Việt UTF-8)
         csv.append('\ufeff');
         csv.append("BAO CAO THONG KE HOAT DONG BEP TRUNG TAM\n");
         csv.append("Tu ngay:,").append(startDate.toLocalDate()).append(",Den ngay:,").append(endDate.toLocalDate()).append("\n\n");
 
-        // --- PHẦN 2: CHỈ SỐ TỔNG QUAN ---
+        // Chỉ số tổng quan
         csv.append("1. CHI SO TONG QUAN\n");
         csv.append("Ten Chi So,Gia Tri Ky Nay,Gia Tri Ky Truoc,Tang Truong (%),Xu Huong\n");
 
@@ -171,7 +180,7 @@ public class AnalyticsService {
                 .append(summary.getTotalWastageValue().getGrowthPercentage()).append("%,")
                 .append(summary.getTotalWastageValue().getTrend()).append("\n\n");
 
-        // --- PHẦN 3: TOP 5 MÓN XUẤT KHO ---
+        // Top 5 sản phẩm xuất kho
         csv.append("2. TOP 5 SAN PHAM XUAT KHO NHIEU NHAT\n");
         csv.append("Ma Mon,Ten Mon,Tong So Luong,Tong Tien (VNĐ)\n");
         for (ProductReportDto item : summary.getTopExportedProducts()) {
@@ -181,7 +190,6 @@ public class AnalyticsService {
                     .append(item.getTotalValue()).append("\n");
         }
 
-        // Trả về mảng byte để Controller đẩy về cho trình duyệt tải xuống
-        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return csv.toString().getBytes(StandardCharsets.UTF_8); // 🌟 Đã gọt bớt đường dẫn dài
     }
 }

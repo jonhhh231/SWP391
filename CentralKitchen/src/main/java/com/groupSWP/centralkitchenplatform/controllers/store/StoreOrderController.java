@@ -23,11 +23,12 @@ import java.util.List;
 public class StoreOrderController {
 
     private final OrderService orderService;
-    private final AccountRepository accountRepository; // Bơm cái này vào để check quyền
+    private final AccountRepository accountRepository;
 
-    // =======================================================
-    // HÀM HELPER: MÓC STORE_ID TỪ TOKEN ĐĂNG NHẬP
-    // =======================================================
+    /**
+     * Hàm Helper: Lấy Store ID từ Token đăng nhập.
+     * <p>Đảm bảo an toàn bảo mật IDOR bằng cách luôn lấy ID cửa hàng từ danh tính thật của người dùng.</p>
+     */
     private String getStoreIdFromPrincipal(Principal principal) {
         String username = principal.getName();
         Account account = accountRepository.findByUsername(username)
@@ -39,64 +40,73 @@ public class StoreOrderController {
         return account.getStore().getStoreId();
     }
 
-    // =======================================================
-    // 1. API LẤY DANH SÁCH ĐƠN HÀNG CỦA CỬA HÀNG
-    // =======================================================
+    /**
+     * API Lấy danh sách lịch sử đơn hàng của Cửa hàng.
+     * <p>Hệ thống tự động nhận diện cửa hàng thông qua Token đăng nhập.</p>
+     *
+     * @param principal Đối tượng bảo mật chứa danh tính người gọi.
+     * @return Phản hồi HTTP 200 chứa danh sách lịch sử đơn hàng.
+     */
     @GetMapping
     public ResponseEntity<?> getOrderHistory(Principal principal) {
         try {
-            // Tự động moi storeId chuẩn xác từ Token
             String storeId = getStoreIdFromPrincipal(principal);
             log.info("Cửa hàng {} đang xem lịch sử đơn hàng", storeId);
 
-            // Gọi hàm CÓ SẴN của Sếp
             List<OrderHistoryResponse> history = orderService.getOrderHistory(storeId);
             return ResponseEntity.ok(history);
-
         } catch (RuntimeException e) {
             log.error("Lỗi khi xem lịch sử đơn hàng: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    // =======================================================
-    // 2. API XEM CHI TIẾT 1 ĐƠN HÀNG (KÈM CHỐNG XEM TRỘM)
-    // =======================================================
+    /**
+     * API Xem chi tiết một đơn hàng cụ thể.
+     * <p>
+     * Tích hợp cơ chế chống xem trộm (IDOR Protection), chặn đứng mọi hành vi
+     * truy cập vào đơn hàng thuộc về Cửa hàng khác.
+     * </p>
+     *
+     * @param principal Đối tượng bảo mật chứa danh tính người gọi.
+     * @param orderId   Mã định danh của đơn hàng.
+     * @return Phản hồi HTTP 200 chứa chi tiết đơn hàng hoặc 403 nếu cố tình vi phạm.
+     */
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getOrderDetail(Principal principal, @PathVariable String orderId) {
         try {
             String storeId = getStoreIdFromPrincipal(principal);
             log.info("Cửa hàng {} đang xem chi tiết đơn {}", storeId, orderId);
 
-            // Gọi hàm CÓ SẴN của Sếp
             OrderDetailResponse detail = orderService.getOrderDetail(orderId);
 
-            // 🛡️ BẢO MẬT: Chặn đứng nếu Cửa hàng cố tình nhập ID đơn của tiệm khác
             if (!detail.getStoreId().equals(storeId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Lỗi bảo mật: Bạn không có quyền xem đơn hàng của cửa hàng khác!");
             }
 
             return ResponseEntity.ok(detail);
-
         } catch (RuntimeException e) {
             log.error("Lỗi khi xem chi tiết đơn {}: {}", orderId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    // =======================================================
-    // 3. API TẠO ĐƠN HÀNG TIÊU CHUẨN (STANDARD)
-    // =======================================================
+    /**
+     * API Khởi tạo Đơn hàng Tiêu chuẩn (Standard Order).
+     *
+     * @param principal Đối tượng bảo mật chứa danh tính người gọi.
+     * @param request   Payload chứa danh sách các mặt hàng cần đặt.
+     * @return Phản hồi HTTP 200 chứa đối tượng Đơn hàng vừa tạo thành công.
+     */
     @PostMapping("/standard")
     public ResponseEntity<?> createStandardOrder(Principal principal, @RequestBody OrderRequest request) {
         try {
             String realStoreId = getStoreIdFromPrincipal(principal);
             request.setStoreId(realStoreId);
 
-            log.info("Cửa hàng {} bóp cò đơn STANDARD", realStoreId);
+            log.info("Cửa hàng {} bóp cò đơn STANDARD", realStoreId); // Giữ nguyên log theo ý thích nhóm Dev
 
-            // Gọi hàm gộp All-in-one
             OrderResponse response = orderService.createOrder(request, false);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
@@ -105,9 +115,13 @@ public class StoreOrderController {
         }
     }
 
-    // =======================================================
-    // 4. API TẠO ĐƠN HÀNG KHẨN CẤP (URGENT)
-    // =======================================================
+    /**
+     * API Khởi tạo Đơn hàng Khẩn cấp (Urgent Order).
+     *
+     * @param principal Đối tượng bảo mật chứa danh tính người gọi.
+     * @param request   Payload chứa danh sách các mặt hàng cần đặt gấp.
+     * @return Phản hồi HTTP 200 chứa đối tượng Đơn hàng khẩn cấp vừa tạo.
+     */
     @PostMapping("/urgent")
     public ResponseEntity<?> createUrgentOrder(Principal principal, @RequestBody OrderRequest request) {
         try {
@@ -116,7 +130,6 @@ public class StoreOrderController {
 
             log.info("Cửa hàng {} bóp cò đơn URGENT", realStoreId);
 
-            // Gọi hàm gộp All-in-one với flag isUrgent = true
             OrderResponse response = orderService.createOrder(request, true);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
