@@ -136,4 +136,52 @@ public class AnalyticsService {
         }
         return trend;
     }
+
+    // =======================================================================
+    // 🌟 HÀM MỚI: XUẤT FILE BÁO CÁO EXCEL (CSV)
+    // =======================================================================
+    public byte[] exportDashboardToCsv(LocalDateTime startDate, LocalDateTime endDate) {
+        // 1. Lấy lại toàn bộ số liệu y chang API getDashboardStats nãy mình làm
+        DashboardSummary summary = getDashboardStats(startDate, endDate);
+
+        // 2. Dùng StringBuilder để "vẽ" ra nội dung file CSV (Các cột cách nhau bằng dấu phẩy)
+        StringBuilder csv = new StringBuilder();
+
+        // --- PHẦN 1: HEADER (BOM để Excel hiểu tiếng Việt UTF-8) ---
+        csv.append('\ufeff');
+        csv.append("BAO CAO THONG KE HOAT DONG BEP TRUNG TAM\n");
+        csv.append("Tu ngay:,").append(startDate.toLocalDate()).append(",Den ngay:,").append(endDate.toLocalDate()).append("\n\n");
+
+        // --- PHẦN 2: CHỈ SỐ TỔNG QUAN ---
+        csv.append("1. CHI SO TONG QUAN\n");
+        csv.append("Ten Chi So,Gia Tri Ky Nay,Gia Tri Ky Truoc,Tang Truong (%),Xu Huong\n");
+
+        csv.append("Tong Gia tri Xuat kho,").append(summary.getTotalExportValue().getCurrentValue()).append(",")
+                .append(summary.getTotalExportValue().getPreviousValue()).append(",")
+                .append(summary.getTotalExportValue().getGrowthPercentage()).append("%,")
+                .append(summary.getTotalExportValue().getTrend()).append("\n");
+
+        csv.append("Tong So Don Hang,").append(summary.getTotalOrders().getCurrentValue()).append(",")
+                .append(summary.getTotalOrders().getPreviousValue()).append(",")
+                .append(summary.getTotalOrders().getGrowthPercentage()).append("%,")
+                .append(summary.getTotalOrders().getTrend()).append("\n");
+
+        csv.append("Tong Tien Hao Hut,").append(summary.getTotalWastageValue().getCurrentValue()).append(",")
+                .append(summary.getTotalWastageValue().getPreviousValue()).append(",")
+                .append(summary.getTotalWastageValue().getGrowthPercentage()).append("%,")
+                .append(summary.getTotalWastageValue().getTrend()).append("\n\n");
+
+        // --- PHẦN 3: TOP 5 MÓN XUẤT KHO ---
+        csv.append("2. TOP 5 SAN PHAM XUAT KHO NHIEU NHAT\n");
+        csv.append("Ma Mon,Ten Mon,Tong So Luong,Tong Tien (VNĐ)\n");
+        for (ProductReportDto item : summary.getTopExportedProducts()) {
+            csv.append(item.getProductId()).append(",")
+                    .append(item.getProductName()).append(",")
+                    .append(item.getTotalQuantity()).append(",")
+                    .append(item.getTotalValue()).append("\n");
+        }
+
+        // Trả về mảng byte để Controller đẩy về cho trình duyệt tải xuống
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
 }
