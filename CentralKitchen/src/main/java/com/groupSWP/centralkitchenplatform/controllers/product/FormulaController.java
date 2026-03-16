@@ -54,10 +54,9 @@ public class FormulaController {
      */
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @PostMapping
-    public ResponseEntity<String> upsertFormula(@RequestBody FormulaUpsertRequest req) {
+    public ResponseEntity<?> upsertFormula(@RequestBody FormulaUpsertRequest req) {
         // Đã sửa recipeService -> formulaService và upsertRecipe -> upsertFormula
-        formulaService.upsertFormula(req);
-        return ResponseEntity.ok("Lưu công thức thành công");
+        return ResponseEntity.ok(formulaService.upsertFormula(req));
     }
 
     // =======================================================
