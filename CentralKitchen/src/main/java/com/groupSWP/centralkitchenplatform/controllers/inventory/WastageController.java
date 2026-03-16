@@ -17,12 +17,18 @@ public class WastageController {
     private final WastageService wastageService;
 
     /**
-     * POST /api/kitchen/wastage
-     * Ghi nhận hao hụt / hỏng hóc nguyên liệu
-     * Role: KITCHEN_MANAGER, MANAGER, ADMIN
+     * API Ghi nhận hao hụt hoặc hỏng hóc nguyên liệu.
+     * <p>
+     * Dành cho nhân sự Bếp trung tâm báo cáo các trường hợp nguyên liệu bị hỏng,
+     * hết hạn hoặc hao hụt trong quá trình chế biến. Hệ thống sẽ lưu vết lịch sử
+     * và tự động trừ số lượng tồn kho tương ứng.
+     * </p>
+     *
+     * @param request Payload chứa danh sách nguyên liệu và số lượng hao hụt.
+     * @return Phản hồi HTTP 200 chứa đối tượng {@link WastageResponse} xác nhận kết quả ghi nhận.
      */
     @PostMapping("/wastage")
-    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER','ADMIN')")//
+    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER','ADMIN')")
     public ResponseEntity<WastageResponse> recordWastage(
             @Valid @RequestBody WastageRequest request) {
         return ResponseEntity.ok(wastageService.recordWastage(request));
