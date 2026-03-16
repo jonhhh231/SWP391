@@ -24,7 +24,7 @@ public class StoreSettingsController {
      * Secondary Actor: ADMIN, MANAGER (Quản trị hệ thống)
      */
     @GetMapping("/profile")
-    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')") // 🔥 Đã sửa thành hasAnyRole
+    @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')")
     public ResponseEntity<StoreProfileResponse> getStoreProfile(Principal principal) {
         return ResponseEntity.ok(storeSettingsService.getProfileByUsername(principal.getName()));
     }

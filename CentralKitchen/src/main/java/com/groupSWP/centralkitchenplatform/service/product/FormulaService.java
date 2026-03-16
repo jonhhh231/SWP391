@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -67,7 +68,7 @@ public class FormulaService {
      * Cơ chế: Xóa sạch công thức cũ và lưu lại danh sách mới để tránh rác dữ liệu.
      */
     @Transactional
-    public void upsertFormula(FormulaUpsertRequest req) {
+    public Map<String, Object> upsertFormula(FormulaUpsertRequest req) {
         if (req.getProductId() == null || req.getProductId().isBlank()) {
             throw new IllegalArgumentException("Mã sản phẩm không được để trống");
         }
@@ -78,11 +79,12 @@ public class FormulaService {
         Product product = productRepo.findById(req.getProductId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm: " + req.getProductId()));
 
-        // Xoá công thức cũ (replace toàn bộ)
+        // Xóa cũ và dọn đường (Flush)
         formulaRepo.deleteByProduct_ProductId(req.getProductId());
+        formulaRepo.flush();
 
-        // 1. TẠO CÁI TÚI RỖNG ĐỂ GOM DATA
         List<Formula> formulasToSave = new ArrayList<>();
+        java.util.Set<String> seenIngredients = new java.util.HashSet<>();
 
         for (FormulaUpsertRequest.Item item : req.getIngredients()) {
             if (item.getIngredientId() == null || item.getIngredientId().isBlank()) {
@@ -90,6 +92,11 @@ public class FormulaService {
             }
             if (item.getAmountNeeded() == null || item.getAmountNeeded().signum() <= 0) {
                 throw new IllegalArgumentException("Số lượng cần phải lớn hơn 0");
+            }
+
+            if (!seenIngredients.add(item.getIngredientId())) {
+                throw new IllegalArgumentException("Lỗi dữ liệu: Nguyên liệu " + item.getIngredientId() + " bị lặp " +
+                        "lại nhiều lần!");
             }
 
             Ingredient ing = ingredientRepo.findById(item.getIngredientId())
@@ -101,12 +108,35 @@ public class FormulaService {
             f.setIngredient(ing);
             f.setAmountNeeded(item.getAmountNeeded());
 
-            // 2. BỎ VÀO TÚI THAY VÌ LƯU LIỀN
             formulasToSave.add(f);
         }
 
-        // 3. LƯU 1 LẦN DUY NHẤT VÀO DATABASE -> SIÊU MƯỢT!
-        formulaRepo.saveAll(formulasToSave);
+        // Lưu toàn bộ công thức mới
+        List<Formula> savedFormulas = formulaRepo.saveAll(formulasToSave);
+
+        // =====================================================================
+        // 🔥 ĐÓNG GÓI DỮ LIỆU JSON ĐỂ TRẢ VỀ FRONTEND MỘT CÁCH SẠCH SẼ NHẤT
+        // =====================================================================
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("productId", product.getProductId());
+        response.put("productName", product.getProductName());
+        response.put("message", "Lưu công thức thành công!");
+
+        // Tạo mảng danh sách các nguyên liệu đã lưu
+        List<Map<String, Object>> ingredientList = new ArrayList<>();
+        for (Formula f : savedFormulas) {
+            Map<String, Object> ingDetail = new java.util.HashMap<>();
+            ingDetail.put("ingredientId", f.getIngredient().getIngredientId()); // Lấy ID
+            ingDetail.put("ingredientName", f.getIngredient().getName());       // Lấy Tên hiển thị cho FE dễ đọc
+            ingDetail.put("amountNeeded", f.getAmountNeeded());                 // Số lượng chuẩn
+            ingDetail.put("unit", f.getIngredient().getUnit());                 // (Tùy chọn) Thêm đơn vị tính
+
+            ingredientList.add(ingDetail);
+        }
+
+        response.put("formulas", ingredientList);
+
+        return response;
     }
 
     /**
