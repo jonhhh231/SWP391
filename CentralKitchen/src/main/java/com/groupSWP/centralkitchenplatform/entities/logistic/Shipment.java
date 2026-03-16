@@ -62,4 +62,5 @@ public class Shipment extends BaseEntity {
         REPLACEMENT    // Chuyến xe đền bù (Giữ lại cho luồng xử lý sự cố)
     }
     private LocalDateTime resolvedAt;
+    private LocalDateTime deliveredAt;
 }

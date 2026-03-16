@@ -119,7 +119,7 @@ public class SecurityConfig {
 
                         // Khu vực dành cho LOGISTICS / COORDINATOR
                         .requestMatchers("/api/logistics/**", "/api/shipments/**")
-                        .hasAnyRole("ADMIN", "MANAGER", "COORDINATOR")
+                        .hasAnyRole("ADMIN", "MANAGER", "COORDINATOR","STORE_MANAGER")
 
                         // Khu vực dành cho KITCHEN MANAGER (Quản lý Bếp trung tâm)
                         .requestMatchers("/api/kitchen/**", "/api/inventory/**")
