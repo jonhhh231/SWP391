@@ -22,6 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Service quản lý các nghiệp vụ Kho và Nhập xuất nguyên liệu (Inventory Management).
+ * <p>
+ * Đảm nhiệm việc tạo phiếu nhập kho, tự động tính toán quy đổi đơn vị (Unit Conversion),
+ * cập nhật số lượng tồn kho vật lý (Kitchen Stock) và tính toán giá vốn nguyên liệu theo chuẩn kế toán.
+ * </p>
+ */
 @Service
 @RequiredArgsConstructor
 public class InventoryService {
@@ -31,6 +38,24 @@ public class InventoryService {
     private final AccountRepository accountRepository;
     private final UnitConversionRepository conversionRepository;
 
+    /**
+     * Xử lý nghiệp vụ Nhập kho nguyên liệu.
+     * <p>
+     * Hệ thống sẽ duyệt qua danh sách nguyên liệu đầu vào, đối chiếu với cấu hình quy đổi đơn vị
+     * để quy về đơn vị gốc (Base Unit). Sau đó, thực hiện:
+     * <ul>
+     * <li>Tính toán giá vốn của 1 đơn vị gốc dựa trên tổng tiền dòng nhập.</li>
+     * <li>Cộng dồn số lượng vào tồn kho hiện tại.</li>
+     * <li>Tạo và lưu trữ Phiếu nhập kho (Import Ticket) kèm chi tiết từng mặt hàng để phục vụ truy xuất FIFO.</li>
+     * </ul>
+     * </p>
+     *
+     * @param request  Payload chứa danh sách các nguyên liệu cần nhập, số lượng, đơn vị và tổng tiền.
+     * @param username Tên đăng nhập của người dùng thực hiện thao tác (lấy từ Token).
+     * @return Đối tượng {@link ImportTicketResponse} chứa thông tin chi tiết phiếu nhập vừa tạo.
+     * @throws IllegalArgumentException nếu danh sách trống hoặc số lượng không hợp lệ.
+     * @throws RuntimeException nếu không tìm thấy nguyên liệu, tài khoản hoặc luật quy đổi đơn vị.
+     */
     @Transactional
     public ImportTicketResponse importIngredients(ImportRequest request, String username) {
         if (request.getItems() == null || request.getItems().isEmpty()) {
@@ -115,6 +140,12 @@ public class InventoryService {
         return mapToResponse(savedTicket);
     }
 
+    /**
+     * Hàm Helper: Chuyển đổi Entity ImportTicket sang DTO ImportTicketResponse.
+     *
+     * @param ticket Thực thể Phiếu nhập kho vừa được lưu.
+     * @return DTO chứa dữ liệu phản hồi đã được định dạng cho Frontend.
+     */
     private ImportTicketResponse mapToResponse(ImportTicket ticket) {
         List<ImportTicketResponse.ImportItemResponse> itemResponses = ticket.getImportItems().stream()
                 .map(item -> ImportTicketResponse.ImportItemResponse.builder()

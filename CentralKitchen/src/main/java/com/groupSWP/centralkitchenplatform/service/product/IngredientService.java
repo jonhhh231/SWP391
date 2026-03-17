@@ -1,9 +1,9 @@
-package com.groupSWP.centralkitchenplatform.service.product; // Đổi lại package nếu bạn lưu ở thư mục khác
+package com.groupSWP.centralkitchenplatform.service.product;
 
+import com.groupSWP.centralkitchenplatform.dto.product.IngredientRequest;
 import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
-import com.groupSWP.centralkitchenplatform.dto.product.IngredientRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,6 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Service quản lý danh mục Nguyên vật liệu (Ingredient Management).
+ * <p>
+ * Cung cấp các thao tác CRUD an toàn cho dữ liệu nguyên liệu thô.
+ * Đảm bảo tính toàn vẹn của dữ liệu giá cả và tồn kho bằng các chốt chặn kiểm tra logic nghiệp vụ.
+ * </p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,20 +26,38 @@ public class IngredientService {
 
     private final IngredientRepository ingredientRepository;
 
-    // LẤY TẤT CẢ
+    /**
+     * Lấy danh sách toàn bộ nguyên liệu trong hệ thống.
+     *
+     * @return Danh sách các thực thể {@link Ingredient}.
+     */
     public List<Ingredient> getAllIngredients() {
         return ingredientRepository.findAll();
     }
 
-    // LẤY CHI TIẾT 1 CÁI
+    /**
+     * Lấy chi tiết một nguyên liệu dựa trên ID.
+     *
+     * @param id Mã định danh nguyên liệu.
+     * @return Thực thể {@link Ingredient} tương ứng.
+     * @throws RuntimeException Nếu không tìm thấy nguyên liệu.
+     */
     public Ingredient getIngredientById(String id) {
         return ingredientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu với ID: " + id));
     }
 
-    // ==========================================
-    // 🌟 THÊM MỚI (Dùng DTO hứng data bảo mật)
-    // ==========================================
+    /**
+     * Khởi tạo nguyên liệu mới.
+     * <p>
+     * Dữ liệu nhận vào qua DTO sẽ được map sang Entity. Mức tồn kho ban đầu (Kitchen Stock)
+     * luôn được mặc định gán bằng 0 (chỉ được tăng lên qua luồng Nhập kho).
+     * </p>
+     *
+     * @param request Payload chứa thông tin nguyên liệu mới.
+     * @return Thực thể Nguyên liệu vừa được lưu vào cơ sở dữ liệu.
+     * @throws RuntimeException Nếu đơn giá nhập vào nhỏ hơn hoặc bằng 0.
+     */
     @Transactional
     public Ingredient createIngredient(IngredientRequest request) {
         log.info("Đang tạo mới nguyên liệu: {}", request.getName());
@@ -54,9 +79,18 @@ public class IngredientService {
         return ingredientRepository.save(ingredient);
     }
 
-    // ==========================================
-    // 🌟 CẬP NHẬT (Dùng DTO hứng data bảo mật)
-    // ==========================================
+    /**
+     * Cập nhật thông tin chi tiết của một nguyên liệu.
+     * <p>
+     * Chỉ cập nhật các trường có sự thay đổi (khác null). Các quy tắc validate (như đơn giá > 0)
+     * vẫn được kiểm soát chặt chẽ như lúc tạo mới.
+     * </p>
+     *
+     * @param id      Mã định danh nguyên liệu cần cập nhật.
+     * @param request Payload chứa dữ liệu mới.
+     * @return Thực thể Nguyên liệu sau khi cập nhật thành công.
+     * @throws RuntimeException Nếu đơn giá mới nhỏ hơn hoặc bằng 0.
+     */
     @Transactional
     public Ingredient updateIngredient(String id, IngredientRequest request) {
         Ingredient existingIngredient = getIngredientById(id);
@@ -85,7 +119,11 @@ public class IngredientService {
         return ingredientRepository.save(existingIngredient);
     }
 
-    // XÓA
+    /**
+     * Xóa một nguyên liệu khỏi hệ thống.
+     *
+     * @param id Mã định danh nguyên liệu cần xóa.
+     */
     @Transactional
     public void deleteIngredient(String id) {
         Ingredient existingIngredient = getIngredientById(id);
