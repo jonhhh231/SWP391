@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -166,5 +168,56 @@ public class InventoryService {
                 .createdByName(ticket.getCreatedBy().getFullName())
                 .items(itemResponses)
                 .build();
+    }
+
+    /**
+     * Lấy toàn bộ lịch sử các Phiếu nhập kho (kèm chi tiết từng món).
+     * Sắp xếp từ mới nhất đến cũ nhất.
+     */
+    @Transactional(readOnly = true)
+    public List<ImportTicketResponse> getAllImportHistory() {
+        // 1. Lấy tất cả các phiếu nhập từ Database
+        List<ImportTicket> tickets = ticketRepository.findAllByOrderByCreatedAtDesc();
+
+        // 2. Dùng hàm mapToResponse có sẵn để chuyển đổi Entity sang DTO và trả về
+        return tickets.stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ImportTicketResponse> getImportHistoryByTime(Integer year, Integer month, Integer day) {
+        LocalDateTime startDate;
+        LocalDateTime endDate;
+
+        // Nếu không truyền năm, mặc định trả về tất cả
+        if (year == null) {
+            return getAllImportHistory();
+        }
+
+        if (month != null && day != null) {
+            // Trường hợp 1: Lọc theo NGÀY cụ thể (Ví dụ: 18/03/2026)
+            startDate = LocalDateTime.of(year, month, day, 0, 0, 0); // 00:00:00 của ngày đó
+            endDate = LocalDateTime.of(year, month, day, 23, 59, 59, 999999999); // 23:59:59 của ngày đó
+
+        } else if (month != null) {
+            // Trường hợp 2: Lọc theo THÁNG (Ví dụ: Tháng 03/2026)
+            YearMonth yearMonth = YearMonth.of(year, month);
+            startDate = yearMonth.atDay(1).atStartOfDay(); // Ngày 1 của tháng, lúc 00:00:00
+            endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59, 999999999); // Ngày cuối cùng của tháng, lúc 23:59:59
+
+        } else {
+            // Trường hợp 3: Lọc theo NĂM (Ví dụ: Năm 2026)
+            startDate = LocalDateTime.of(year, 1, 1, 0, 0, 0); // 01/01/Năm lúc 00:00:00
+            endDate = LocalDateTime.of(year, 12, 31, 23, 59, 59, 999999999); // 31/12/Năm lúc 23:59:59
+        }
+
+        // Truy vấn DB bằng hàm đã tạo ở Repository
+        List<ImportTicket> tickets = ticketRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(startDate, endDate);
+
+        // Map sang DTO trả về cho gọn đẹp
+        return tickets.stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 }
