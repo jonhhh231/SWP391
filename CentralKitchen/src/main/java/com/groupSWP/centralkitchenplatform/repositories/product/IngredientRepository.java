@@ -8,4 +8,5 @@ import java.util.List;
 
 @Repository
 public interface IngredientRepository extends JpaRepository<Ingredient, String> {
+    boolean existsByNameIgnoreCase(String name);
 }
