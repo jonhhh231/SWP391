@@ -6,10 +6,12 @@ import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.InventoryLog;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.repositories.inventory.InventoryLogRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ProductionRunRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ public class WastageService {
     private final FormulaRepository formulaRepository;
     private final IngredientRepository ingredientRepository;
     private final InventoryLogRepository inventoryLogRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     @Transactional
     public WastageResponse recordWastage(WastageRequest request) {
@@ -94,6 +97,14 @@ public class WastageService {
             ingredientRepository.saveAll(ingredientsToUpdate);
             inventoryLogRepository.saveAll(logsToSave);
         }
+
+        // 🔥 THÔNG BÁO: Báo cáo hao hụt lên cho Manager nắm tình hình thất thoát
+        notificationService.broadcastNotification(
+                List.of("MANAGER"),
+                "🗑️ BÁO CÁO HAO HỤT",
+                "Bếp vừa ghi nhận hao hụt " + request.getWasteQty() + " đơn vị cho mẻ nấu " + run.getRunId() + ". Lý do: " + request.getReason(),
+                Notification.NotificationType.WARNING
+        );
 
         // 6. Trả về response
         return WastageResponse.builder()
