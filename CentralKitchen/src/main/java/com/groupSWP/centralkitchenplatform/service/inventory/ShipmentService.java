@@ -7,6 +7,7 @@ import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.product.Stock;
 import com.groupSWP.centralkitchenplatform.entities.product.StockKey;
 
@@ -15,6 +16,7 @@ import com.groupSWP.centralkitchenplatform.repositories.inventory.StockRepositor
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentRepository;
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentDetailRepository;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,6 +40,7 @@ public class ShipmentService {
     private final OrderRepository orderRepository;
     private final AccountRepository accountRepository;
     private final StockRepository stockRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     // =========================================================================
     // 🔥 TỰ ĐỘNG CHỐT ĐƠN VÀ CỘNG KHO SAU 6 TIẾNG QUÁ HẠN (CRON JOB)
@@ -151,6 +154,16 @@ public class ShipmentService {
             orderRepository.saveAll(shipment.getOrders());
         }
 
+        // 🔥 THÔNG BÁO: Nếu có thiếu hàng, báo động cho Bếp & Điều phối!
+        if (hasIssue) {
+            notificationService.broadcastNotification(
+                    List.of("COORDINATOR", "KITCHEN_MANAGER"),
+                    "⚠️ KHIẾU NẠI THIẾU HÀNG",
+                    "Cửa hàng " + targetStore.getName() + " vừa báo thiếu hàng tại chuyến " + shipmentId + ". Vui lòng xử lý đền bù!",
+                    Notification.NotificationType.WARNING
+            );
+        }
+
         return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Đã báo cho Bếp trung tâm lên đơn bù!" : "Xác nhận nhận đủ hàng. Kho cửa hàng đã được cập nhật!";
     }
 
@@ -251,6 +264,20 @@ public class ShipmentService {
 
         shipmentRepository.save(shipment);
         log.info("Đã gán tài xế {} cho chuyến xe {}.", driver.getUsername(), shipmentId);
+
+        // 🔥 THÔNG BÁO: Báo cho Store Manager là xe bắt đầu chạy
+        if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+            Account storeAcc = shipment.getOrders().get(0).getStore().getAccount();
+            if (storeAcc != null) {
+                notificationService.sendNotification(
+                        storeAcc,
+                        "🛵 TÀI XẾ ĐANG TỚI",
+                        "Chuyến xe " + shipmentId + " đã được gán tài xế " + driver.getUsername() + " và đang trên đường đến!",
+                        Notification.NotificationType.INFO,
+                        null
+                );
+            }
+        }
     }
 
     // =========================================================================
