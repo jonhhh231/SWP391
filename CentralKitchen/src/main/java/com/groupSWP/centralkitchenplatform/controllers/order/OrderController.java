@@ -1,9 +1,6 @@
 package com.groupSWP.centralkitchenplatform.controllers.order;
 
-import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
+import com.groupSWP.centralkitchenplatform.dto.order.*;
 import com.groupSWP.centralkitchenplatform.service.order.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -152,5 +149,26 @@ public class OrderController {
 
         orderService.cancelOrder(orderId);
         return ResponseEntity.ok("Đã hủy đơn hàng " + orderId + " thành công!");
+    }
+    /**
+     * API Bóc tách và tính toán định mức nguyên vật liệu của một đơn hàng.
+     * <p>
+     * Cho phép Quản lý Bếp hoặc Cửa hàng xem trước tổng khối lượng nguyên liệu thô
+     * (thịt, rau củ, gia vị...) cần thiết để chế biến toàn bộ các thành phẩm trong đơn hàng.
+     * Hệ thống sẽ tự động quét qua Công thức (BOM) của từng món và cộng dồn định lượng.
+     * </p>
+     *
+     * @param orderId Mã đơn hàng cần bóc tách nguyên vật liệu.
+     * @return Phản hồi HTTP 200 kèm danh sách chi tiết các nguyên vật liệu và tổng khối lượng cần thiết.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @GetMapping("/{orderId}/materials")
+    public ResponseEntity<List<OrderMaterialBreakdownResponse>> getOrderMaterialBreakdown(
+            @PathVariable String orderId) {
+
+        List<OrderMaterialBreakdownResponse> breakdown =
+                orderService.getOrderMaterialBreakdown(orderId);
+
+        return ResponseEntity.ok(breakdown);
     }
 }

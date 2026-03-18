@@ -2,10 +2,8 @@ package com.groupSWP.centralkitchenplatform.service.order;
 
 import com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse; // 🌟 Thêm import
 import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest; // 🌟 Thêm import
-import com.groupSWP.centralkitchenplatform.dto.order.OrderDetailResponse;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderHistoryResponse;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderRequest;
-import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
+import com.groupSWP.centralkitchenplatform.dto.order.*;
+import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.entities.cart.CartItem; // 🌟 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
@@ -13,6 +11,7 @@ import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
+import com.groupSWP.centralkitchenplatform.repositories.product.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import com.groupSWP.centralkitchenplatform.service.inventory.ProductionService;
@@ -40,6 +39,7 @@ public class OrderService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final ProductionService productionService;
+    private final FormulaRepository formulaRepository;
     private final SystemConfigService systemConfigService;
 
     // =========================================================================
@@ -300,5 +300,41 @@ public class OrderService {
             order.setStatus(Order.OrderStatus.READY_TO_SHIP);
         }
         orderRepository.saveAll(pendingOrders);
+    }
+
+    // =========================================================================
+    // TÍNH NĂNG VIP: BÓC TÁCH NGUYÊN VẬT LIỆU CỦA 1 ĐƠN HÀNG (CLEAN CODE VERSION)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public List<OrderMaterialBreakdownResponse> getOrderMaterialBreakdown(String orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderId));
+
+        Map<String, OrderMaterialBreakdownResponse> materialMap = new HashMap<>();
+
+        for (OrderItem item : order.getOrderItems()) {
+            Product product = item.getProduct();
+            int orderQuantity = item.getQuantity();
+
+            List<Formula> formulas = formulaRepository.findByProduct_ProductId(product.getProductId());
+
+            for (Formula formula : formulas) {
+                String ingId = formula.getIngredient().getIngredientId();
+                BigDecimal totalNeeded = formula.getAmountNeeded().multiply(BigDecimal.valueOf(orderQuantity));
+
+                if (materialMap.containsKey(ingId)) {
+                    OrderMaterialBreakdownResponse existing = materialMap.get(ingId);
+                    existing.setTotalAmountNeeded(existing.getTotalAmountNeeded().add(totalNeeded));
+                } else {
+                    materialMap.put(ingId, OrderMaterialBreakdownResponse.builder()
+                            .ingredientId(ingId)
+                            .ingredientName(formula.getIngredient().getName())
+                            .unit(formula.getIngredient().getUnit().name())
+                            .totalAmountNeeded(totalNeeded)
+                            .build());
+                }
+            }
+        }
+        return new ArrayList<>(materialMap.values());
     }
 }
