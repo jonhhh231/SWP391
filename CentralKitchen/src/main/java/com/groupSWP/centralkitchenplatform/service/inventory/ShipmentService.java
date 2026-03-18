@@ -155,7 +155,7 @@ public class ShipmentService {
     }
 
     // =========================================================================
-    // 🔥 TẠO ĐƠN ĐỀN BÙ
+    // 🔥 TẠO ĐƠN ĐỀN BÙ (CÁCH 1: QUY TRÌNH CHẶT CHẼ - BẾP PHẢI NẤU LẠI)
     // =========================================================================
     @Transactional
     public String createReplacementShipment(String originalShipmentId) {
@@ -166,54 +166,57 @@ public class ShipmentService {
             throw new RuntimeException("Chuyến hàng này không có báo cáo thiếu/lỗi để bù!");
         }
 
-        Shipment replacementShipment = Shipment.builder()
-                .shipmentId(originalShipmentId + "-REP-" + System.currentTimeMillis() % 1000)
-                .shipmentType(Shipment.ShipmentType.REPLACEMENT)
-                .status(Shipment.ShipmentStatus.PENDING)
-                .coordinator(originalShipment.getCoordinator())
-                .shipmentDetails(new ArrayList<>())
-                .orders(new ArrayList<>())
-                .build();
-
-        Shipment savedReplacement = shipmentRepository.saveAndFlush(replacementShipment);
-
+        // 1. TẠO ĐƠN HÀNG BÙ (Không tạo chuyến xe vội)
         Order compensationOrder = new Order();
-        compensationOrder.setOrderId("COMP-" + System.currentTimeMillis() % 10000);
+        String compOrderId = "COMP-" + System.currentTimeMillis() % 10000;
+        compensationOrder.setOrderId(compOrderId);
         compensationOrder.setOrderType(Order.OrderType.COMPENSATION);
-        compensationOrder.setStatus(Order.OrderStatus.READY_TO_SHIP);
-        compensationOrder.setShipment(savedReplacement);
+        compensationOrder.setStatus(Order.OrderStatus.NEW); // 🔥 Trạng thái NEW để Bếp nhìn thấy và lấy đi nấu
+        compensationOrder.setNote("Đơn bù hàng thiếu cho chuyến xe: " + originalShipmentId);
+        compensationOrder.setTotalAmount(java.math.BigDecimal.ZERO); // Hàng bù nên tổng tiền đơn = 0
 
         if (originalShipment.getOrders() != null && !originalShipment.getOrders().isEmpty()) {
             compensationOrder.setStore(originalShipment.getOrders().get(0).getStore());
+        } else {
+            throw new RuntimeException("Không xác định được cửa hàng để tạo đơn bù!");
         }
 
+        List<OrderItem> compItems = new ArrayList<>();
+        boolean hasMissingItems = false;
+
+        // Quét các món bị thiếu để đưa vào Đơn bù
         for (ShipmentDetail oldDetail : originalShipment.getShipmentDetails()) {
             int missingQty = oldDetail.getMissingQuantity();
             if (missingQty > 0) {
-                ShipmentDetail newDetail = ShipmentDetail.builder()
-                        .shipment(savedReplacement)
-                        .product(oldDetail.getProduct())
-                        .productName(oldDetail.getProductName())
-                        .expectedQuantity(missingQty)
-                        .receivedQuantity(0)
-                        .issueNote("Giao bù cho chuyến: " + originalShipmentId)
-                        .build();
-                savedReplacement.getShipmentDetails().add(newDetail);
+                hasMissingItems = true;
+
+                OrderItem item = new OrderItem();
+                // Dùng OrderItemKey ghép từ ID Đơn bù và ID Sản phẩm
+                item.setId(new com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey(compOrderId, oldDetail.getProduct().getProductId()));
+                item.setOrder(compensationOrder);
+                item.setProduct(oldDetail.getProduct());
+                item.setQuantity(missingQty); // Đòi đúng số lượng bị thiếu
+                item.setPriceAtOrder(java.math.BigDecimal.ZERO); // Đơn giá = 0
+
+                compItems.add(item);
             }
         }
 
-        if (savedReplacement.getShipmentDetails().isEmpty()) {
-            throw new RuntimeException("Không tìm thấy sản phẩm nào bị thiếu để tạo chuyến bù!");
+        if (!hasMissingItems) {
+            throw new RuntimeException("Không tìm thấy sản phẩm nào bị thiếu để tạo đơn bù!");
         }
 
-        orderRepository.save(compensationOrder);
-        shipmentDetailRepository.saveAll(savedReplacement.getShipmentDetails());
+        compensationOrder.setOrderItems(compItems);
 
+        // Lưu Đơn hàng bù xuống DB (Hibernate sẽ tự động lưu các OrderItem nếu có cascade)
+        orderRepository.save(compensationOrder);
+
+        // 2. ĐÓNG HỒ SƠ CHUYẾN XE CŨ (RESOLVED)
         originalShipment.setStatus(Shipment.ShipmentStatus.RESOLVED);
         originalShipment.setResolvedAt(LocalDateTime.now());
         shipmentRepository.save(originalShipment);
 
-        return "Đã lên đơn BÙ (COMPENSATION) thành công! Mã chuyến mới: " + savedReplacement.getShipmentId();
+        return "Đã tạo ĐƠN BÙ thành công! Mã đơn: " + compOrderId + ". Đơn đã được đẩy về hàng đợi (NEW) chờ Bếp Trung Tâm xử lý và trừ kho.";
     }
 
     // =========================================================================
