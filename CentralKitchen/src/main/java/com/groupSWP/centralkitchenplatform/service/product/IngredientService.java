@@ -61,14 +61,25 @@ public class IngredientService {
     @Transactional
     public Ingredient createIngredient(IngredientRequest request) {
         log.info("Đang tạo mới nguyên liệu: {}", request.getName());
+        // 1. Chặn rỗng hoặc null
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new RuntimeException("Lỗi: Tên nguyên liệu không được để trống!");
+        }
 
-        // 🛑 Lỗ hổng A đã vá: Chặn giá trị <= 0 ở tầng Service cho chắc cốp
-        if (request.getUnitCost().compareTo(BigDecimal.ZERO) <= 0) {
+        // 2. Chuẩn hóa chuỗi (Cắt bỏ các dấu cách thừa ở đầu và cuối chữ)
+        String normalizedName = request.getName().trim();
+
+        // 3. Kiểm tra trùng lặp tên trong kho (Không phân biệt hoa thường)
+        if (ingredientRepository.existsByNameIgnoreCase(normalizedName)) {
+            throw new RuntimeException("Lỗi: Nguyên liệu mang tên '" + normalizedName + "' đã tồn tại trong kho!");
+        }
+
+        if (request.getUnitCost() == null || request.getUnitCost().compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Lỗi: Đơn giá (unitCost) phải lớn hơn 0!");
         }
 
         Ingredient ingredient = new Ingredient();
-        ingredient.setName(request.getName());
+        ingredient.setName(normalizedName); // 🔥 Lưu tên đã được "dọn dẹp" sạch sẽ
         ingredient.setUnit(UnitType.valueOf(request.getUnit().toUpperCase()));
         ingredient.setUnitCost(request.getUnitCost());
         ingredient.setMinThreshold(request.getMinThreshold());
