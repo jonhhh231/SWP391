@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 
 /**
  * Controller quản lý các nghiệp vụ Kho và Nhập xuất nguyên liệu (Inventory Management).
@@ -52,5 +53,23 @@ public class InventoryController {
 
         // Chuyển giao nhiệm vụ tính toán, cập nhật kho cho tầng Service
         return ResponseEntity.ok(inventoryService.importIngredients(request, username));
+    }
+
+    /**
+     * API Xem và Lọc lịch sử nhập kho.
+     * <p>
+     * - Nếu KHÔNG truyền tham số: Trả về toàn bộ lịch sử từ trước đến nay.
+     * - Nếu CÓ truyền tham số: Tự động lọc theo Năm / Tháng / Ngày.
+     * </p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @GetMapping("/import-history")
+    public ResponseEntity<List<ImportTicketResponse>> getImportHistory(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer day) {
+
+        // Truyền thẳng xuống Service. Service đã có logic: nếu year == null thì tự lấy tất cả.
+        return ResponseEntity.ok(inventoryService.getImportHistoryByTime(year, month, day));
     }
 }
