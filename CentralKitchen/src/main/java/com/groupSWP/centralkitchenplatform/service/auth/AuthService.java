@@ -40,12 +40,12 @@ public class AuthService {
     private final StoreRepository storeRepository;
 
     /**
-     * Xử lý đăng nhập bước 1: Kiểm tra thông tin tài khoản và gửi OTP.
+     * Xử lý đăng nhập: Admin bắt buộc xác thực OTP, các Role khác đăng nhập trực tiếp.
      *
      * @param request Payload chứa Username và Password.
-     * @return Đối tượng AuthResponse yêu cầu xác thực OTP (OTP_REQUIRED).
-     * @throws ResponseStatusException nếu sai tài khoản, mật khẩu hoặc thiếu email.
+     * @return Đối tượng AuthResponse (Yêu cầu OTP với Admin, hoặc trả về Token với Role khác).
      */
+    @Transactional
     public AuthResponse login(AuthRequest request) {
         Account account = accountRepository.findByUsername(request.username())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
@@ -55,20 +55,42 @@ public class AuthService {
         }
 
         SystemUser profile = account.getSystemUser();
-        // CẬP NHẬT: Thêm .isBlank() để chặn trường hợp email rỗng ""
-        if (profile == null || profile.getEmail() == null || profile.getEmail().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài khoản chưa cập nhật Email để nhận mã OTP!");
+
+        // =====================================================================
+        // 🔥 LOGIC MỚI: PHÂN NHÁNH ĐĂNG NHẬP THEO ROLE
+        // =====================================================================
+
+        if (account.getRole() == Account.Role.ADMIN) {
+            // 🛑 NHÁNH 1: DÀNH CHO ADMIN -> Bắt buộc gửi và kiểm tra OTP
+            if (profile == null || profile.getEmail() == null || profile.getEmail().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài khoản Admin chưa cập nhật Email để nhận mã OTP!");
+            }
+
+            String otp = otpService.generateOtp(account.getUsername());
+            mailService.sendOtpMail(profile.getEmail(), otp);
+
+            return AuthResponse.builder()
+                    .username(account.getUsername())
+                    .message("OTP_REQUIRED")
+                    .fullName(profile.getFullName())
+                    .build();
+
+        } else {
+            // 🟢 NHÁNH 2: DÀNH CHO CÁC ROLE KHÁC -> Cấp Token và cho vào thẳng
+            String token = jwtService.generateToken(account);
+
+            // Lưu token vào Database (đè token cũ nếu có) để quản lý phiên đăng nhập
+            account.setActiveToken(token);
+            accountRepository.save(account);
+
+            return AuthResponse.builder()
+                    .token(token)
+                    .username(account.getUsername())
+                    .role(account.getRole().name())
+                    .message("Login Success")
+                    .fullName(profile != null ? profile.getFullName() : "N/A")
+                    .build();
         }
-
-        String otp = otpService.generateOtp(account.getUsername());
-        mailService.sendOtpMail(profile.getEmail(), otp);
-
-        return AuthResponse.builder()
-                .username(account.getUsername())
-                .message("OTP_REQUIRED")
-                // 🌟 THÊM ĐÚNG 1 DÒNG NÀY VÀO LÀ XONG
-                .fullName(profile.getFullName())
-                .build();
     }
 
     /**
