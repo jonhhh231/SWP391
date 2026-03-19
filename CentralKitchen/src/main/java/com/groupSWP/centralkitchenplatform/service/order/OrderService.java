@@ -324,11 +324,19 @@ public class OrderService {
             productionService.createProductionRun(request);
         }
 
-        // 🔥 FIX LOGIC: Đổi về sang READY_TO_SHIP ngay!
+        // 🔥 FIX LOGIC MỚI CỦA SẾP: Đổi về sang PLANNED (Chờ nấu)
         for (Order order : pendingOrders) {
-            order.setStatus(Order.OrderStatus.READY_TO_SHIP);
+            order.setStatus(Order.OrderStatus.PLANNED);
         }
         orderRepository.saveAll(pendingOrders);
+
+        // 🔥 GỬI THÔNG BÁO: Báo cho Bếp biết đã chốt xong danh sách gom đơn
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER"),
+                "📋 ĐÃ GOM ĐƠN THÀNH CÔNG",
+                "Hệ thống đã chốt danh sách gom đơn. Các đơn hàng hiện đang ở trạng thái Chờ Nấu (PLANNED)!",
+                Notification.NotificationType.INFO
+        );
     }
 
     // =========================================================================

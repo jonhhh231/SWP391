@@ -2,7 +2,9 @@ package com.groupSWP.centralkitchenplatform.service.system;
 
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.entities.config.SystemConfig;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.repositories.system.SystemConfigRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -29,6 +31,7 @@ import java.util.List;
 public class SystemConfigService {
 
     private final SystemConfigRepository systemConfigRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService vào đây
 
     /**
      * Lấy giá trị cấu hình theo Khóa (Config Key) - Có áp dụng Cache.
@@ -122,6 +125,19 @@ public class SystemConfigService {
         config.setUpdatedBy(updatedBy);
 
         log.info("🔥 Đã cập nhật cấu hình {} = {} và xóa Cache cũ!", configKey, configValue);
-        return systemConfigRepository.save(config);
+
+        SystemConfig savedConfig = systemConfigRepository.save(config);
+
+        // ==========================================================
+        // 🔥 THÔNG BÁO: PHÁT LOA CHO CÁC BỘ PHẬN BIẾT CẤU HÌNH ĐÃ ĐỔI
+        // ==========================================================
+        notificationService.broadcastNotification(
+                List.of("STORE_MANAGER", "KITCHEN_MANAGER", "COORDINATOR"), // Gửi cho 3 bên
+                "⚙️ THAY ĐỔI CẤU HÌNH HỆ THỐNG",
+                "Quản lý vừa cập nhật tham số [" + configKey + "] thành giá trị mới là: " + configValue + ". Vui lòng lưu ý để sắp xếp công việc!",
+                Notification.NotificationType.INFO
+        );
+
+        return savedConfig;
     }
 }

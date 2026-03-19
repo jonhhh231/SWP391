@@ -53,6 +53,7 @@ public class Order extends BaseEntity {
 
     public enum OrderStatus {
         NEW,
+        PLANNED,          // 🔥 THÊM TRẠNG THÁI NÀY: Đã gom đơn, chờ mang đi nấu
         PREPARING,        // Bếp đang nấu
         SHIPPING,         // Đang trên xe giao đến cửa hàng
         DELIVERED,        // Xe đã tới nơi (Chờ Store Manager đếm hàng)

@@ -26,9 +26,9 @@ public class OrderDeliveryService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng!"));
 
-        // 🔥 GUARDRAIL: Chỉ đơn mới (NEW/PENDING) mới được mang đi nấu
-        if (order.getStatus() != Order.OrderStatus.NEW) {
-            throw new RuntimeException("Lỗi: Chỉ có thể nấu các đơn hàng mới (NEW hoặc PENDING)!");
+        // 🔥 GUARDRAIL MỚI: Chỉ đơn ĐÃ GOM (PLANNED) mới được mang đi nấu!
+        if (order.getStatus() != Order.OrderStatus.PLANNED) {
+            throw new RuntimeException("Lỗi: Đơn hàng chưa được Gom (PLANNED) nên không thể bắt đầu nấu!");
         }
 
         order.setStatus(Order.OrderStatus.PREPARING);

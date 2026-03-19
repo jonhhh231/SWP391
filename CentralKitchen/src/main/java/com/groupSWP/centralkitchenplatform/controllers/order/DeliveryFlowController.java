@@ -27,7 +27,7 @@ public class DeliveryFlowController {
     /**
      * API Cập nhật trạng thái đơn hàng thành "Đang chuẩn bị" (PREPARING).
      * <p>
-     * Hành động này đánh dấu việc Bếp trung tâm đã tiếp nhận đơn hàng và
+     * Hành động này đánh dấu việc Bếp trung tâm đã tiếp nhận đơn hàng (từ trạng thái PLANNED) và
      * bắt đầu quá trình nấu nướng, xuất kho nguyên liệu hoặc đóng gói.
      * </p>
      *
