@@ -6,12 +6,14 @@ import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
 import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportTicket;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ImportTicketRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.UnitConversionRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class InventoryService {
     private final IngredientRepository ingredientRepository;
     private final AccountRepository accountRepository;
     private final UnitConversionRepository conversionRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     /**
      * Xử lý nghiệp vụ Nhập kho nguyên liệu.
@@ -138,6 +141,14 @@ public class InventoryService {
         ticket.setImportItems(importItems);
         ticket.setTotalAmount(totalAmount);
         ImportTicket savedTicket = ticketRepository.save(ticket);
+
+        // 🔥 THÔNG BÁO: Báo cho Bếp trưởng biết là kho mới được "bơm máu"
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER"),
+                "📦 NHẬP KHO THÀNH CÔNG",
+                "Phiếu nhập kho " + savedTicket.getTicketId() + " đã hoàn tất. Nguyên vật liệu đã được cộng vào hệ thống!",
+                Notification.NotificationType.SUCCESS
+        );
 
         return mapToResponse(savedTicket);
     }

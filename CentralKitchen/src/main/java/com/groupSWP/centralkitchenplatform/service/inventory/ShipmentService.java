@@ -7,6 +7,7 @@ import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥
 import com.groupSWP.centralkitchenplatform.entities.product.Stock;
 import com.groupSWP.centralkitchenplatform.entities.product.StockKey;
 
@@ -15,6 +16,7 @@ import com.groupSWP.centralkitchenplatform.repositories.inventory.StockRepositor
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentRepository;
 import com.groupSWP.centralkitchenplatform.repositories.logistic.ShipmentDetailRepository;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,6 +40,7 @@ public class ShipmentService {
     private final OrderRepository orderRepository;
     private final AccountRepository accountRepository;
     private final StockRepository stockRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     // =========================================================================
     // 🔥 TỰ ĐỘNG CHỐT ĐƠN VÀ CỘNG KHO SAU 6 TIẾNG QUÁ HẠN (CRON JOB)
@@ -58,6 +61,31 @@ public class ShipmentService {
                 // Nhận tự động với tư cách ADMIN để bypass
                 reportIssue(shipment.getShipmentId(), "ADMIN", null);
                 count++;
+
+                // 🔥 THÔNG BÁO SAU KHI ROBOT CHỐT ĐƠN THÀNH CÔNG
+                if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+                    Store targetStore = shipment.getOrders().get(0).getStore();
+
+                    // 1. Báo cáo lên cho MANAGER nắm tình hình (Biết chi nhánh nào đang lười)
+                    notificationService.broadcastNotification(
+                            List.of("MANAGER"),
+                            "🤖 TỰ ĐỘNG CHỐT ĐƠN QUÁ HẠN",
+                            "Chuyến xe " + shipment.getShipmentId() + " của cửa hàng " + targetStore.getName() + " đã quá hạn 6 tiếng. Hệ thống đã tự động chốt sổ và cộng kho!",
+                            Notification.NotificationType.WARNING
+                    );
+
+                    // 2. Cảnh cáo trực tiếp ông Cửa hàng trưởng của tiệm đó
+                    if (targetStore.getAccount() != null) {
+                        notificationService.sendNotification(
+                                targetStore.getAccount(),
+                                "⏰ QUÁ HẠN XÁC NHẬN HÀNG",
+                                "Bạn đã quên xác nhận chuyến xe " + shipment.getShipmentId() + " quá 6 tiếng. Hệ thống đã tự động chốt nhận ĐỦ 100% hàng vào kho. Bạn không thể khiếu nại thiếu hàng cho chuyến này nữa!",
+                                Notification.NotificationType.WARNING,
+                                null
+                        );
+                    }
+                }
+
             } catch (Exception e) {
                 log.error("Lỗi khi tự động chốt chuyến xe {}: {}", shipment.getShipmentId(), e.getMessage());
             }
@@ -88,6 +116,7 @@ public class ShipmentService {
         }
 
         boolean hasIssue = false;
+        List<String> missingItemNames = new ArrayList<>(); // 🔥 Thêm List để gom danh sách món bị thiếu
 
         if (request != null && request.getReportedItems() != null && !request.getReportedItems().isEmpty()) {
             for (ReportShipmentRequest.ItemReport report : request.getReportedItems()) {
@@ -101,6 +130,8 @@ public class ShipmentService {
 
                 if (detail.getMissingQuantity() > 0) {
                     hasIssue = true;
+                    // 🔥 Ghi nhận lại tên món và số lượng thiếu
+                    missingItemNames.add(detail.getProduct().getProductName() + " (Thiếu: " + detail.getMissingQuantity() + ")");
                 }
             }
         } else {
@@ -149,6 +180,17 @@ public class ShipmentService {
         if (shipment.getOrders() != null) {
             shipment.getOrders().forEach(o -> o.setStatus(finalOrderStatus));
             orderRepository.saveAll(shipment.getOrders());
+        }
+
+        // 🔥 THÔNG BÁO XỊN SÒ CÓ KÈM CHI TIẾT MÓN THIẾU
+        if (hasIssue) {
+            String missingDetails = String.join(", ", missingItemNames); // Nối các món lại thành chuỗi đẹp mắt
+            notificationService.broadcastNotification(
+                    List.of("COORDINATOR", "KITCHEN_MANAGER"),
+                    "⚠️ KHIẾU NẠI THIẾU HÀNG",
+                    "Cửa hàng " + targetStore.getName() + " vừa báo thiếu hàng tại chuyến " + shipmentId + ". Chi tiết: " + missingDetails + ". Vui lòng xử lý đền bù!",
+                    Notification.NotificationType.WARNING
+            );
         }
 
         return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Đã báo cho Bếp trung tâm lên đơn bù!" : "Xác nhận nhận đủ hàng. Kho cửa hàng đã được cập nhật!";
@@ -216,6 +258,22 @@ public class ShipmentService {
         originalShipment.setResolvedAt(LocalDateTime.now());
         shipmentRepository.save(originalShipment);
 
+        // ===================================================================
+        // 🔥 THÔNG BÁO: BÁO TIN VUI CHO CỬA HÀNG TRƯỞNG LÀ ĐÃ DUYỆT ĐƠN ĐỀN BÙ
+        // ===================================================================
+        if (originalShipment.getOrders() != null && !originalShipment.getOrders().isEmpty()) {
+            Account storeAcc = originalShipment.getOrders().get(0).getStore().getAccount();
+            if (storeAcc != null) {
+                notificationService.sendNotification(
+                        storeAcc,
+                        "🎁 ĐƠN ĐỀN BÙ ĐÃ TẠO",
+                        "Khiếu nại thiếu hàng của bạn tại chuyến " + originalShipmentId + " đã được duyệt! Đơn đền bù mã " + compOrderId + " đã được chuyển xuống Bếp để xử lý.",
+                        Notification.NotificationType.SUCCESS,
+                        null
+                );
+            }
+        }
+
         return "Đã tạo ĐƠN BÙ thành công! Mã đơn: " + compOrderId + ". Đơn đã được đẩy về hàng đợi (NEW) chờ Bếp Trung Tâm xử lý và trừ kho.";
     }
 
@@ -251,6 +309,20 @@ public class ShipmentService {
 
         shipmentRepository.save(shipment);
         log.info("Đã gán tài xế {} cho chuyến xe {}.", driver.getUsername(), shipmentId);
+
+        // 🔥 THÔNG BÁO: Báo cho Store Manager là xe bắt đầu chạy
+        if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+            Account storeAcc = shipment.getOrders().get(0).getStore().getAccount();
+            if (storeAcc != null) {
+                notificationService.sendNotification(
+                        storeAcc,
+                        "🛵 TÀI XẾ ĐANG TỚI",
+                        "Chuyến xe " + shipmentId + " đã được gán tài xế " + driver.getUsername() + " và đang trên đường đến!",
+                        Notification.NotificationType.INFO,
+                        null
+                );
+            }
+        }
     }
 
     // =========================================================================

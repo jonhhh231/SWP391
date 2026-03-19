@@ -9,12 +9,14 @@ import com.groupSWP.centralkitchenplatform.entities.cart.CartItem; // 🌟 Thêm
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import Notification
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import com.groupSWP.centralkitchenplatform.service.inventory.ProductionService;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import NotificationService
 import com.groupSWP.centralkitchenplatform.service.system.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,9 @@ public class OrderService {
     private final ProductionService productionService;
     private final FormulaRepository formulaRepository;
     private final SystemConfigService systemConfigService;
+
+    // 🔥 Tiêm NotificationService vào để gửi thông báo
+    private final NotificationService notificationService;
 
     // =========================================================================
     // HÀM HELPER: KHỞI TẠO ĐƠN HÀNG VÀ CHẶN GIỜ GIẤC (DÙNG CHUNG)
@@ -130,6 +135,14 @@ public class OrderService {
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
 
+        // 🔥 GỬI THÔNG BÁO: Báo cho Kitchen Manager và Manager
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER", "MANAGER"),
+                isUrgent ? "🚨 ĐƠN HÀNG KHẨN CẤP" : "📦 Đơn hàng mới",
+                "Cửa hàng " + store.getName() + " vừa đặt đơn " + savedOrder.getOrderId(),
+                isUrgent ? Notification.NotificationType.URGENT : Notification.NotificationType.INFO
+        );
+
         return buildOrderResponse(savedOrder, isUrgent ? "Tạo đơn KHẨN CẤP thành công (+ " + order.getSurcharge() + " VNĐ phí)!" : "Tạo đơn TIÊU CHUẨN thành công!");
     }
 
@@ -162,6 +175,14 @@ public class OrderService {
         order.setTotalAmount(totalAmount.add(order.getSurcharge()));
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
+
+        // 🔥 GỬI THÔNG BÁO: Báo cho Kitchen Manager và Manager
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER", "MANAGER"),
+                isUrgent ? "🚨 ĐƠN HÀNG KHẨN CẤP (TỪ GIỎ)" : "📦 Đơn hàng mới",
+                "Cửa hàng " + store.getName() + " chốt đơn " + savedOrder.getOrderId(),
+                isUrgent ? Notification.NotificationType.URGENT : Notification.NotificationType.INFO
+        );
 
         return buildOrderResponse(savedOrder, isUrgent ? "Chốt đơn KHẨN CẤP thành công!" : "Chốt đơn TIÊU CHUẨN thành công!");
     }
@@ -253,6 +274,14 @@ public class OrderService {
 
         order.setStatus(Order.OrderStatus.CANCELLED);
         orderRepository.save(order);
+
+        // 🔥 GỬI THÔNG BÁO: Báo cho Bếp và Manager biết đơn đã bị hủy
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER", "MANAGER"),
+                "❌ ĐƠN HÀNG ĐÃ HỦY",
+                "Cửa hàng " + order.getStore().getName() + " vừa hủy đơn " + order.getOrderId(),
+                Notification.NotificationType.WARNING
+        );
     }
 
     public List<KitchenAggregationResponse> getPendingProductionAggregation() {
@@ -295,11 +324,19 @@ public class OrderService {
             productionService.createProductionRun(request);
         }
 
-        // 🔥 FIX LOGIC: Đổi về sang READY_TO_SHIP ngay!
+        // 🔥 FIX LOGIC MỚI CỦA SẾP: Đổi về sang PLANNED (Chờ nấu)
         for (Order order : pendingOrders) {
-            order.setStatus(Order.OrderStatus.READY_TO_SHIP);
+            order.setStatus(Order.OrderStatus.PLANNED);
         }
         orderRepository.saveAll(pendingOrders);
+
+        // 🔥 GỬI THÔNG BÁO: Báo cho Bếp biết đã chốt xong danh sách gom đơn
+        notificationService.broadcastNotification(
+                List.of("KITCHEN_MANAGER"),
+                "📋 ĐÃ GOM ĐƠN THÀNH CÔNG",
+                "Hệ thống đã chốt danh sách gom đơn. Các đơn hàng hiện đang ở trạng thái Chờ Nấu (PLANNED)!",
+                Notification.NotificationType.INFO
+        );
     }
 
     // =========================================================================

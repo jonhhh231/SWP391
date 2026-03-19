@@ -6,6 +6,7 @@ import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.InventoryLog;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ImportItemRepository;
@@ -13,6 +14,7 @@ import com.groupSWP.centralkitchenplatform.repositories.inventory.InventoryLogRe
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ProductionRunRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,7 @@ public class ProductionService {
     private final IngredientRepository ingredientRepository;
     private final ImportItemRepository importItemRepository;
     private final InventoryLogRepository inventoryLogRepository;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     /**
      * Khởi tạo Kế hoạch mẻ nấu (Production Run).
@@ -133,6 +136,16 @@ public class ProductionService {
                 // Chạy hàm FIFO trừ kho và tính tiền
                 BigDecimal ingredientCost = deductIngredientWithFIFO(ingredient, totalNeeded, run);
                 totalProductionCost = totalProductionCost.add(ingredientCost);
+
+                // 🔥 THÔNG BÁO: Kiểm tra tồn kho sau khi trừ, nếu rớt xuống dưới mức ngưỡng thì báo động!
+                if (ingredient.getMinThreshold() != null && ingredient.getKitchenStock().compareTo(ingredient.getMinThreshold()) < 0) {
+                    notificationService.broadcastNotification(
+                            List.of("MANAGER"),
+                            "📉 CẢNH BÁO TỒN KHO",
+                            "Nguyên liệu " + ingredient.getName() + " vừa rớt xuống dưới mức an toàn (" + ingredient.getKitchenStock() + " " + ingredient.getUnit() + "). Vui lòng lên kế hoạch nhập hàng!",
+                            Notification.NotificationType.WARNING
+                    );
+                }
             }
 
             // Ghi nhận giá vốn thực tế vào mẻ nấu

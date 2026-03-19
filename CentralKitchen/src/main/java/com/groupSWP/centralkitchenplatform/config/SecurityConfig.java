@@ -94,7 +94,12 @@ public class SecurityConfig {
                         // Giới hạn thao tác Xóa (DELETE)
                         .requestMatchers(HttpMethod.DELETE,
                                 "/api/products/**", "/api/categories/**", "/api/ingredients/**", "/api/manager/conversions/**")
+
                         .hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER")
+                        // =========================================================
+                        // LUỒNG THÔNG BÁO (NOTIFICATION) - ĐƯA LÊN TRÊN ĐỂ ƯU TIÊN
+                        // =========================================================
+                        .requestMatchers("/api/notifications/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN_MANAGER", "STORE_MANAGER", "COORDINATOR")
 
                         // =========================================================
                         // 3. ƯU TIÊN 2: CÁC LUỒNG TỔNG QUÁT (Dùng /** để bao quát các prefix)

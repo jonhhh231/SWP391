@@ -5,9 +5,11 @@ import com.groupSWP.centralkitchenplatform.dto.auth.UpdateAccountRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
 import com.groupSWP.centralkitchenplatform.entities.auth.SystemUser;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.auth.SystemUserRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class AccountService {
     private final StoreRepository storeRepository;
     private final SystemUserRepository systemUserRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
 
     /**
      * Lấy danh sách toàn bộ tài khoản trong hệ thống (Loại trừ ADMIN).
@@ -193,6 +196,23 @@ public class AccountService {
         account.setRole(newRole);
         accountRepository.save(account);
 
+        // 🔥 THÔNG BÁO: Gửi cho chính nhân viên đó biết họ vừa bị luân chuyển
+        notificationService.sendNotification(
+                account,
+                "📋 Cập nhật chức vụ mới",
+                "Bạn đã được điều động sang vị trí mới: " + newRole.name() + " trên hệ thống.",
+                Notification.NotificationType.INFO,
+                null
+        );
+
+        // 🔥 THÔNG BÁO: Báo cáo cho MANAGER biết có biến động nhân sự
+        notificationService.broadcastNotification(
+                List.of("MANAGER"),
+                "👥 BIẾN ĐỘNG NHÂN SỰ",
+                "Admin vừa thay đổi chức vụ của tài khoản [" + account.getUsername() + "] sang " + newRole.name() + ".",
+                Notification.NotificationType.INFO
+        );
+
         return thongBao;
     }
 
@@ -256,6 +276,16 @@ public class AccountService {
         account.setActive(!account.isActive());
         accountRepository.save(account);
 
+        // 🔥 THÔNG BÁO: Báo cáo cho MANAGER biết tài khoản vừa bị khóa/mở
+        notificationService.broadcastNotification(
+                List.of("MANAGER"),
+                "🔒 TRẠNG THÁI TÀI KHOẢN",
+                account.isActive() ?
+                        "Tài khoản [" + account.getUsername() + "] vừa được MỞ KHÓA lại." :
+                        "Tài khoản [" + account.getUsername() + "] vừa bị KHÓA.",
+                Notification.NotificationType.WARNING
+        );
+
         return detailedMessage;
     }
 
@@ -315,6 +345,15 @@ public class AccountService {
         }
 
         accountRepository.save(account);
+
+        // 🔥 THÔNG BÁO: Báo cho MANAGER biết việc tháo/lắp Cửa hàng trưởng
+        notificationService.broadcastNotification(
+                List.of("MANAGER"),
+                "🏪 CẬP NHẬT QUẢN LÝ CỬA HÀNG",
+                thongBao,
+                Notification.NotificationType.INFO
+        );
+
         return thongBao;
     }
 
@@ -364,6 +403,14 @@ public class AccountService {
 
         accountRepository.save(acc1);
         accountRepository.save(acc2);
+
+        // 🔥 THÔNG BÁO: Báo cho MANAGER biết việc hoán đổi
+        notificationService.broadcastNotification(
+                List.of("MANAGER"),
+                "🔄 HOÁN ĐỔI NHÂN SỰ",
+                "Admin vừa thực hiện hoán đổi vị trí giữa [" + acc1.getUsername() + "] và [" + acc2.getUsername() + "].",
+                Notification.NotificationType.INFO
+        );
 
         return "Đã HOÁN ĐỔI VỊ TRÍ thành công! " +
                 "Quản lý [" + acc1.getUsername() + "] chuyển sang tiệm [" + store2.getName() + "]. " +
