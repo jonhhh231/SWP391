@@ -25,8 +25,15 @@ public class LogisticDao {
     }
 
     public List<Map<String, Object>> findActiveShipments() {
-        String sql = "SELECT shipment_id, driver_name as driver, vehicle_plate as plate, status " +
-                "FROM shipments WHERE status IN ('PENDING', 'SHIPPING')";
+        // 🔥 Đã thêm: store_name (Tên cửa hàng), address, order_id, shipment_type, created_at
+        String sql = "SELECT sh.shipment_id, sh.driver_name AS driver, sh.vehicle_plate AS plate, sh.status, " +
+                "sh.shipment_type, sh.created_at, " +
+                "o.order_id, s.name AS store_name, s.address AS store_address " +
+                "FROM shipments sh " +
+                "LEFT JOIN orders o ON sh.shipment_id = o.shipment_id " +
+                "LEFT JOIN stores s ON o.store_id = s.store_id " +
+                "WHERE sh.status IN ('PENDING', 'SHIPPING') " +
+                "ORDER BY sh.created_at DESC";
         return jdbcTemplate.queryForList(sql);
     }
 
@@ -36,8 +43,16 @@ public class LogisticDao {
     }
 
     public List<Map<String, Object>> findCompletedShipments() {
-        String sql = "SELECT shipment_id, driver_name as driver, vehicle_plate as plate, status " +
-                "FROM shipments WHERE status IN ('DELIVERED', 'RESOLVED') ORDER BY updated_at DESC";
+        // 🔥 Đã thêm: store_name, order_id, shipment_type, delivered_at (thời gian giao thực tế)
+        // Lưu ý: Đã bổ sung thêm trạng thái ISSUE_REPORTED (có báo cáo lỗi) vào lịch sử
+        String sql = "SELECT sh.shipment_id, sh.driver_name AS driver, sh.vehicle_plate AS plate, sh.status, " +
+                "sh.shipment_type, sh.delivered_at, sh.resolved_at, " +
+                "o.order_id, s.name AS store_name " +
+                "FROM shipments sh " +
+                "LEFT JOIN orders o ON sh.shipment_id = o.shipment_id " +
+                "LEFT JOIN stores s ON o.store_id = s.store_id " +
+                "WHERE sh.status IN ('DELIVERED', 'ISSUE_REPORTED', 'RESOLVED') " +
+                "ORDER BY sh.updated_at DESC";
         return jdbcTemplate.queryForList(sql);
     }
 
