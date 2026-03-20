@@ -20,6 +20,8 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     List<Order> findByStatus(Order.OrderStatus status);
 
+    List<Order> findByStatusAndOrderItems_Product_ProductId(Order.OrderStatus status, String productId);
+
     List<Order> findByStore_StoreId(String storeId);// Lấy tất cả đơn hàng của 1 cửa hàng
 
     List<Order> findByCreatedAtGreaterThanEqualAndStatusNot(LocalDateTime startTime, Order.OrderStatus status);

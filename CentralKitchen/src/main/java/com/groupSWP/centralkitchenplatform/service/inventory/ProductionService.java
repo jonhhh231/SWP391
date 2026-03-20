@@ -6,12 +6,14 @@ import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.InventoryLog;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
+import com.groupSWP.centralkitchenplatform.entities.logistic.Order; // 🔥 Thêm import Order
 import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ImportItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.InventoryLogRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ProductionRunRepository;
+import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository; // 🔥 Thêm import OrderRepository
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
@@ -44,6 +46,7 @@ public class ProductionService {
     private final ImportItemRepository importItemRepository;
     private final InventoryLogRepository inventoryLogRepository;
     private final NotificationService notificationService; // 🔥 Tiêm NotificationService
+    private final OrderRepository orderRepository; // 🔥 Thêm tiêm OrderRepository để xử lý luồng ngầm cho FE
 
     /**
      * Khởi tạo Kế hoạch mẻ nấu (Production Run).
@@ -152,9 +155,50 @@ public class ProductionService {
             run.setTotalCostAtProduction(totalProductionCost);
         }
 
+        // =================================================================================
+        // 🔥 LOGIC MỚI BỔ SUNG: QUÉT NGẦM VÀ ĐỔI TRẠNG THÁI ĐƠN HÀNG LÊN "PREPARING" (YÊU CẦU CỦA FE)
+        // =================================================================================
+        if (oldStatus == ProductionRun.ProductionStatus.PLANNED && newStatus == ProductionRun.ProductionStatus.COOKING) {
+            List<Order> plannedOrders = orderRepository.findByStatusAndOrderItems_Product_ProductId(
+                    Order.OrderStatus.PLANNED, run.getProduct().getProductId()
+            );
+            if (!plannedOrders.isEmpty()) {
+                plannedOrders.forEach(o -> o.setStatus(Order.OrderStatus.PREPARING));
+                orderRepository.saveAll(plannedOrders);
+            }
+        }
+
         // Chặn lùi trạng thái (Đã nấu rồi thì không được lùi về Kế hoạch để tránh lỗi kho kép)
         if (oldStatus == ProductionRun.ProductionStatus.COOKING && newStatus == ProductionRun.ProductionStatus.PLANNED) {
             throw new RuntimeException("Mẻ nấu đang diễn ra (COOKING), không thể lùi về trạng thái Kế Hoạch (PLANNED)!");
+        }
+
+        // =================================================================================
+        // 🔥 LOGIC MỚI BỔ SUNG: KHI NẤU XONG (COMPLETED)
+        // =================================================================================
+        if (newStatus == ProductionRun.ProductionStatus.COMPLETED) {
+
+            // 1. Tính toán chốt sổ số lượng thực tế (Giúp FE không cần nhập tay)
+            BigDecimal waste = run.getWasteQty() != null ? run.getWasteQty() : BigDecimal.ZERO;
+            run.setActualQty(run.getPlannedQty().subtract(waste));
+
+            // 2. Quét ngầm và cập nhật trạng thái Đơn hàng lên "READY_TO_SHIP" (YÊU CẦU CỦA FE)
+            List<Order> preparingOrders = orderRepository.findByStatusAndOrderItems_Product_ProductId(
+                    Order.OrderStatus.PREPARING, run.getProduct().getProductId()
+            );
+
+            if (!preparingOrders.isEmpty()) {
+                preparingOrders.forEach(o -> o.setStatus(Order.OrderStatus.READY_TO_SHIP));
+                orderRepository.saveAll(preparingOrders);
+
+                // Reo chuông cho Điều phối viên (Coordinator) ra xếp xe
+                notificationService.broadcastNotification(
+                        List.of("COORDINATOR"),
+                        "✅ HÀNG ĐÃ NẤU XONG",
+                        "Mẻ nấu " + run.getProduct().getProductName() + " đã hoàn tất. Các đơn hàng liên quan đã sẵn sàng (READY_TO_SHIP). Vui lòng điều phối tài xế!",
+                        Notification.NotificationType.INFO
+                );
+            }
         }
 
         run.setStatus(newStatus);
