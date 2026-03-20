@@ -23,4 +23,8 @@ public interface ShipmentDetailRepository extends JpaRepository<ShipmentDetail, 
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate,
             Pageable pageable);
+
+    // Lấy danh sách các món bị giao thiếu
+    @Query("SELECT sd FROM ShipmentDetail sd JOIN FETCH sd.shipment s WHERE sd.expectedQuantity > sd.receivedQuantity AND s.createdAt BETWEEN :startDate AND :endDate")
+    List<ShipmentDetail> findMissingShipmentDetails(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }
