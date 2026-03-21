@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface ShipmentRepository extends JpaRepository<Shipment, String> {
     List<Shipment> findByStatusAndDeliveredAtBefore(Shipment.ShipmentStatus status, LocalDateTime time);
+    List<Shipment> findByStatus(Shipment.ShipmentStatus status);
 }

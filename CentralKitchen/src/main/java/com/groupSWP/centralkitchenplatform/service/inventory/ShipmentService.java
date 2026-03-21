@@ -24,10 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -416,5 +413,54 @@ public class ShipmentService {
 
         orderRepository.saveAll(ordersToUpdate);
         return "Đã tách và tạo thành công " + shipmentCount + " chuyến giao hàng độc lập cho từng đơn!";
+    }
+
+    // =========================================================================
+    //  LẤY DANH SÁCH CÁC CHUYẾN XE BỊ BÁO CÁO THIẾU HÀNG (KÈM CHI TIẾT)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getReportedShipments() {
+        // Lấy tất cả chuyến xe đang ở trạng thái CÓ VẤN ĐỀ
+        List<Shipment> reportedShipments = shipmentRepository.findByStatus(Shipment.ShipmentStatus.ISSUE_REPORTED);
+
+        List<Map<String, Object>> responseList = new ArrayList<>();
+
+        for (Shipment shipment : reportedShipments) {
+            Map<String, Object> shipmentData = new HashMap<>();
+            shipmentData.put("shipmentId", shipment.getShipmentId());
+            shipmentData.put("status", shipment.getStatus().name());
+            shipmentData.put("updatedAt", shipment.getUpdatedAt());
+
+            // Móc thông tin Cửa hàng từ Đơn hàng
+            String storeName = "Không xác định";
+            String storeId = "";
+            if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+                Store store = shipment.getOrders().get(0).getStore();
+                storeName = store.getName();
+                storeId = store.getStoreId();
+            }
+            shipmentData.put("storeId", storeId);
+            shipmentData.put("storeName", storeName);
+
+            // Lọc ra CHỈ NHỮNG MÓN BỊ THIẾU để hiển thị
+            List<Map<String, Object>> missingItems = new ArrayList<>();
+            for (ShipmentDetail detail : shipment.getShipmentDetails()) {
+                if (detail.getMissingQuantity() > 0) {
+                    Map<String, Object> itemData = new HashMap<>();
+                    itemData.put("productId", detail.getProduct().getProductId());
+                    itemData.put("productName", detail.getProductName());
+                    itemData.put("expectedQuantity", detail.getExpectedQuantity());
+                    itemData.put("receivedQuantity", detail.getReceivedQuantity());
+                    itemData.put("missingQuantity", detail.getMissingQuantity());
+                    itemData.put("issueNote", detail.getIssueNote());
+                    missingItems.add(itemData);
+                }
+            }
+            shipmentData.put("missingItems", missingItems);
+
+            responseList.add(shipmentData);
+        }
+
+        return responseList;
     }
 }

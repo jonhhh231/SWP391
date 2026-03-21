@@ -109,4 +109,18 @@ public class ShipmentController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    /**
+     * API Lấy danh sách các chuyến xe bị Cửa hàng báo cáo thiếu hàng.
+     * <p>Giúp Bếp trung tâm và Điều phối viên nắm được danh sách cần đền bù.</p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER', 'COORDINATOR')")
+    @GetMapping("/reported")
+    public ResponseEntity<?> getReportedShipments() {
+        try {
+            return ResponseEntity.ok(shipmentService.getReportedShipments());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
