@@ -37,7 +37,7 @@ public class ShipmentService {
     private final OrderRepository orderRepository;
     private final AccountRepository accountRepository;
     private final StockRepository stockRepository;
-    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
+    private final NotificationService notificationService;
 
     // =========================================================================
     // 🔥 TỰ ĐỘNG CHỐT ĐƠN VÀ CỘNG KHO SAU 6 TIẾNG QUÁ HẠN (CRON JOB)
@@ -457,6 +457,52 @@ public class ShipmentService {
                 }
             }
             shipmentData.put("missingItems", missingItems);
+
+            responseList.add(shipmentData);
+        }
+
+        return responseList;
+    }
+
+    // =========================================================================
+    // 🔥 CỬA HÀNG: LẤY DANH SÁCH CHUYẾN XE ĐÃ ĐẾN NƠI (CHỜ KIỂM ĐẾM)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getPendingReportShipmentsForStore(String storeId) {
+        if (storeId == null || storeId.isEmpty()) {
+            throw new RuntimeException("Lỗi: Không xác định được Cửa hàng của bạn!");
+        }
+
+        // Tìm các chuyến xe đang đậu trước cửa (DELIVERED) của chính cửa hàng này
+        List<Shipment> deliveredShipments = shipmentRepository.getShipmentsForStore(
+                Shipment.ShipmentStatus.DELIVERED, storeId
+        );
+
+        List<Map<String, Object>> responseList = new ArrayList<>();
+
+        for (Shipment shipment : deliveredShipments) {
+            Map<String, Object> shipmentData = new HashMap<>();
+            shipmentData.put("shipmentId", shipment.getShipmentId());
+            shipmentData.put("driverName", shipment.getDriverName());
+            shipmentData.put("deliveredAt", shipment.getDeliveredAt()); // Giờ xe tới nơi
+
+            // Tính số phút đã trôi qua kể từ lúc xe tới (Giúp FE hiện cảnh báo sắp bị hệ thống tự chốt)
+            long minutesElapsed = 0;
+            if (shipment.getDeliveredAt() != null) {
+                minutesElapsed = java.time.Duration.between(shipment.getDeliveredAt(), LocalDateTime.now()).toMinutes();
+            }
+            shipmentData.put("minutesElapsed", minutesElapsed);
+
+            // Móc danh sách các món cần phải đếm
+            List<Map<String, Object>> itemsToCheck = new ArrayList<>();
+            for (ShipmentDetail detail : shipment.getShipmentDetails()) {
+                Map<String, Object> itemData = new HashMap<>();
+                itemData.put("productId", detail.getProduct().getProductId());
+                itemData.put("productName", detail.getProductName());
+                itemData.put("expectedQuantity", detail.getExpectedQuantity()); // Số lượng Bếp gửi đi
+                itemsToCheck.add(itemData);
+            }
+            shipmentData.put("items", itemsToCheck);
 
             responseList.add(shipmentData);
         }
