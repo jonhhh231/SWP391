@@ -174,7 +174,7 @@ public class ProductionService {
         }
 
         // =================================================================================
-        // 🔥 LOGIC MỚI BỔ SUNG: KHI NẤU XONG (COMPLETED)
+        // 🔥 LOGIC MỚI BỔ SUNG: KHI NẤU XONG (COMPLETED) - ĐÃ FIX HIỂN THỊ MÃ ĐƠN
         // =================================================================================
         if (newStatus == ProductionRun.ProductionStatus.COMPLETED) {
 
@@ -188,14 +188,19 @@ public class ProductionService {
             );
 
             if (!preparingOrders.isEmpty()) {
+                // 🔥 ĐIỂM FIX MỚI CỦA SẾP: Rút danh sách Mã Đơn ra để báo cáo chi tiết
+                String orderIdsList = preparingOrders.stream()
+                        .map(Order::getOrderId)
+                        .collect(Collectors.joining(", "));
+
                 preparingOrders.forEach(o -> o.setStatus(Order.OrderStatus.READY_TO_SHIP));
                 orderRepository.saveAll(preparingOrders);
 
-                // Reo chuông cho Điều phối viên (Coordinator) ra xếp xe
+                // Reo chuông cho Điều phối viên (Coordinator) ra xếp xe (Có kèm list mã đơn)
                 notificationService.broadcastNotification(
                         List.of("COORDINATOR"),
                         "✅ HÀNG ĐÃ NẤU XONG",
-                        "Mẻ nấu " + run.getProduct().getProductName() + " đã hoàn tất. Các đơn hàng liên quan đã sẵn sàng (READY_TO_SHIP). Vui lòng điều phối tài xế!",
+                        "Mẻ nấu " + run.getProduct().getProductName() + " đã hoàn tất. Các đơn hàng [" + orderIdsList + "] đã sẵn sàng (READY_TO_SHIP). Vui lòng điều phối tài xế!",
                         Notification.NotificationType.INFO
                 );
             }
