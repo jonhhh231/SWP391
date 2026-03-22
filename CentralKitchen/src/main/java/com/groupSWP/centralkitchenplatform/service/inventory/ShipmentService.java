@@ -337,7 +337,10 @@ public class ShipmentService {
         Account currentUser = accountRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản người dùng!"));
 
-        boolean isHighLevelManager = currentUser.getRole() == Account.Role.ADMIN || currentUser.getRole() == Account.Role.MANAGER;
+        // 🔥 ĐÃ FIX LỖI Ở ĐÂY: Mở cửa cho cả ADMIN, MANAGER và COORDINATOR qua trạm kiểm soát
+        boolean isHighLevelManager = currentUser.getRole() == Account.Role.ADMIN ||
+                currentUser.getRole() == Account.Role.MANAGER ||
+                currentUser.getRole() == Account.Role.COORDINATOR;
 
         if (!isHighLevelManager) {
             if (shipment.getDriver() == null || !shipment.getDriver().getAccountId().equals(currentUser.getAccountId())) {
@@ -345,9 +348,11 @@ public class ShipmentService {
             }
         }
 
+        // Cập nhật trạng thái chuyến xe
         shipment.setStatus(Shipment.ShipmentStatus.DELIVERED);
         shipment.setDeliveredAt(LocalDateTime.now()); // LƯU MỐC ĐẾM GIỜ CHỐT TỰ ĐỘNG
 
+        // Cập nhật trạng thái từng đơn hàng trong xe
         if (shipment.getOrders() != null) {
             shipment.getOrders().forEach(o -> o.setStatus(Order.OrderStatus.DELIVERED));
             orderRepository.saveAll(shipment.getOrders());
@@ -355,6 +360,20 @@ public class ShipmentService {
 
         shipmentRepository.save(shipment);
         log.info("Chuyến xe {} đã tới nơi an toàn!", shipmentId);
+
+        // 🔥 ĐÃ THÊM: Bắn thông báo cho Cửa hàng trưởng ra nhận hàng
+        if (shipment.getOrders() != null && !shipment.getOrders().isEmpty()) {
+            Account storeAcc = shipment.getOrders().get(0).getStore().getAccount();
+            if (storeAcc != null) {
+                notificationService.sendNotification(
+                        storeAcc,
+                        "🚚 XE ĐÃ TỚI NƠI",
+                        "Chuyến xe " + shipmentId + " đã cập bến. Sếp vui lòng ra kiểm tra và chốt số lượng thực nhận trên hệ thống nhé!",
+                        Notification.NotificationType.INFO,
+                        null
+                );
+            }
+        }
     }
 
     // =========================================================================

@@ -73,7 +73,7 @@ public class IngredientController {
      * @return Phản hồi HTTP 201 (Created) kèm dữ liệu nguyên liệu vừa được cấp ID và lưu thành công.
      */
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @PostMapping
     public ResponseEntity<Ingredient> create(@Valid @RequestBody IngredientRequest request) { // 🌟 Dùng DTO + @Valid
         Ingredient created = ingredientService.createIngredient(request);
@@ -91,7 +91,7 @@ public class IngredientController {
      * @param ingredientDetails Payload chứa các thông số mới.
      * @return Phản hồi HTTP 200 chứa trạng thái nguyên liệu sau khi đã cập nhật.
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @PutMapping("/{id}")
     public ResponseEntity<Ingredient> update(@PathVariable String id, @Valid @RequestBody IngredientRequest request) { // 🌟 Dùng DTO + @Valid
         Ingredient updated = ingredientService.updateIngredient(id, request);
@@ -109,7 +109,7 @@ public class IngredientController {
      * @param id Mã định danh của nguyên liệu cần xóa.
      * @return Phản hồi HTTP 200 kèm JSON thông báo kết quả xóa thành công.
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable String id) {
         ingredientService.deleteIngredient(id);

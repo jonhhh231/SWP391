@@ -38,7 +38,7 @@ public class ProductController {
      * @return Phản hồi HTTP 200 chứa thông tin {@link ProductResponse} vừa được tạo thành công.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ProductResponse> createProduct(
             @RequestBody ProductRequest request
     ) {
@@ -57,7 +57,7 @@ public class ProductController {
      * @return Phản hồi HTTP 200 chứa dữ liệu sản phẩm sau khi đã được cập nhật.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable String id,
             @RequestBody ProductRequest request
@@ -80,7 +80,7 @@ public class ProductController {
      * @return Phản hồi HTTP 200 kèm chuỗi thông báo trạng thái mới của sản phẩm.
      */
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<String> toggleProductStatus(@PathVariable String id) {
         return ResponseEntity.ok(productService.toggleProductStatus(id));
     }
