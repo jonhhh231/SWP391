@@ -66,6 +66,25 @@ public class ShipmentController {
         }
     }
 
+
+    /**
+     * API Cửa hàng xem danh sách các chuyến xe ĐÃ ĐẾN NƠI và đang chờ mình xác nhận.
+     * <p>API này tự động lấy storeId từ Token, cửa hàng nào chỉ thấy xe của cửa hàng đó.</p>
+     */
+    @PreAuthorize("hasRole('STORE_MANAGER')")
+    @GetMapping("/pending-report")
+    public ResponseEntity<?> getShipmentsPendingReport(Principal principal) {
+        try {
+            // Lấy ID cửa hàng của người đang gọi API
+            String storeId = getStoreIdFromPrincipal(principal);
+
+            // Trả về danh sách
+            return ResponseEntity.ok(shipmentService.getPendingReportShipmentsForStore(storeId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     /**
      * API Cửa hàng trưởng chốt số lượng hàng thực nhận.
      */
