@@ -18,7 +18,7 @@ public class Order extends BaseEntity {
 
     // 1. Giữ lại bộ này (Có EnumType.STRING là chuẩn bài)
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", columnDefinition = "VARCHAR(50)")
     private OrderStatus status;
 
     private BigDecimal totalAmount;
@@ -26,7 +26,7 @@ public class Order extends BaseEntity {
 
     // 2. Giữ lại bộ này
     @Enumerated(EnumType.STRING)
-    @Column(name = "order_type")
+    @Column(name = "order_type", columnDefinition = "VARCHAR(50)")
     private OrderType orderType;
 
     @Enumerated(EnumType.STRING)
@@ -60,8 +60,29 @@ public class Order extends BaseEntity {
         PARTIAL_RECEIVED, // Cửa hàng báo THIẾU HÀNG (Chờ Bếp lên đơn bù)
         DONE,             // Cửa hàng báo NHẬN ĐỦ
         CANCELLED,
-        READY_TO_SHIP
+        READY_TO_SHIP,
+        PENDING_PAYMENT
     }
     public enum OrderType { STANDARD, URGENT, COMPENSATION }
     public enum DeliveryWindow { MORNING, AFTERNOON }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", columnDefinition = "VARCHAR(50)")
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID; // Mặc định tạo đơn là chưa trả tiền
+
+    @Column(name = "transaction_id")
+    private String transactionId; // Lưu mã giao dịch của VNPay (vnp_TransactionNo) để đối soát kế toán
+
+    @Column(name = "payment_date")
+    private LocalDateTime paymentDate; // Ghi nhận thời điểm tiền thực sự ting ting vào tài khoản
+
+    // ... các khóa ngoại và liên kết bảng giữ nguyên ...
+
+    // Khai báo Enum PaymentStatus ngay dưới OrderStatus
+    public enum PaymentStatus {
+        UNPAID,     // Chưa thanh toán (Đợi thanh toán hoặc trả tiền mặt)
+        PAID,       // Đã thanh toán thành công qua cổng thanh toán
+        FAILED,     // Thanh toán thất bại (Khách hủy ngang, thẻ hết tiền)
+        REFUNDED    // Đã hoàn tiền (Do hủy đơn)
+    }
 }
