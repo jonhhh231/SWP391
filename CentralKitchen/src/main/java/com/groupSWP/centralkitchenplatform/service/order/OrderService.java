@@ -1,22 +1,22 @@
 package com.groupSWP.centralkitchenplatform.service.order;
 
-import com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse; // 🌟 Thêm import
-import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest; // 🌟 Thêm import
+import com.groupSWP.centralkitchenplatform.dto.kitchen.KitchenAggregationResponse;
+import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest;
 import com.groupSWP.centralkitchenplatform.dto.order.*;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
-import com.groupSWP.centralkitchenplatform.entities.cart.CartItem; // 🌟 Thêm import
+import com.groupSWP.centralkitchenplatform.entities.cart.CartItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
 import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey;
-import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import Notification
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.FormulaRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
 import com.groupSWP.centralkitchenplatform.service.inventory.ProductionService;
-import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import NotificationService
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService;
 import com.groupSWP.centralkitchenplatform.service.system.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap; // 🌟 Thêm import
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +44,6 @@ public class OrderService {
     private final FormulaRepository formulaRepository;
     private final SystemConfigService systemConfigService;
 
-    // 🔥 Tiêm NotificationService vào để gửi thông báo
     private final NotificationService notificationService;
 
     // =========================================================================
@@ -69,7 +68,11 @@ public class OrderService {
 
         Order order = new Order();
         order.setStore(store);
-        order.setStatus(Order.OrderStatus.NEW);
+
+        // 🔥 ĐÃ SỬA: Mới tạo đơn thì trạng thái là Chờ Thanh Toán, chưa đưa cho Bếp
+        order.setStatus(Order.OrderStatus.PENDING_PAYMENT);
+        order.setPaymentStatus(Order.PaymentStatus.UNPAID);
+
         order.setNote(note);
 
         BigDecimal surcharge = BigDecimal.ZERO;
@@ -135,15 +138,18 @@ public class OrderService {
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
 
-        // 🔥 GỬI THÔNG BÁO: Báo cho Kitchen Manager và Manager
+        // 🔥 ĐÃ SỬA: Comment/Xóa đoạn thông báo này đi vì đơn chưa được thanh toán
+        /*
         notificationService.broadcastNotification(
                 List.of("KITCHEN_MANAGER", "MANAGER"),
                 isUrgent ? "🚨 ĐƠN HÀNG KHẨN CẤP" : "📦 Đơn hàng mới",
                 "Cửa hàng " + store.getName() + " vừa đặt đơn " + savedOrder.getOrderId(),
                 isUrgent ? Notification.NotificationType.URGENT : Notification.NotificationType.INFO
         );
+        */
 
-        return buildOrderResponse(savedOrder, isUrgent ? "Tạo đơn KHẨN CẤP thành công (+ " + order.getSurcharge() + " VNĐ phí)!" : "Tạo đơn TIÊU CHUẨN thành công!");
+        // 🔥 ĐÃ SỬA: Thay đổi câu thông báo trả về cho FE
+        return buildOrderResponse(savedOrder, isUrgent ? "Tạo đơn KHẨN CẤP thành công! Vui lòng thanh toán để Bếp chuẩn bị." : "Tạo đơn TIÊU CHUẨN thành công! Vui lòng thanh toán để Bếp chuẩn bị.");
     }
 
     // =========================================================================
@@ -176,15 +182,18 @@ public class OrderService {
         order.setOrderItems(orderItems);
         Order savedOrder = orderRepository.save(order);
 
-        // 🔥 GỬI THÔNG BÁO: Báo cho Kitchen Manager và Manager
+        // 🔥 ĐÃ SỬA: Comment/Xóa đoạn thông báo này đi
+        /*
         notificationService.broadcastNotification(
                 List.of("KITCHEN_MANAGER", "MANAGER"),
                 isUrgent ? "🚨 ĐƠN HÀNG KHẨN CẤP (TỪ GIỎ)" : "📦 Đơn hàng mới",
                 "Cửa hàng " + store.getName() + " chốt đơn " + savedOrder.getOrderId(),
                 isUrgent ? Notification.NotificationType.URGENT : Notification.NotificationType.INFO
         );
+        */
 
-        return buildOrderResponse(savedOrder, isUrgent ? "Chốt đơn KHẨN CẤP thành công!" : "Chốt đơn TIÊU CHUẨN thành công!");
+        // 🔥 ĐÃ SỬA: Thay đổi câu thông báo trả về cho FE
+        return buildOrderResponse(savedOrder, isUrgent ? "Chốt đơn KHẨN CẤP thành công! Vui lòng thanh toán để Bếp chuẩn bị." : "Chốt đơn TIÊU CHUẨN thành công! Vui lòng thanh toán để Bếp chuẩn bị.");
     }
 
     // HÀM HELPER: MAP DỮ LIỆU TRẢ VỀ CHO FRONTEND
@@ -268,7 +277,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + orderId));
 
-        if (!order.getStatus().name().equals("NEW")) {
+        if (!order.getStatus().name().equals("NEW") && !order.getStatus().name().equals("PENDING_PAYMENT")) {
             throw new IllegalStateException("Không thể hủy! Đơn hàng đang ở trạng thái: " + order.getStatus().name());
         }
 
