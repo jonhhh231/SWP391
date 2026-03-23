@@ -3,10 +3,7 @@ package com.groupSWP.centralkitchenplatform.service.inventory;
 import com.groupSWP.centralkitchenplatform.dto.logistics.ReportShipmentRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
-import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
-import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
-import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
-import com.groupSWP.centralkitchenplatform.entities.logistic.ShipmentDetail;
+import com.groupSWP.centralkitchenplatform.entities.logistic.*;
 import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥
 import com.groupSWP.centralkitchenplatform.entities.product.Stock;
 import com.groupSWP.centralkitchenplatform.entities.product.StockKey;
@@ -207,7 +204,7 @@ public class ShipmentService {
 
         // 1. TẠO ĐƠN HÀNG BÙ (Không tạo chuyến xe vội)
         Order compensationOrder = new Order();
-        String compOrderId = "COMP-" + System.currentTimeMillis() % 10000;
+        String compOrderId = "COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         compensationOrder.setOrderId(compOrderId);
         compensationOrder.setOrderType(Order.OrderType.COMPENSATION);
         compensationOrder.setStatus(Order.OrderStatus.NEW); // 🔥 Trạng thái NEW để Bếp nhìn thấy và lấy đi nấu
@@ -231,7 +228,7 @@ public class ShipmentService {
 
                 OrderItem item = new OrderItem();
                 // Dùng OrderItemKey ghép từ ID Đơn bù và ID Sản phẩm
-                item.setId(new com.groupSWP.centralkitchenplatform.entities.logistic.OrderItemKey(compOrderId, oldDetail.getProduct().getProductId()));
+                item.setId(new OrderItemKey(compOrderId, oldDetail.getProduct().getProductId()));
                 item.setOrder(compensationOrder);
                 item.setProduct(oldDetail.getProduct());
                 item.setQuantity(missingQty); // Đòi đúng số lượng bị thiếu
