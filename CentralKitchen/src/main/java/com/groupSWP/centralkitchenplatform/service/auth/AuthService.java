@@ -45,10 +45,23 @@ public class AuthService {
      * @param request Payload chứa Username và Password.
      * @return Đối tượng AuthResponse (Yêu cầu OTP với Admin, hoặc trả về Token với Role khác).
      */
+    /**
+     * Xử lý đăng nhập: Admin bắt buộc xác thực OTP, các Role khác đăng nhập trực tiếp.
+     *
+     * @param request Payload chứa Username và Password.
+     * @return Đối tượng AuthResponse (Yêu cầu OTP với Admin, hoặc trả về Token với Role khác).
+     */
     @Transactional
     public AuthResponse login(AuthRequest request) {
         Account account = accountRepository.findByUsername(request.username())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+
+        // =====================================================================
+        // 🔥 ĐÃ THÊM: CHẶN TÀI KHOẢN INACTIVE (BỊ KHÓA / XÓA MỀM)
+        // =====================================================================
+        if (!account.isActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Đăng nhập thất bại! Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa.");
+        }
 
         if (!passwordEncoder.matches(request.password(), account.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sai mật khẩu!");
@@ -57,7 +70,7 @@ public class AuthService {
         SystemUser profile = account.getSystemUser();
 
         // =====================================================================
-        // 🔥 LOGIC MỚI: PHÂN NHÁNH ĐĂNG NHẬP THEO ROLE
+        // LOGIC MỚI: PHÂN NHÁNH ĐĂNG NHẬP THEO ROLE
         // =====================================================================
 
         if (account.getRole() == Account.Role.ADMIN) {
