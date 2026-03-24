@@ -19,11 +19,17 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     // API 1: Lấy link thanh toán
+    // API 1: Lấy link thanh toán
     @PostMapping("/create-url")
     public ResponseEntity<?> createPaymentUrl(@RequestParam String orderId, HttpServletRequest request) {
         try {
             String url = paymentService.createPaymentUrl(orderId, request);
-            return ResponseEntity.ok(Map.of("paymentUrl", url));
+
+            // 🔥 ĐÃ SỬA: Gói cả orderId và paymentUrl vào trong Map trả về
+            return ResponseEntity.ok(Map.of(
+                    "orderId", orderId,
+                    "paymentUrl", url
+            ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

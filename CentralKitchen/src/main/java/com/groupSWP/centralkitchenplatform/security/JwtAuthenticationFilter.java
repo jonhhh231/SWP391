@@ -44,12 +44,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             username = jwtService.extractUsername(jwt);
             role = jwtService.extractRole(jwt); // Lấy role từ token
 
-            // 2. Kiểm tra username và trạng thái Authentication hiện tại
+
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 Account account = accountRepository.findByUsername(username).orElse(null);
 
-                // 🔥 ĐÃ SỬA: Tách logic kiểm tra ra cho rõ ràng và thêm phần check isActive
+
 
                 if (account == null) {
                     filterChain.doFilter(request, response);
@@ -77,7 +77,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return; // Văng ra ngoài luôn
                 }
 
-                // 3. Kiểm tra xem role có bị null không trước khi tạo Authority
+                
                 if (role != null && !role.isEmpty()) {
                     List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
 
