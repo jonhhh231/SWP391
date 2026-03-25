@@ -30,8 +30,8 @@ public class Notification {
     @Column(nullable = false)
     private String title;
 
-    // Nội dung chi tiết (VD: "Cửa hàng Q1 vừa đặt đơn URG-123...")
-    @Column(nullable = false, length = 500)
+    // 🔥 ĐÃ FIX: Dùng TEXT để lưu nội dung dài tẹt ga, không bị gò bó 500 ký tự nữa
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
     // Phân loại thông báo để Frontend tô màu (INFO: xanh dương, URGENT: đỏ, WARNING: vàng, SUCCESS: xanh lá)

@@ -13,13 +13,16 @@ import java.util.UUID;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
-    // Đổi String -> UUID ở đây
     List<Notification> findByAccount_AccountIdOrderByCreatedAtDesc(UUID accountId);
 
-    // Đổi String -> UUID ở đây
     long countByAccount_AccountIdAndIsReadFalse(UUID accountId);
 
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.account.accountId = :accountId AND n.isRead = false")
-    void markAllAsRead(@Param("accountId") UUID accountId); // Chỗ này cũng UUID luôn Sếp nhé
+    void markAllAsRead(@Param("accountId") UUID accountId);
+
+    // 🔥 ĐÃ FIX: Thêm câu Query cập nhật trực tiếp 1 thông báo cho nhẹ máy
+    @Modifying
+    @Query("UPDATE Notification n SET n.isRead = true WHERE n.id = :notificationId")
+    void markAsReadById(@Param("notificationId") UUID notificationId);
 }

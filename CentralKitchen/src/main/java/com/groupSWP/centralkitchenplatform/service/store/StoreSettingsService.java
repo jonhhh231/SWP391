@@ -3,7 +3,9 @@ package com.groupSWP.centralkitchenplatform.service.store;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileResponse;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreProfileUpdateRequest;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreSettingsService {
 
     private final StoreRepository storeRepository; // Đã đổi sang dùng StoreRepository chung
+    private final NotificationService notificationService; // 🔥 Đã tiêm NotificationService
 
     /**
      * Lấy hồ sơ cửa hàng thông qua Tên đăng nhập của người quản lý.
@@ -60,5 +63,16 @@ public class StoreSettingsService {
 
         store.setActive(isActive);
         storeRepository.save(store);
+
+        // 🔥 THÔNG BÁO 3: Báo cho Cửa hàng trưởng biết bị bật/tắt khẩn cấp
+        if (store.getAccount() != null) {
+            notificationService.sendNotification(
+                    store.getAccount(),
+                    "🔒 TRẠNG THÁI CỬA HÀNG",
+                    isActive ? "Admin vừa MỞ CỬA lại chi nhánh của bạn." : "Admin vừa ĐÓNG CỬA chi nhánh của bạn khẩn cấp!",
+                    isActive ? Notification.NotificationType.INFO : Notification.NotificationType.WARNING,
+                    null
+            );
+        }
     }
 }

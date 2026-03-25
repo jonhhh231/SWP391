@@ -102,11 +102,9 @@ public class NotificationService {
     // =========================================================================
     // 6. API CHO FRONTEND: ĐÁNH DẤU ĐÃ ĐỌC 1 CÁI (Khi bấm vào xem chi tiết)
     // =========================================================================
+    // 🔥 ĐÃ FIX: Gọi thẳng câu Query Update cho nhẹ máy, bỏ FindById
     @Transactional
     public void markAsRead(UUID notificationId) {
-        Notification notif = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo này!"));
-        notif.setRead(true);
-        notificationRepository.save(notif);
+        notificationRepository.markAsReadById(notificationId);
     }
 }
