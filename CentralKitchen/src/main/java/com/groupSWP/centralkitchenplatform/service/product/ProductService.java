@@ -11,9 +11,6 @@ import com.groupSWP.centralkitchenplatform.repositories.product.IngredientReposi
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -21,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +45,7 @@ public class ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-// 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
+        // 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
         BigDecimal autoCalculatedCost = calculateCostPriceAndValidate(request.getIngredients(), request.getSellingPrice());
 
         // Khởi tạo Entity Product
@@ -151,32 +149,32 @@ public class ProductService {
                 "Đã NGỪNG KINH DOANH sản phẩm: " + product.getProductName();
     }
 
-    public Page<ProductResponse> getAllProducts(
-            int page, int size,
+    public List<ProductResponse> getAllProducts(
             String keyword, String category,
             Boolean isActive,
             BigDecimal minPrice, BigDecimal maxPrice,
             String sortBy, String sortDir
     ) {
+        // 1. Cấu hình Sắp xếp (Sort)
         Sort sort = sortDir.equalsIgnoreCase("desc")
                 ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
 
-        Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size, sort);
-
         // =========================================================
-        // 🌟 ĐIỂM CHỐT CHẶN (BẢO VỆ MENU)
-        // Nếu Frontend không truyền trạng thái (isActive = null),
-        // ta bắt buộc ép nó thành TRUE để tự động ẨN các món đã bị xóa mềm.
+        // 🔥 ĐÃ FIX: TRUYỀN THẲNG isActive VÀO SPECIFICATION
+        // Nếu Frontend truyền isActive = null -> Lấy toàn bộ thực đơn
         // =========================================================
-        Boolean finalIsActive = (isActive == null) ? true : isActive;
-
         Specification<Product> spec = ProductSpecification.filterProducts(
-                keyword, category, finalIsActive, minPrice, maxPrice
+                keyword, category, isActive, minPrice, maxPrice
         );
 
-        Page<Product> productPage = productRepository.findAll(spec, pageable);
-        return productPage.map(this::mapToResponse);
+        // 3. Lấy ra List từ DB
+        List<Product> productList = productRepository.findAll(spec, sort);
+
+        // 4. Map từ Entity sang DTO Response
+        return productList.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
