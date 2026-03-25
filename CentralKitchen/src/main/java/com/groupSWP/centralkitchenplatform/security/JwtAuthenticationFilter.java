@@ -22,6 +22,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final AccountRepository accountRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -43,22 +44,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             username = jwtService.extractUsername(jwt);
             role = jwtService.extractRole(jwt); // Lấy role từ token
 
-            // 2. Kiểm tra username và trạng thái Authentication hiện tại
+
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 Account account = accountRepository.findByUsername(username).orElse(null);
-                if (account == null || !jwt.equals(account.getActiveToken())) {
-                    // Nếu không khớp -> Bị đăng nhập ở máy khác -> Trả về lỗi 401
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"error\": \"Tài khoản của bạn đã được đăng nhập ở một thiết bị khác. Vui lòng đăng nhập lại!\"}");
-                    return; // Dừng luồng xử lý ngay lập tức
+
+
+
+                if (account == null) {
+                    filterChain.doFilter(request, response);
+                    return;
                 }
 
 
-                // 3. Kiểm tra xem role có bị null không trước khi tạo Authority
-                System.out.println("Username tu token: " + username);
-                System.out.println("Role tu token: " + role);
+
+
+
+                if (!account.isActive()) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN); // Lỗi 403
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\": \"Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa. Quyền truy cập bị từ chối!\"}");
+                    return; // Văng ra ngoài luôn, không cho đi tiếp
+                }
+
+                // =================================================================
+                // CHẶN ĐĂNG NHẬP NHIỀU NƠI (Token không khớp với DB)
+                // =================================================================
+                if (!jwt.equals(account.getActiveToken())) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // Lỗi 401
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\": \"Tài khoản của bạn đã được đăng nhập ở một thiết bị khác. Vui lòng đăng nhập lại!\"}");
+                    return; // Văng ra ngoài luôn
+                }
+
+                
                 if (role != null && !role.isEmpty()) {
                     List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
 
@@ -69,14 +88,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    System.out.println("Role dang nhan duoc: " + role);
                     // 4. Xác thực thành công và lưu vào Context
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
             // Nếu Token sai, hết hạn hoặc lỗi giải mã, ta không set Authentication
-            // Bạn có thể log lỗi ở đây nếu cần: System.out.println("JWT Error: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);

@@ -57,7 +57,11 @@ public class LogisticDao {
     }
 
     public List<Map<String, Object>> findCoordinatorAccountsRaw() {
-        String sql = "SELECT account_id as id, username, role FROM accounts WHERE role = 'COORDINATOR'";
+        String sql = "SELECT a.account_id AS id, a.username, a.role, su.full_name AS fullName " +
+                "FROM accounts a " +
+                "LEFT JOIN system_users su ON a.account_id = su.account_id " +
+                "WHERE a.role = 'COORDINATOR'";
+
         return jdbcTemplate.queryForList(sql);
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -109,9 +110,7 @@ public class ProductController {
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> getProducts(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
+    public ResponseEntity<List<ProductResponse>> getProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean isActive,
@@ -120,16 +119,12 @@ public class ProductController {
             @RequestParam(defaultValue = "productName") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir
     ) {
-        Page<ProductResponse> productPage = productService.getAllProducts(
-                page, size, keyword, category, isActive, minPrice, maxPrice, sortBy, sortDir
+        // Gọi Service trả về List
+        List<ProductResponse> productList = productService.getAllProducts(
+                keyword, category, isActive, minPrice, maxPrice, sortBy, sortDir
         );
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("data", productPage.getContent());
-        response.put("currentPage", productPage.getNumber() + 1);
-        response.put("totalItems", productPage.getTotalElements());
-        response.put("totalPages", productPage.getTotalPages());
-
-        return ResponseEntity.ok(response);
+        // Trả thẳng List ra dạng mảng JSON: [ {product1}, {product2} ]
+        return ResponseEntity.ok(productList);
     }
 }
