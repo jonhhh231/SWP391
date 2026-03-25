@@ -4,8 +4,10 @@ import com.groupSWP.centralkitchenplatform.dto.store.StoreRequest;
 import com.groupSWP.centralkitchenplatform.dto.store.StoreResponse;
 import com.groupSWP.centralkitchenplatform.entities.auth.Account;
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification;
 import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.store.StoreRepository;
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final AccountRepository accountRepository;
+    private final NotificationService notificationService; // 🔥 Đã tiêm NotificationService
 
     /**
      * Khởi tạo Cửa hàng mới.
@@ -145,6 +148,15 @@ public class StoreService {
         newManager.setStore(store);
         accountRepository.save(newManager);
 
+        // 🔥 THÔNG BÁO 1: Báo cho Quản lý mới biết đã được cấp tiệm
+        notificationService.sendNotification(
+                newManager,
+                "🎉 BỔ NHIỆM QUẢN LÝ",
+                "Chúc mừng! Bạn đã được bổ nhiệm làm Quản lý của cửa hàng: " + store.getName(),
+                Notification.NotificationType.INFO,
+                null
+        );
+
         return "Đã gán tài khoản " + newManager.getUsername() + " làm Quản lý cửa hàng: " + store.getName();
     }
 
@@ -207,6 +219,21 @@ public class StoreService {
 
         // Chỉ gọi save đúng 1 lần duy nhất cho toàn bộ quá trình!
         storeRepository.save(store);
+
+        // 🔥 THÔNG BÁO 2: Báo cho Quản lý cũ biết tiệm đã đóng / luân chuyển
+        if (currentManager != null) {
+            String msg = targetStore != null ?
+                    "Cửa hàng cũ đã đóng. Bạn được điều chuyển sang quản lý cửa hàng: " + targetStore.getName() :
+                    "Cửa hàng của bạn đã bị đóng. Hiện tại bạn đang ở trạng thái dự bị.";
+
+            notificationService.sendNotification(
+                    currentManager,
+                    "🔄 LUÂN CHUYỂN CÔNG TÁC",
+                    msg,
+                    Notification.NotificationType.WARNING,
+                    null
+            );
+        }
 
         // 🌟 Trả về thông báo siêu chi tiết
         return (currentManager != null && targetStore != null) ?
