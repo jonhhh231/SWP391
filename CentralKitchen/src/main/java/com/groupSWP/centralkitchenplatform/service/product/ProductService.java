@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -151,18 +152,16 @@ public class ProductService {
                 "Đã NGỪNG KINH DOANH sản phẩm: " + product.getProductName();
     }
 
-    public Page<ProductResponse> getAllProducts(
-            int page, int size,
+    public List<ProductResponse> getAllProducts(
             String keyword, String category,
             Boolean isActive,
             BigDecimal minPrice, BigDecimal maxPrice,
             String sortBy, String sortDir
     ) {
+        // 1. Vẫn giữ nguyên logic Sắp xếp (Sort)
         Sort sort = sortDir.equalsIgnoreCase("desc")
                 ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
-
-        Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size, sort);
 
         // =========================================================
         // 🌟 ĐIỂM CHỐT CHẶN (BẢO VỆ MENU)
@@ -171,12 +170,18 @@ public class ProductService {
         // =========================================================
         Boolean finalIsActive = (isActive == null) ? true : isActive;
 
+        // 2. Build Specification lọc dữ liệu
         Specification<Product> spec = ProductSpecification.filterProducts(
                 keyword, category, finalIsActive, minPrice, maxPrice
         );
 
-        Page<Product> productPage = productRepository.findAll(spec, pageable);
-        return productPage.map(this::mapToResponse);
+        // 3. Lấy ra List (Không dùng Pageable nữa)
+        List<Product> productList = productRepository.findAll(spec, sort);
+
+        // 4. Map từ Entity sang DTO Response
+        return productList.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
