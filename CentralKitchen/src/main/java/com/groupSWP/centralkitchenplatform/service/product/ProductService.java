@@ -11,9 +11,6 @@ import com.groupSWP.centralkitchenplatform.repositories.product.IngredientReposi
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
 import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -48,7 +45,7 @@ public class ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
 
-// 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
+        // 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
         BigDecimal autoCalculatedCost = calculateCostPriceAndValidate(request.getIngredients(), request.getSellingPrice());
 
         // Khởi tạo Entity Product
@@ -158,24 +155,20 @@ public class ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String sortBy, String sortDir
     ) {
-        // 1. Vẫn giữ nguyên logic Sắp xếp (Sort)
+        // 1. Cấu hình Sắp xếp (Sort)
         Sort sort = sortDir.equalsIgnoreCase("desc")
                 ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
 
         // =========================================================
-        // 🌟 ĐIỂM CHỐT CHẶN (BẢO VỆ MENU)
-        // Nếu Frontend không truyền trạng thái (isActive = null),
-        // ta bắt buộc ép nó thành TRUE để tự động ẨN các món đã bị xóa mềm.
+        // 🔥 ĐÃ FIX: TRUYỀN THẲNG isActive VÀO SPECIFICATION
+        // Nếu Frontend truyền isActive = null -> Lấy toàn bộ thực đơn
         // =========================================================
-        Boolean finalIsActive = (isActive == null) ? true : isActive;
-
-        // 2. Build Specification lọc dữ liệu
         Specification<Product> spec = ProductSpecification.filterProducts(
-                keyword, category, finalIsActive, minPrice, maxPrice
+                keyword, category, isActive, minPrice, maxPrice
         );
 
-        // 3. Lấy ra List (Không dùng Pageable nữa)
+        // 3. Lấy ra List từ DB
         List<Product> productList = productRepository.findAll(spec, sort);
 
         // 4. Map từ Entity sang DTO Response
