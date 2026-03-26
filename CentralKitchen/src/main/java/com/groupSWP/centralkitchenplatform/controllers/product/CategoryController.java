@@ -22,6 +22,10 @@ import java.util.List;
  * đều bị giới hạn nghiêm ngặt, chỉ cho phép các cấp quản lý (ADMIN, MANAGER)
  * và Bếp trưởng (KITCHEN_MANAGER) thao tác.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-27
  */
 @RestController
 @RequestMapping("/api/categories")
