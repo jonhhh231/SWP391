@@ -26,6 +26,7 @@ public class KitchenController {
 
     /**
      * API Xem danh sách đơn hàng dành cho Bếp trung tâm.
+     * * @return Phản hồi HTTP 200 chứa danh sách đơn hàng của Bếp Trung Tâm.
      */
     @GetMapping("/orders")
     @PreAuthorize("hasRole('KITCHEN_MANAGER')")
@@ -35,6 +36,8 @@ public class KitchenController {
 
     /**
      * API Xóa công thức.
+     * * @param id Mã định danh của công thức.
+     * @return Phản hồi HTTP 200 thông báo đã xóa công thức.
      */
     @DeleteMapping("/formula/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -50,6 +53,7 @@ public class KitchenController {
      * </p>
      *
      * @return Phản hồi HTTP 200 chứa danh sách tổng hợp các món cần nấu.
+     * @throws AccessDeniedException Nếu người dùng không có quyền quản lý bếp hoặc quản lý vận hành.
      */
     @GetMapping("/aggregation")
     public ResponseEntity<List<KitchenAggregationResponse>> getPendingAggregation() {
@@ -73,6 +77,7 @@ public class KitchenController {
      * </p>
      *
      * @return Phản hồi HTTP 200 thông báo khởi tạo kế hoạch sản xuất thành công.
+     * @throws AccessDeniedException Nếu người dùng không có quyền quản lý bếp hoặc quản lý vận hành.
      */
     @PostMapping("/aggregation/confirm")
     public ResponseEntity<String> confirmProduction() {
@@ -92,6 +97,7 @@ public class KitchenController {
      * API Xem danh sách các mẻ đang chờ nấu hoặc đang nấu (Active Productions).
      *
      * @return Phản hồi HTTP 200 chứa danh sách các mẻ nấu hiện hành.
+     * @throws AccessDeniedException Nếu người dùng không có quyền quản lý bếp hoặc quản lý vận hành.
      */
     @GetMapping("/productions/active")
     public ResponseEntity<List<ProductionResponse>> getActiveProductions() {
@@ -112,6 +118,7 @@ public class KitchenController {
      * @param runId  Mã định danh của mẻ nấu.
      * @param status Trạng thái đích muốn chuyển sang.
      * @return Phản hồi HTTP 200 chứa thông tin mẻ nấu sau khi cập nhật.
+     * @throws AccessDeniedException Nếu người dùng không có quyền quản lý bếp hoặc quản lý vận hành.
      */
     @PutMapping("/productions/{runId}/status")
     public ResponseEntity<ProductionResponse> changeProductionStatus(
@@ -137,6 +144,7 @@ public class KitchenController {
      * @param runIds Danh sách các mã định danh mẻ nấu (JSON Array).
      * @param status Trạng thái đích muốn chuyển sang.
      * @return Phản hồi HTTP 200 chứa danh sách các mẻ nấu đã được cập nhật.
+     * @throws AccessDeniedException Nếu người dùng không có quyền quản lý bếp hoặc quản lý vận hành.
      */
     @PutMapping("/productions/status/bulk")
     public ResponseEntity<List<ProductionResponse>> changeBulkProductionStatus(
