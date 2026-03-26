@@ -24,6 +24,10 @@ import java.util.List;
  * <b>Phân quyền:</b> Toàn bộ class này được bảo vệ nghiêm ngặt, chỉ cho phép tài khoản
  * mang quyền {@code ADMIN} hoặc {@code MANAGER} truy cập.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-26
  */
 @Slf4j
 @RestController
