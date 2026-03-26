@@ -32,6 +32,13 @@ public class ShipmentController {
     private final ShipmentService shipmentService;
     private final AccountRepository accountRepository; // Bơm thêm repo để kiểm tra Role và Store
 
+    /**
+     * Trích xuất mã cửa hàng (Store ID) từ thông tin xác thực của người dùng.
+     *
+     * @param principal Đối tượng chứa thông tin xác thực của người dùng hiện tại (Token).
+     * @return Mã cửa hàng dạng chuỗi, hoặc chuỗi rỗng nếu tài khoản không gắn với cửa hàng nào.
+     * @throws RuntimeException Nếu không tìm thấy tài khoản tương ứng với username trong Token.
+     */
     // Hàm Helper lấy ID cửa hàng từ Token
     private String getStoreIdFromPrincipal(Principal principal) {
         if (principal == null) return null;
