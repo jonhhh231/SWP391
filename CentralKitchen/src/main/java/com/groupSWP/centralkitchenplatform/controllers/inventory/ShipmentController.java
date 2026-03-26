@@ -14,6 +14,23 @@ import java.util.Map;
 
 /**
  * Controller quản lý luồng vận hành giao nhận hàng hóa (Logistics & Shipment).
+ * <p>
+ * Phân hệ này chịu trách nhiệm điều phối toàn bộ vòng đời của một chuyến xe vận chuyển,
+ * từ khâu gán tài xế, theo dõi lộ trình đến điểm đích, cho tới khi hoàn tất đối soát
+ * và xử lý các kịch bản đền bù hàng hóa nếu có sai sót phát sinh.
+ * </p>
+ * <p>
+ * <b>Các giai đoạn chính trong luồng (Workflows):</b>
+ * <ul>
+ * <li><b>Assignment:</b> Điều phối viên chỉ định phương tiện và nhân sự vận chuyển.</li>
+ * <li><b>In Transit:</b> Giám sát trạng thái di chuyển của lô hàng trên đường.</li>
+ * <li><b>Receiving & Audit:</b> Cửa hàng trưởng thực hiện kiểm đếm thực tế (Physical count).</li>
+ * <li><b>Dispute Resolution:</b> Bếp trung tâm xử lý khiếu nại và giao bù (Replacement).</li>
+ * </ul>
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
  */
 @RestController
 @RequestMapping("/api/shipments")
