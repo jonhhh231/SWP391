@@ -32,7 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 // 🔥 ĐÃ FIX LỖI 403: Chuyển từ hasAnyRole sang hasAnyAuthority để tránh bẫy của Spring Security
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER','KITCHEN_MANAGER')")
-//@PreAuthorize("hasRole('MANAGER_KITCHEN')") // 🌟 BẢO MẬT: Phân quyền toàn bộ class cho KITCHEN_MANAGER
+//@PreAuthorize("hasRole('MANAGER_KITCHEN') // 🌟 BẢO MẬT: Phân quyền toàn bộ class cho KITCHEN_MANAGER
 public class CategoryController {
 
     private final CategoryService categoryService;
