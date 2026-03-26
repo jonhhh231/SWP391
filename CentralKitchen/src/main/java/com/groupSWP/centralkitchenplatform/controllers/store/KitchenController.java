@@ -16,6 +16,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Controller quản lý các nghiệp vụ liên quan đến Bếp trung tâm.
+ * <p>
+ * Lớp này cung cấp các API chuyên dụng cho nhân viên Quản lý bếp
+ * để thực hiện các giao dịch xem đơn hàng, gom đơn, quản lý các mẻ nấu
+ * và thay đổi trạng thái sản xuất.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-26
+ */
 @RestController
 @RequestMapping("/api/kitchen")
 @RequiredArgsConstructor
@@ -26,7 +38,8 @@ public class KitchenController {
 
     /**
      * API Xem danh sách đơn hàng dành cho Bếp trung tâm.
-     * * @return Phản hồi HTTP 200 chứa danh sách đơn hàng của Bếp Trung Tâm.
+     *
+     * @return Phản hồi HTTP 200 chứa danh sách đơn hàng của Bếp Trung Tâm.
      */
     @GetMapping("/orders")
     @PreAuthorize("hasRole('KITCHEN_MANAGER')")
@@ -36,7 +49,8 @@ public class KitchenController {
 
     /**
      * API Xóa công thức.
-     * * @param id Mã định danh của công thức.
+     *
+     * @param id Mã định danh của công thức.
      * @return Phản hồi HTTP 200 thông báo đã xóa công thức.
      */
     @DeleteMapping("/formula/{id}")
