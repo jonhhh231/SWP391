@@ -14,6 +14,15 @@ import java.util.Map;
 
 /**
  * Controller quản lý luồng vận hành giao nhận hàng hóa (Logistics & Shipment).
+ * <p>
+ * Lớp này chịu trách nhiệm điều phối và theo dõi toàn bộ vòng đời của một chuyến xe.
+ * Bao gồm việc gán tài xế, xác nhận giao hàng, chốt số lượng thực nhận tại cửa hàng,
+ * và xử lý các sự cố phát sinh cần giao bù.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-27
  */
 @RestController
 @RequestMapping("/api/shipments")
