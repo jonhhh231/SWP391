@@ -40,6 +40,18 @@ public class ShipmentController {
     private final ShipmentService shipmentService;
     private final AccountRepository accountRepository; // Bơm thêm repo để kiểm tra Role và Store
 
+
+    /**
+     * Phương thức hỗ trợ (Utility Method) để phân tách Store ID từ Security Principal.
+     * <p>
+     * Việc sử dụng hàm helper này giúp đảm bảo tính đóng gói (Encapsulation) và tái sử dụng
+     * logic truy vấn thông tin cửa hàng từ Token bảo mật trong toàn bộ Controller.
+     * Hỗ trợ cơ chế phân quyền dựa trên phạm vi cửa hàng (Store-based Authorization).
+     * </p>
+     *
+     * @param principal Đối tượng chứa thông tin xác thực của người dùng hiện tại.
+     * @return String chứa mã định danh cửa hàng hoặc rỗng nếu không thuộc cửa hàng nào.
+     */
     // Hàm Helper lấy ID cửa hàng từ Token
     private String getStoreIdFromPrincipal(Principal principal) {
         if (principal == null) return null;
@@ -50,6 +62,14 @@ public class ShipmentController {
 
     /**
      * API Gán tài xế cho chuyến xe.
+     * <p>
+     * Thao tác này chuyển đổi trạng thái chuyến hàng từ chờ xử lý sang trạng thái chuẩn bị lăn bánh.
+     * Hệ thống sẽ ghi nhận ID tài xế để phục vụ công tác liên lạc khi có sự cố.
+     * </p>
+     *
+     * @param shipmentId Mã định danh duy nhất của chuyến xe cần gán.
+     * @param payload Map chứa thông tin tài xế (key: accountId).
+     * @return Phản hồi HTTP 200 kèm thông báo thành công.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
     @PostMapping("/{shipmentId}/assign")
