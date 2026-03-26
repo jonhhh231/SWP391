@@ -150,12 +150,20 @@ public class OrderController {
         orderService.cancelOrder(orderId);
         return ResponseEntity.ok("Đã hủy đơn hàng " + orderId + " thành công!");
     }
+    // =======================================================
+    // 5. BÓC TÁCH ĐỊNH MỨC NGUYÊN VẬT LIỆU (BOM)
+    // =======================================================
+
     /**
      * API Bóc tách và tính toán định mức nguyên vật liệu của một đơn hàng.
      * <p>
      * Cho phép Quản lý Bếp hoặc Cửa hàng xem trước tổng khối lượng nguyên liệu thô
      * (thịt, rau củ, gia vị...) cần thiết để chế biến toàn bộ các thành phẩm trong đơn hàng.
      * Hệ thống sẽ tự động quét qua Công thức (BOM) của từng món và cộng dồn định lượng.
+     * </p>
+     * <p>
+     * <b>Ghi chú Phân quyền:</b> API này được ghi đè quyền truy cập, mở rộng thêm cho
+     * {@code KITCHEN_MANAGER} để phục vụ nghiệp vụ tại xưởng.
      * </p>
      *
      * @param orderId Mã đơn hàng cần bóc tách nguyên vật liệu.
