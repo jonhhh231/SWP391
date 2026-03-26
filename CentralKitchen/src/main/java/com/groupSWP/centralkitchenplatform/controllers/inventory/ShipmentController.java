@@ -114,6 +114,11 @@ public class ShipmentController {
 
     /**
      * API Cửa hàng trưởng chốt số lượng hàng thực nhận.
+     *
+     * @param principal Thông tin tài khoản người đang chốt biên bản.
+     * @param shipmentId Mã chuyến xe cần báo cáo.
+     * @param request Chi tiết báo cáo hàng lỗi/hư hỏng (không bắt buộc).
+     * @return Phản hồi HTTP kèm kết quả gửi báo cáo.
      */
     @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/report")
@@ -144,6 +149,9 @@ public class ShipmentController {
 
     /**
      * API Bếp trung tâm xác nhận sự cố và lên đơn giao bù.
+     *
+     * @param shipmentId Mã chuyến xe có phát sinh sự cố.
+     * @return Phản hồi HTTP kèm thông báo tạo chuyến xe đền bù.
      */
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/resolve-replacement")
@@ -159,6 +167,8 @@ public class ShipmentController {
     /**
      * API Lấy danh sách các chuyến xe bị Cửa hàng báo cáo thiếu hàng.
      * <p>Giúp Bếp trung tâm và Điều phối viên nắm được danh sách cần đền bù.</p>
+     *
+     * @return Phản hồi HTTP chứa danh sách các chuyến xe bị report.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER', 'COORDINATOR')")
     @GetMapping("/reported")
