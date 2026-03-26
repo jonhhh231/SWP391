@@ -118,7 +118,7 @@ public class ShipmentController {
     /**
      * API Bếp trung tâm xác nhận sự cố và lên đơn giao bù.
      */
-    @PreAuthorize("hasAnyRole('KITCHEN_MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/resolve-replacement")
     public ResponseEntity<?> resolveAndCreateReplacement(@PathVariable String shipmentId) {
         try {
