@@ -40,7 +40,6 @@ public class ShipmentController {
     private final ShipmentService shipmentService;
     private final AccountRepository accountRepository; // Bơm thêm repo để kiểm tra Role và Store
 
-
     /**
      * Phương thức hỗ trợ (Utility Method) để phân tách Store ID từ Security Principal.
      * <p>
@@ -90,6 +89,14 @@ public class ShipmentController {
 
     /**
      * API Xác nhận tài xế đã đến cửa hàng.
+     * <p>
+     * Được gọi khi tài xế hoàn tất quãng đường di chuyển và có mặt tại điểm giao nhận.
+     * Hệ thống ghi nhận thời điểm cập bến để tính toán SLA giao hàng.
+     * </p>
+     *
+     * @param principal Principal lấy từ SecurityContext.
+     * @param shipmentId ID của chuyến xe vừa đến đích.
+     * @return Thông báo xác nhận xe tới nơi thành công.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')") // Thêm Role tài xế vào đây nếu bạn có Role riêng cho họ nhé
     @PostMapping("/{shipmentId}/delivered")
@@ -107,6 +114,9 @@ public class ShipmentController {
     /**
      * API Cửa hàng xem danh sách các chuyến xe ĐÃ ĐẾN NƠI và đang chờ mình xác nhận.
      * <p>API này tự động lấy storeId từ Token, cửa hàng nào chỉ thấy xe của cửa hàng đó.</p>
+     *
+     * @param principal Thông tin tài khoản Store Manager.
+     * @return Danh sách các Shipment đang ở trạng thái DELIVERED.
      */
     @PreAuthorize("hasRole('STORE_MANAGER')")
     @GetMapping("/pending-report")
@@ -124,6 +134,15 @@ public class ShipmentController {
 
     /**
      * API Cửa hàng trưởng chốt số lượng hàng thực nhận.
+     * <p>
+     * Cửa hàng trưởng thực hiện xác nhận số lượng khớp hoặc báo lỗi nếu có hàng hư hỏng/thiếu hụt.
+     * Đây là bước cuối cùng trong luồng kiểm soát thất thoát (Loss Prevention).
+     * </p>
+     *
+     * @param principal Principal xác thực.
+     * @param shipmentId ID chuyến hàng cần chốt biên bản.
+     * @param request Chi tiết danh sách hàng lỗi/thiếu.
+     * @return Thông điệp kết quả xử lý báo cáo.
      */
     @PreAuthorize("hasAnyRole('STORE_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/report")
@@ -154,6 +173,12 @@ public class ShipmentController {
 
     /**
      * API Bếp trung tâm xác nhận sự cố và lên đơn giao bù.
+     * <p>
+     * Khởi tạo một tiến trình vận chuyển đền bù dựa trên báo cáo sự cố từ cửa hàng.
+     * </p>
+     *
+     * @param shipmentId ID chuyến xe gốc gặp sự cố.
+     * @return Xác nhận đã tạo chuyến xe giao bù thành công.
      */
     @PreAuthorize("hasAnyRole('KITCHEN_MANAGER', 'ADMIN')")
     @PostMapping("/{shipmentId}/resolve-replacement")
@@ -169,6 +194,8 @@ public class ShipmentController {
     /**
      * API Lấy danh sách các chuyến xe bị Cửa hàng báo cáo thiếu hàng.
      * <p>Giúp Bếp trung tâm và Điều phối viên nắm được danh sách cần đền bù.</p>
+     *
+     * @return Danh sách các Shipment bị báo cáo sự cố (Reported issues).
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER', 'COORDINATOR')")
     @GetMapping("/reported")
