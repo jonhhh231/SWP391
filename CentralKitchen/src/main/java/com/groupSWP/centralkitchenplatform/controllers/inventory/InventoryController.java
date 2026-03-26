@@ -18,6 +18,10 @@ import java.util.List;
  * để thực hiện các giao dịch nhập hàng, cập nhật số lượng tồn kho và lưu vết
  * lịch sử nhập liệu (Audit Trail).
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-26
  */
 @RestController
 @RequestMapping("/api/inventory")
