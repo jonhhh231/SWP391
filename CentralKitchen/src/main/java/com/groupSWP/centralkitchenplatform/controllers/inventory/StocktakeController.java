@@ -43,17 +43,30 @@ public class StocktakeController {
         return ResponseEntity.ok(history);
     }
 
-    // =========================================================
-    // 🌟 API 2: LẤY CHI TIẾT 1 ĐỢT KIỂM KÊ KHI BẤM VÀO XEM
-    // =========================================================
     @GetMapping("/stocktake/history/{sessionCode}")
-    // 🌟 SỬA Ở ĐÂY: Tương tự như API 1
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
-    public ResponseEntity<List<InventoryLog>> getStocktakeDetails(@PathVariable String sessionCode) {
+    public ResponseEntity<?> getStocktakeDetails(@PathVariable String sessionCode) {
         List<InventoryLog> details = inventoryLogRepository.findByReferenceCode(sessionCode);
+
         if (details.isEmpty()) {
             throw new RuntimeException("Không tìm thấy dữ liệu cho mã kiểm kê: " + sessionCode);
         }
-        return ResponseEntity.ok(details);
+
+        // =========================================================
+        // 🛑 CHỐT CHẶN VÒNG LẶP VÔ HẠN (Đã sửa lại getter)
+        // =========================================================
+        var responseData = details.stream().map(log -> java.util.Map.of(
+                // 🌟 Đổi getLogId() thành getId()
+                "logId", log.getId(),
+                "quantityDeducted", log.getQuantityDeducted(),
+                "note", log.getNote() != null ? log.getNote() : "",
+                "ingredient", java.util.Map.of(
+                        // 🌟 Đổi getId() thành getIngredientId() (hoặc sửa lại theo Entity của Sếp)
+                        "id", log.getIngredient().getIngredientId(),
+                        "name", log.getIngredient().getName()
+                )
+        )).toList();
+
+        return ResponseEntity.ok(responseData);
     }
 }
