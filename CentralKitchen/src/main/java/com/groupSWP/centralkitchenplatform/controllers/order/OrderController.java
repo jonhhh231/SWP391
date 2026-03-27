@@ -24,6 +24,10 @@ import java.util.List;
  * <b>Phân quyền:</b> Toàn bộ class này được bảo vệ nghiêm ngặt, chỉ cho phép tài khoản
  * mang quyền {@code ADMIN} hoặc {@code MANAGER} truy cập.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-26
  */
 @Slf4j
 @RestController
@@ -50,6 +54,7 @@ public class OrderController {
      * @param request Payload chứa danh sách món, số lượng và {@code storeId} của cửa hàng cần đặt.
      * @return Phản hồi HTTP 200 chứa thông tin đơn hàng vừa được tạo.
      * @throws IllegalArgumentException nếu thiếu thông tin {@code storeId}.
+     * @throws RuntimeException nếu quá trình lưu đơn hàng vào cơ sở dữ liệu gặp sự cố.
      */
     @PostMapping("/standard")
     public ResponseEntity<OrderResponse> createStandardOrder(@RequestBody OrderRequest request) {
@@ -71,6 +76,7 @@ public class OrderController {
      * @param request Payload chứa danh sách món, số lượng và {@code storeId}.
      * @return Phản hồi HTTP 200 chứa thông tin đơn hàng khẩn cấp vừa được tạo.
      * @throws IllegalArgumentException nếu thiếu thông tin {@code storeId}.
+     * @throws RuntimeException nếu quá trình thiết lập độ ưu tiên khẩn cấp gặp lỗi.
      */
     @PostMapping("/urgent")
     public ResponseEntity<OrderResponse> createUrgentOrder(@RequestBody OrderRequest request) {
@@ -96,6 +102,7 @@ public class OrderController {
      *
      * @param storeId Mã định danh của Cửa hàng (truyền qua Query Parameter).
      * @return Phản hồi HTTP 200 chứa danh sách lịch sử đơn hàng của cửa hàng đó.
+     * @throws IllegalArgumentException Nếu tham số storeId không hợp lệ hoặc bị bỏ trống.
      */
     @GetMapping("/history")
     public ResponseEntity<List<OrderHistoryResponse>> getOrderHistory(
@@ -119,6 +126,7 @@ public class OrderController {
      *
      * @param orderId Mã đơn hàng cần xem chi tiết.
      * @return Phản hồi HTTP 200 chứa danh sách các mặt hàng, trạng thái và tổng tiền của đơn.
+     * @throws RuntimeException Nếu mã đơn hàng không tồn tại trong hệ thống.
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderDetailResponse> getOrderDetail(@PathVariable String orderId) {
@@ -142,6 +150,7 @@ public class OrderController {
      *
      * @param orderId Mã đơn hàng cần hủy.
      * @return Phản hồi HTTP 200 kèm thông báo quá trình hủy đơn thành công.
+     * @throws RuntimeException Nếu đơn hàng đã chuyển sang trạng thái đang nấu hoặc đã giao, không thể hủy.
      */
     @PutMapping("/{orderId}/cancel")
     public ResponseEntity<String> cancelOrder(@PathVariable String orderId) {
@@ -150,6 +159,10 @@ public class OrderController {
         orderService.cancelOrder(orderId);
         return ResponseEntity.ok("Đã hủy đơn hàng " + orderId + " thành công!");
     }
+    // =======================================================
+    // 5. BÓC TÁCH ĐỊNH MỨC NGUYÊN VẬT LIỆU (BOM)
+    // =======================================================
+
     /**
      * API Bóc tách và tính toán định mức nguyên vật liệu của một đơn hàng.
      * <p>
@@ -157,9 +170,14 @@ public class OrderController {
      * (thịt, rau củ, gia vị...) cần thiết để chế biến toàn bộ các thành phẩm trong đơn hàng.
      * Hệ thống sẽ tự động quét qua Công thức (BOM) của từng món và cộng dồn định lượng.
      * </p>
+     * <p>
+     * <b>Ghi chú Phân quyền:</b> API này được ghi đè quyền truy cập, mở rộng thêm cho
+     * {@code KITCHEN_MANAGER} để phục vụ nghiệp vụ tại xưởng.
+     * </p>
      *
      * @param orderId Mã đơn hàng cần bóc tách nguyên vật liệu.
      * @return Phản hồi HTTP 200 kèm danh sách chi tiết các nguyên vật liệu và tổng khối lượng cần thiết.
+     * @throws RuntimeException Nếu cấu trúc công thức (BOM) của sản phẩm bị thiếu hoặc lỗi tham chiếu.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
     @GetMapping("/{orderId}/materials")
