@@ -15,13 +15,19 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/units")
 public class UnitController {
 
+    /**
+     * API Cung cấp danh sách từ điển Đơn Vị Tính cho Frontend
+     * Có kèm theo cờ isBase và isSales để FE tự động lọc Dropdown
+     */
     @GetMapping
-    public ResponseEntity<List<Map<String, String>>> getAllUnits() {
-        List<Map<String, String>> unitDictionary = Arrays.stream(UnitType.values())
-                .map(unit -> Map.of(
-                        "value", unit.name(),           // Mã không dấu: "THUNG"
-                        "label", unit.getLabel(),       // Tên có dấu: "Thùng"
-                        "group", unit.getGroup()        // Nhóm: "Đóng gói"
+    public ResponseEntity<List<Map<String, Object>>> getAllUnits() {
+        List<Map<String, Object>> unitDictionary = Arrays.stream(UnitType.values())
+                .map(unit -> Map.<String, Object>of(
+                        "value", unit.name(),           // Mã không dấu: "THUNG", "G", "PHAN"
+                        "label", unit.getLabel(),       // Tên có dấu: "Thùng", "Gram", "Phần"
+                        "group", unit.getGroup(),       // Nhóm: "Đóng gói", "Trọng lượng"
+                        "isBase", unit.isBaseUnit(),    // Cờ báo hiệu: true nếu là Đơn vị gốc (Kho)
+                        "isSales", unit.isSalesUnit()   // Cờ báo hiệu: true nếu là Đơn vị bán (Menu)
                 ))
                 .collect(Collectors.toList());
 
