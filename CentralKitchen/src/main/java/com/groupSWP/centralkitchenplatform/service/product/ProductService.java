@@ -13,6 +13,8 @@ import com.groupSWP.centralkitchenplatform.specifications.ProductSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -161,8 +163,23 @@ public class ProductService {
                 : Sort.by(sortBy).ascending();
 
         // =========================================================
-        // 🔥 ĐÃ FIX: TRUYỀN THẲNG isActive VÀO SPECIFICATION
-        // Nếu Frontend truyền isActive = null -> Lấy toàn bộ thực đơn
+        // 🛑 CHỐT CHẶN BẢO MẬT (ZERO TRUST) CHO MENU CỬA HÀNG
+        // Lấy thông tin người đang gọi API từ JWT Token
+        // Nếu phát hiện là Cửa hàng trưởng -> Ép xem món đang mở bán
+        // =========================================================
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null) {
+            boolean isStoreManager = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_STORE_MANAGER") || a.getAuthority().equals("STORE_MANAGER"));
+
+            // NẾU LÀ CỬA HÀNG TRƯỞNG: ÉP CỨNG isActive = true LUÔN (Khỏi hack url)
+            if (isStoreManager) {
+                isActive = true;
+            }
+        }
+
+        // =========================================================
+        // Truyền thẳng isActive vào Specification
         // =========================================================
         Specification<Product> spec = ProductSpecification.filterProducts(
                 keyword, category, isActive, minPrice, maxPrice
