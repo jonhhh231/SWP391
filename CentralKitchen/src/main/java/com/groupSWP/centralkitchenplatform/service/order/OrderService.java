@@ -293,20 +293,31 @@ public class OrderService {
         );
     }
 
+    // =========================================================================
+    // API 1: HIỂN THỊ DANH SÁCH CHỜ GOM NẤU (CHIA LÀM 3 LOẠI)
+    // =========================================================================
     public List<KitchenAggregationResponse> getPendingProductionAggregation() {
         List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
         Map<String, KitchenAggregationResponse> aggregationMap = new HashMap<>();
 
         for (Order order : pendingOrders) {
+            String orderType = order.getOrderType().name(); // Lấy loại đơn: STANDARD, URGENT, COMPENSATION
+
             for (OrderItem item : order.getOrderItems()) {
-                String productId = item.getProduct().getProductId();
-                if (aggregationMap.containsKey(productId)) {
-                    aggregationMap.get(productId).setTotalQuantity(aggregationMap.get(productId).getTotalQuantity() + item.getQuantity());
+                String realProductId = item.getProduct().getProductId();
+
+                // 🔥 ĐIỂM ĂN TIỀN: Tạo Key Gộp (VD: PROD-01|URGENT) để FE hiển thị tách biệt 2 dòng
+                String compositeKey = realProductId + "|" + orderType;
+
+                if (aggregationMap.containsKey(compositeKey)) {
+                    KitchenAggregationResponse existing = aggregationMap.get(compositeKey);
+                    existing.setTotalQuantity(existing.getTotalQuantity() + item.getQuantity());
                 } else {
-                    aggregationMap.put(productId, KitchenAggregationResponse.builder()
-                            .productId(productId)
+                    aggregationMap.put(compositeKey, KitchenAggregationResponse.builder()
+                            .productId(compositeKey) // FE sẽ dùng Key Gộp này làm ID Checkbox
                             .productName(item.getProduct().getProductName())
                             .totalQuantity(item.getQuantity())
+                            .orderType(orderType)    // Trả về type cho FE tô màu Thường / Khẩn cấp / Sự cố
                             .build());
                 }
             }
@@ -314,36 +325,64 @@ public class OrderService {
         return new ArrayList<>(aggregationMap.values());
     }
 
+    // =========================================================================
+    // API 2: CHỐT NẤU CÁC MÓN ĐƯỢC CHỌN (TỪ DANH SÁCH FE GỬI XUỐNG)
+    // =========================================================================
     @Transactional
-    public void confirmProductionAndAggregateOrders() {
+    public void confirmProductionAndAggregateOrders(List<String> selectedKeys) {
+        if (selectedKeys == null || selectedKeys.isEmpty()) {
+            throw new RuntimeException("Vui lòng chọn ít nhất 1 món để gom nấu!");
+        }
+
         List<Order> pendingOrders = orderRepository.findByStatus(Order.OrderStatus.NEW);
         if (pendingOrders.isEmpty()) throw new RuntimeException("Không có đơn hàng mới nào để chốt nấu!");
 
-        Map<String, Integer> productQuantities = new HashMap<>();
+        Map<String, Integer> productQuantitiesToCook = new HashMap<>();
+        List<Order> ordersToUpdate = new ArrayList<>();
+
+        // Quét lại toàn bộ đơn NEW để nhặt đúng các món nằm trong danh sách Bếp chọn
         for (Order order : pendingOrders) {
+            String orderType = order.getOrderType().name();
+            boolean orderHasSelectedItems = false;
+
             for (OrderItem item : order.getOrderItems()) {
-                productQuantities.put(item.getProduct().getProductId(), productQuantities.getOrDefault(item.getProduct().getProductId(), 0) + item.getQuantity());
+                String realProductId = item.getProduct().getProductId();
+                String compositeKey = realProductId + "|" + orderType;
+
+                // Nếu Bếp có tick chọn món này ở loại đơn này
+                if (selectedKeys.contains(compositeKey)) {
+                    productQuantitiesToCook.put(realProductId,
+                            productQuantitiesToCook.getOrDefault(realProductId, 0) + item.getQuantity());
+                    orderHasSelectedItems = true;
+                }
+            }
+
+            // Nếu đơn hàng này có bất kỳ món nào được lôi đi nấu, đổi trạng thái đơn sang PLANNED
+            if (orderHasSelectedItems) {
+                order.setStatus(Order.OrderStatus.PLANNED);
+                ordersToUpdate.add(order);
             }
         }
 
-        for (Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
+        if (productQuantitiesToCook.isEmpty()) {
+            throw new RuntimeException("Các món bạn chọn không hợp lệ hoặc đã bị xử lý!");
+        }
+
+        // Tạo Kế hoạch Mẻ Nấu (Production Run) gộp chung số lượng của loại Thường + Khẩn + Sự cố
+        for (Map.Entry<String, Integer> entry : productQuantitiesToCook.entrySet()) {
             ProductionRequest request = new ProductionRequest();
             request.setProductId(entry.getKey());
             request.setQuantity(new BigDecimal(entry.getValue()));
             productionService.createProductionRun(request);
         }
 
-        // 🔥 FIX LOGIC MỚI CỦA SẾP: Đổi về sang PLANNED (Chờ nấu)
-        for (Order order : pendingOrders) {
-            order.setStatus(Order.OrderStatus.PLANNED);
-        }
-        orderRepository.saveAll(pendingOrders);
+        orderRepository.saveAll(ordersToUpdate);
 
-        // 🔥 GỬI THÔNG BÁO: Báo cho Bếp biết đã chốt xong danh sách gom đơn
+        // Gửi chuông thông báo
         notificationService.broadcastNotification(
                 List.of("KITCHEN_MANAGER"),
                 "📋 ĐÃ GOM ĐƠN THÀNH CÔNG",
-                "Hệ thống đã chốt danh sách gom đơn. Các đơn hàng hiện đang ở trạng thái Chờ Nấu (PLANNED)!",
+                "Hệ thống đã gộp các món được chọn thành mẻ nấu mới (PLANNED). Vui lòng kiểm tra!",
                 Notification.NotificationType.INFO
         );
     }
