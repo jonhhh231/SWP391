@@ -223,6 +223,25 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    // =========================================================
+    // 🌟 API THỐNG KÊ (DASHBOARD) DÀNH CHO FRONTEND
+    // =========================================================
+    public java.util.Map<String, Long> getProductStatistics() {
+        long activeCount = productRepository.countByIsActive(true);
+        long inactiveCount = productRepository.countByIsActive(false); // Gồm cả Bản nháp & Ngừng bán
+        long withFormulaCount = productRepository.countProductsWithFormula();
+        long withoutFormulaCount = productRepository.countProductsWithoutFormula();
+        long totalCategories = categoryRepository.count();
+
+        return java.util.Map.of(
+                "activeProducts", activeCount,
+                "inactiveProducts", inactiveCount,
+                "withFormula", withFormulaCount,
+                "withoutFormula", withoutFormulaCount,
+                "totalCategories", totalCategories
+        );
+    }
+
     // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
     private ProductResponse mapToResponse(Product product) {
         return ProductResponse.builder()
