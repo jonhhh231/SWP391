@@ -18,6 +18,10 @@ import java.util.List;
  * để thực hiện các giao dịch nhập hàng, cập nhật số lượng tồn kho và lưu vết
  * lịch sử nhập liệu (Audit Trail).
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-26
  */
 @RestController
 @RequestMapping("/api/inventory")
@@ -61,6 +65,11 @@ public class InventoryController {
      * - Nếu KHÔNG truyền tham số: Trả về toàn bộ lịch sử từ trước đến nay.
      * - Nếu CÓ truyền tham số: Tự động lọc theo Năm / Tháng / Ngày.
      * </p>
+     *
+     * @param year  Tham số truyền vào để lọc theo năm (Có thể null).
+     * @param month Tham số truyền vào để lọc theo tháng (Có thể null).
+     * @param day   Tham số truyền vào để lọc theo ngày (Có thể null).
+     * @return Phản hồi HTTP 200 chứa danh sách {@link ImportTicketResponse}.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN_MANAGER')")
     @GetMapping("/import-history")
