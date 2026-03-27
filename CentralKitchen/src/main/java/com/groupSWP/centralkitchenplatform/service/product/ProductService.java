@@ -50,6 +50,14 @@ public class ProductService {
         // 🌟 GỌI HÀM TÍNH TOÁN & RÀNG BUỘC VÀO ĐÂY NÈ SẾP
         BigDecimal autoCalculatedCost = calculateCostPriceAndValidate(request.getIngredients(), request.getSellingPrice());
 
+        // =========================================================
+        // 🛑 CHỐT CHẶN BẢO VỆ MENU: BẮT BUỘC DÙNG ĐƠN VỊ BÁN
+        // =========================================================
+        UnitType selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
+        if (!selectedSalesUnit.isSalesUnit()) {
+            throw new RuntimeException("Lỗi: Đơn vị bán hàng của sản phẩm không hợp lệ! Vui lòng dùng PHAN, TO, DIA, COMBO, CHAI, v.v. Không dùng " + selectedSalesUnit.name() + ".");
+        }
+
         // Khởi tạo Entity Product
         Product product = Product.builder()
                 .productId(request.getProductId())
@@ -57,7 +65,7 @@ public class ProductService {
                 .category(category)
                 .sellingPrice(request.getSellingPrice())
                 .costPrice(autoCalculatedCost) // 🌟 NHÉT GIÁ VỐN TỰ ĐỘNG VÀO ĐÂY!
-                .baseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()))
+                .baseUnit(selectedSalesUnit) // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
                 .isActive(true)
                 .build();
 
@@ -89,7 +97,14 @@ public class ProductService {
             }
 
             if (request.getBaseUnit() != null && !request.getBaseUnit().trim().isEmpty()) {
-                existingProduct.setBaseUnit(UnitType.valueOf(request.getBaseUnit().toUpperCase()));
+                // =========================================================
+                // 🛑 CHỐT CHẶN BẢO VỆ MENU KHI UPDATE
+                // =========================================================
+                UnitType selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
+                if (!selectedSalesUnit.isSalesUnit()) {
+                    throw new RuntimeException("Lỗi: Đơn vị bán hàng của sản phẩm không hợp lệ! Vui lòng dùng PHAN, TO, DIA, COMBO, CHAI, v.v. Không dùng " + selectedSalesUnit.name() + ".");
+                }
+                existingProduct.setBaseUnit(selectedSalesUnit); // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
             }
             if (request.getIsActive() != null) existingProduct.setActive(request.getIsActive());
 
