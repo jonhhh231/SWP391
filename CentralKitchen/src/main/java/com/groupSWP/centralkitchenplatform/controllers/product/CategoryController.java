@@ -22,6 +22,10 @@ import java.util.List;
  * đều bị giới hạn nghiêm ngặt, chỉ cho phép các cấp quản lý (ADMIN, MANAGER)
  * và Bếp trưởng (KITCHEN_MANAGER) thao tác.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0.0
+ * @since 2026-03-27
  */
 @RestController
 @RequestMapping("/api/categories")
@@ -42,6 +46,8 @@ public class CategoryController {
      *
      * @param request Payload chứa thông tin danh mục cần tạo (Tên danh mục, Mô tả).
      * @return Phản hồi HTTP 200 chứa đối tượng {@link CategoryResponse} vừa được lưu vào DB.
+     * @throws IllegalArgumentException Nếu dữ liệu đầu vào không hợp lệ (ví dụ để trống tên danh mục).
+     * @throws RuntimeException Nếu quá trình lưu vào cơ sở dữ liệu gặp sự cố.
      */
     @PostMapping
     public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) {
@@ -56,6 +62,7 @@ public class CategoryController {
      * <p>Truy xuất tất cả các danh mục đang tồn tại để hiển thị lên các bảng biểu giao diện hoặc Dropdown chọn món.</p>
      *
      * @return Phản hồi HTTP 200 chứa danh sách các danh mục hệ thống.
+     * @throws RuntimeException Nếu có lỗi kết nối hoặc truy xuất dữ liệu từ database.
      */
     @GetMapping
     public ResponseEntity<List<CategoryResponse>> getAllCategories() {
@@ -72,6 +79,8 @@ public class CategoryController {
      * @param id      Mã định danh (ID) của danh mục cần sửa đổi.
      * @param request Payload chứa dữ liệu mới sẽ được ghi đè lên danh mục cũ.
      * @return Phản hồi HTTP 200 chứa thông tin danh mục sau khi đã được cập nhật thành công.
+     * @throws RuntimeException Nếu không tìm thấy danh mục với ID tương ứng trong hệ thống.
+     * @throws IllegalArgumentException Nếu dữ liệu cập nhật không hợp lệ.
      */
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> updateCategory(
@@ -92,6 +101,7 @@ public class CategoryController {
      *
      * @param id Mã định danh (ID) của danh mục cần xóa.
      * @return Phản hồi HTTP 200 kèm thông báo chuỗi xác nhận xóa thành công.
+     * @throws RuntimeException Nếu không tìm thấy danh mục hoặc danh mục đang chứa sản phẩm không thể xóa.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteCategory(@PathVariable Long id) {
