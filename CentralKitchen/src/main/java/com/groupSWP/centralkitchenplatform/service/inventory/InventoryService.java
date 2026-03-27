@@ -144,7 +144,7 @@ public class InventoryService {
 
         // 🔥 THÔNG BÁO: Báo cho Bếp trưởng biết là kho mới được "bơm máu"
         notificationService.broadcastNotification(
-                List.of("KITCHEN_MANAGER"),
+                List.of("ADMIN","KITCHEN_MANAGER"),
                 "📦 NHẬP KHO THÀNH CÔNG",
                 "Phiếu nhập kho " + savedTicket.getTicketId() + " đã hoàn tất. Nguyên vật liệu đã được cộng vào hệ thống!",
                 Notification.NotificationType.SUCCESS
