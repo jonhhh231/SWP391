@@ -75,7 +75,7 @@ public class KitchenController {
      * @return Phản hồi HTTP 200 thông báo khởi tạo kế hoạch sản xuất thành công.
      */
     @PostMapping("/aggregation/confirm")
-    public ResponseEntity<String> confirmProduction() {
+    public ResponseEntity<String> confirmProduction(@RequestBody List<String> selectedKeys) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentRole = authentication.getAuthorities().iterator().next().getAuthority();
 
@@ -84,8 +84,10 @@ public class KitchenController {
             throw new AccessDeniedException("Chỉ Quản lý bếp hoặc Quản lý vận hành mới có quyền chốt nấu!");
         }
 
-        orderService.confirmProductionAndAggregateOrders();
-        return ResponseEntity.ok("Đã chốt sổ gom đơn thành công! Hệ thống đã tạo danh sách các lệnh sản xuất (PLANNED) cho Bếp. Vui lòng bấm 'Bắt đầu nấu' để xuất kho!");
+        // Truyền list ID mà FE gửi xuống cho Service xử lý
+        orderService.confirmProductionAndAggregateOrders(selectedKeys);
+
+        return ResponseEntity.ok("Đã chốt sổ gom đơn thành công! Hệ thống đã tạo danh sách các lệnh sản xuất (PLANNED). Vui lòng bấm 'Bắt đầu nấu' để xuất kho!");
     }
 
     /**
