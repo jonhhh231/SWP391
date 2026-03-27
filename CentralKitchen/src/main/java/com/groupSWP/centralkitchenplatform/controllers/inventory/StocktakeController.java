@@ -20,34 +20,24 @@ public class StocktakeController {
 
     private final StocktakeService stocktakeService;
     private final InventoryLogRepository inventoryLogRepository;
+
     /**
      * API Kiểm kê kho định kỳ (Stocktake).
-     * <p>
-     * Dành cho Manager/Admin thực hiện vào cuối ngày hoặc cuối tuần.
-     * Hệ thống sẽ nhận số lượng đếm tay thực tế, so sánh với số lượng trên phần mềm
-     * để tìm ra chênh lệch. Nếu có hao hụt, tự động chạy thuật toán FIFO trừ kho
-     * và ghi log báo cáo.
-     * </p>
-     *
-     * @param request Payload chứa danh sách nguyên liệu và số lượng thực tế đếm được.
-     * @return Phản hồi HTTP 200 xác nhận hoàn tất kiểm kê.
      */
     @PostMapping("/stocktake")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    // 🌟 SỬA Ở ĐÂY: Dùng hasAnyAuthority bao trọn gói cả có ROLE_ và không có ROLE_
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<?> processStocktake(@Valid @RequestBody StocktakeRequest request) {
         stocktakeService.processStocktake(request);
-        // Trả về JSON cho FE dễ xài: { "message": "..." }
         return ResponseEntity.ok(java.util.Map.of("message", "Đã hoàn tất quá trình đối soát và kiểm kê kho!"));
     }
-
-    // Nêm cái dòng này ở trên cùng Controller của Sếp
-    // private final InventoryLogRepository inventoryLogRepository;
 
     // =========================================================
     // 🌟 API 1: LẤY DANH SÁCH LỊCH SỬ KIỂM KÊ (GOM NHÓM)
     // =========================================================
     @GetMapping("/stocktake/history")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    // 🌟 SỬA Ở ĐÂY: Mở cửa thêm cho Bếp trưởng (KITCHEN_MANAGER) vì họ cũng cần xem lịch sử kho
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<List<StocktakeHistoryProjection>> getStocktakeHistorySummary() {
         List<StocktakeHistoryProjection> history = inventoryLogRepository.getStocktakeHistorySummary();
         return ResponseEntity.ok(history);
@@ -57,7 +47,8 @@ public class StocktakeController {
     // 🌟 API 2: LẤY CHI TIẾT 1 ĐỢT KIỂM KÊ KHI BẤM VÀO XEM
     // =========================================================
     @GetMapping("/stocktake/history/{sessionCode}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    // 🌟 SỬA Ở ĐÂY: Tương tự như API 1
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<List<InventoryLog>> getStocktakeDetails(@PathVariable String sessionCode) {
         List<InventoryLog> details = inventoryLogRepository.findByReferenceCode(sessionCode);
         if (details.isEmpty()) {
