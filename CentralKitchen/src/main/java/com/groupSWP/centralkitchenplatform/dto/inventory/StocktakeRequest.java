@@ -24,5 +24,7 @@ public class StocktakeRequest {
         private BigDecimal actualQty;
 
         private String note; // Ví dụ: "Chuột cắn rách bao", "Thịt teo do rã đông"
+
+        private boolean forceConfirm; // FE truyền false mặc định, nếu FE tick chọn thì truyền true
     }
 }
