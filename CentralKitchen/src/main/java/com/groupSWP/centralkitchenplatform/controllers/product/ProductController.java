@@ -97,8 +97,6 @@ public class ProductController {
      * (metadata) để hỗ trợ phân trang trên giao diện.
      * </p>
      *
-     * @param page      Số thứ tự trang cần lấy (Mặc định: 1).
-     * @param size      Số lượng bản ghi trên mỗi trang (Mặc định: 10).
      * @param keyword   Từ khóa tìm kiếm theo tên sản phẩm (Tùy chọn).
      * @param category  Lọc theo tên hoặc mã danh mục (Tùy chọn).
      * @param isActive  Lọc theo trạng thái hoạt động: true (hiện), false (ẩn) (Tùy chọn).
@@ -106,7 +104,7 @@ public class ProductController {
      * @param maxPrice  Mức giá cao nhất để lọc (Tùy chọn).
      * @param sortBy    Tên trường dữ liệu dùng để sắp xếp (Mặc định: "productName").
      * @param sortDir   Chiều sắp xếp: "asc" (tăng dần) hoặc "desc" (giảm dần) (Mặc định: "asc").
-     * @return Phản hồi HTTP 200 chứa Map dữ liệu gồm danh sách sản phẩm và thông tin phân trang.
+     * @return Phản hồi HTTP 200 chứa List dữ liệu gồm danh sách sản phẩm.
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -126,5 +124,25 @@ public class ProductController {
 
         // Trả thẳng List ra dạng mảng JSON: [ {product1}, {product2} ]
         return ResponseEntity.ok(productList);
+    }
+
+    // =======================================================
+    // API 3: LẤY SỐ LIỆU THỐNG KÊ CHO DASHBOARD MENU
+    // =======================================================
+    /**
+     * API Truy xuất số liệu thống kê tổng quan của danh mục sản phẩm.
+     * <p>
+     * Dựa trên các truy vấn tối ưu tại tầng Database, API này đếm và trả về các số liệu
+     * như: Tổng số sản phẩm đang bán, bản nháp/ngừng bán, số sản phẩm đã được thiết lập
+     * công thức định lượng (BOM) và số sản phẩm chưa có định lượng.
+     * Phục vụ cho việc hiển thị các chỉ số (Metrics) trên Dashboard của Manager.
+     * </p>
+     *
+     * @return Phản hồi HTTP 200 chứa cấu trúc dữ liệu Map gồm các cặp Key-Value thống kê.
+     */
+    @GetMapping("/statistics")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
+    public ResponseEntity<Map<String, Long>> getProductStatistics() {
+        return ResponseEntity.ok(productService.getProductStatistics());
     }
 }

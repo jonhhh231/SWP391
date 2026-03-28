@@ -66,7 +66,10 @@ public class ProductService {
                 .sellingPrice(request.getSellingPrice())
                 .costPrice(autoCalculatedCost) // 🌟 NHÉT GIÁ VỐN TỰ ĐỘNG VÀO ĐÂY!
                 .baseUnit(selectedSalesUnit) // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
-                .isActive(true)
+                // =========================================================
+                // 🛑 MẶC ĐỊNH LƯU NHÁP: Cắt luôn quyền mở bán khi mới tạo
+                // =========================================================
+                .isActive(false)
                 .build();
 
         Product savedProduct = productRepository.save(product);
@@ -156,6 +159,17 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm ID: " + id));
 
+        // =========================================================
+        // 🛑 CHỐT CHẶN VÀNG: KHÔNG CÓ CÔNG THỨC THÌ CẤM MỞ BÁN
+        // =========================================================
+        // Nếu đang Tắt (muốn bật lên) MÀ danh sách nguyên liệu rỗng -> Chặn ngay!
+        if (!product.isActive()) {
+            boolean hasNoFormula = product.getFormulas() == null || product.getFormulas().isEmpty();
+            if (hasNoFormula) {
+                throw new RuntimeException("CẢNH BÁO: Không thể mở bán sản phẩm này vì CHƯA CÓ CÔNG THỨC (BOM). Vui lòng thêm nguyên liệu định lượng trước khi tung ra thị trường!");
+            }
+        }
+
         // Đảo ngược trạng thái: Đang true (mở bán) -> false (ngừng bán) và ngược lại
         product.setActive(!product.isActive());
         productRepository.save(product);
@@ -209,6 +223,25 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    // =========================================================
+    // 🌟 API THỐNG KÊ (DASHBOARD) DÀNH CHO FRONTEND
+    // =========================================================
+    public java.util.Map<String, Long> getProductStatistics() {
+        long activeCount = productRepository.countByIsActive(true);
+        long inactiveCount = productRepository.countByIsActive(false); // Gồm cả Bản nháp & Ngừng bán
+        long withFormulaCount = productRepository.countProductsWithFormula();
+        long withoutFormulaCount = productRepository.countProductsWithoutFormula();
+        long totalCategories = categoryRepository.count();
+
+        return java.util.Map.of(
+                "activeProducts", activeCount,
+                "inactiveProducts", inactiveCount,
+                "withFormula", withFormulaCount,
+                "withoutFormula", withoutFormulaCount,
+                "totalCategories", totalCategories
+        );
+    }
+
     // --- HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO ---
     private ProductResponse mapToResponse(Product product) {
         return ProductResponse.builder()
@@ -219,6 +252,10 @@ public class ProductService {
                 .sellingPrice(product.getSellingPrice())
                 .baseUnit(product.getBaseUnit() != null ? product.getBaseUnit().name() : null)
                 .isActive(product.isActive())
+                // =========================================================
+                // 🌟 TRẢ NGÀY TẠO ĐỂ FE XỬ LÝ GIAO DIỆN "MÓN MỚI"
+                // =========================================================
+                .createdAt(product.getCreatedAt())
                 // .imageUrl(product.getImageUrl()) // Bạn có thể xóa dòng này nếu DTO cũng đã bỏ field imageUrl
                 .build();
     }
