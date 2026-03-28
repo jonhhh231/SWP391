@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -33,6 +35,12 @@ public class StocktakeService {
         log.info("Manager bắt đầu xử lý Kiểm kê kho định kỳ...");
         int totalDiscrepancies = 0;
         boolean hasSevereLoss = false; // Cờ theo dõi xem có vụ mất cắp/hao hụt nghiêm trọng nào không
+
+        // 🌟 TẠO MÃ PHIÊN KIỂM KÊ (SESSION CODE) DUY NHẤT CHO ĐỢT NÀY
+        // Format: KK-YYMMDD-RANDOM (VD: KK-260327-A8F2)
+        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+        String randomSuffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        String sessionCode = "KK-" + dateStr + "-" + randomSuffix;
 
         for (StocktakeRequest.StocktakeItem item : request.getItems()) {
             Ingredient ingredient = ingredientRepository.findById(item.getIngredientId())
@@ -69,7 +77,8 @@ public class StocktakeService {
                 log.warn("Phát hiện hao hụt nguyên liệu {}: Hệ thống = {}, Thực tế = {}", ingredient.getName(), systemQty, actualQty);
 
                 // Thuật toán FIFO y chang lúc nấu ăn để tiền vốn khớp 100%
-                deductIngredientWithFIFO(ingredient, discrepancy, item.getNote());
+                // 🌟 Truyền sessionCode vào để gom nhóm log
+                deductIngredientWithFIFO(ingredient, discrepancy, item.getNote(), sessionCode);
 
                 // Cập nhật lại tồn kho tổng
                 ingredient.setKitchenStock(actualQty);
@@ -88,6 +97,7 @@ public class StocktakeService {
                         .quantityDeducted(discrepancy) // Số âm thể hiện việc cộng thêm vào
                         .note("Kiểm kê bởi Manager: Điều chỉnh tăng kho. Ghi chú: " + item.getNote())
                         .createdAt(LocalDateTime.now())
+                        .referenceCode(sessionCode) // 🌟 Gán mã sessionCode cho hàng Dư kho
                         .build();
                 inventoryLogRepository.save(logEntry);
             }
@@ -109,7 +119,7 @@ public class StocktakeService {
             notificationService.broadcastNotification(
                     List.of("ADMIN", "KITCHEN_MANAGER"),
                     "⚠️ BÁO CÁO KIỂM KÊ KHO",
-                    "Quản lý (Manager) vừa hoàn tất kiểm kê định kỳ. Phát hiện " + totalDiscrepancies + " nguyên liệu có sự chênh lệch (Hao hụt nhẹ) so với sổ sách.",
+                    "Quản lý (Manager) vừa hoàn tất kiểm kê định kỳ (" + sessionCode + "). Phát hiện " + totalDiscrepancies + " nguyên liệu có sự chênh lệch (Hao hụt nhẹ) so với sổ sách.",
                     Notification.NotificationType.WARNING
             );
         }
@@ -118,7 +128,8 @@ public class StocktakeService {
     // =========================================================================
     // HÀM TRỪ KHO FIFO DÀNH RIÊNG CHO KIỂM KÊ
     // =========================================================================
-    private void deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, String userNote) {
+    // 🌟 Thêm tham số sessionCode vào hàm này
+    private void deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, String userNote, String sessionCode) {
         BigDecimal remainingToDeduct = quantityNeeded;
 
         List<ImportItem> availableBatches = importItemRepository
@@ -143,15 +154,15 @@ public class StocktakeService {
 
             String finalNote = "Hao hụt kiểm kê kho bởi Manager. " + (userNote != null ? "- Ghi chú: " + userNote : "");
 
-            InventoryLog log = InventoryLog.builder()
+            InventoryLog logEntry = InventoryLog.builder()
                     .importItem(batch)
                     .ingredient(ingredient)
                     .quantityDeducted(deductedAmount)
                     .note(finalNote)
                     .createdAt(LocalDateTime.now())
-                    .referenceCode("STOCKTAKE-" + System.currentTimeMillis())
+                    .referenceCode(sessionCode) // 🌟 Thay vì tự sinh mã mới, dùng mã truyền vào
                     .build();
-            inventoryLogRepository.save(log);
+            inventoryLogRepository.save(logEntry);
         }
 
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
