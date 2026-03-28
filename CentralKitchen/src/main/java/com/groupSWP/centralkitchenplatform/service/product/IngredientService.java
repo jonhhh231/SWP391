@@ -78,9 +78,17 @@ public class IngredientService {
             throw new RuntimeException("Lỗi: Đơn giá (unitCost) phải lớn hơn 0!");
         }
 
+        // =========================================================
+        // 🛑 CHỐT CHẶN BẢO VỆ KHO: BẮT BUỘC DÙNG ĐƠN VỊ GỐC (G, ML...)
+        // =========================================================
+        UnitType selectedUnit = UnitType.valueOf(request.getUnit().toUpperCase());
+        if (!selectedUnit.isBaseUnit()) {
+            throw new RuntimeException("Lỗi: Đơn vị tồn kho của nguyên liệu thô bắt buộc phải là đơn vị nhỏ nhất (G, ML, CAI, TRAI, CU, CON, LA). Không được dùng " + selectedUnit.name() + "!");
+        }
+
         Ingredient ingredient = new Ingredient();
         ingredient.setName(normalizedName); // 🔥 Lưu tên đã được "dọn dẹp" sạch sẽ
-        ingredient.setUnit(UnitType.valueOf(request.getUnit().toUpperCase()));
+        ingredient.setUnit(selectedUnit);   // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
         ingredient.setUnitCost(request.getUnitCost());
         ingredient.setMinThreshold(request.getMinThreshold());
 
@@ -110,7 +118,14 @@ public class IngredientService {
             if (request.getName() != null) existingIngredient.setName(request.getName());
 
             if (request.getUnit() != null) {
-                existingIngredient.setUnit(UnitType.valueOf(request.getUnit().toUpperCase()));
+                // =========================================================
+                // 🛑 CHỐT CHẶN BẢO VỆ KHO KHI UPDATE
+                // =========================================================
+                UnitType selectedUnit = UnitType.valueOf(request.getUnit().toUpperCase());
+                if (!selectedUnit.isBaseUnit()) {
+                    throw new RuntimeException("Lỗi: Đơn vị tồn kho của nguyên liệu thô bắt buộc phải là đơn vị nhỏ nhất (G, ML, CAI, TRAI, CU, CON, LA). Không được dùng " + selectedUnit.name() + "!");
+                }
+                existingIngredient.setUnit(selectedUnit); // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
             }
 
             if (request.getUnitCost() != null) {
