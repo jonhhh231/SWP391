@@ -43,6 +43,11 @@ public class ProductService {
             throw new RuntimeException("Mã sản phẩm '" + request.getProductId() + "' đã tồn tại trong hệ thống. Vui lòng nhập mã khác!");
         }
 
+        // 🔥 KHIÊN CHẮN: Kiểm tra rỗng trước khi tìm Category
+        if (request.getCategoryId() == null) {
+            throw new RuntimeException("Danh mục không được để trống!");
+        }
+
         // 1. Tìm Category từ ID (Giữ nguyên code cũ của sếp)
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại!"));
@@ -53,7 +58,18 @@ public class ProductService {
         // =========================================================
         // 🛑 CHỐT CHẶN BẢO VỆ MENU: BẮT BUỘC DÙNG ĐƠN VỊ BÁN
         // =========================================================
-        UnitType selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
+        // 🔥 KHIÊN CHẮN: Bắt lỗi Enum để tránh sập 500
+        if (request.getBaseUnit() == null || request.getBaseUnit().trim().isEmpty()) {
+            throw new RuntimeException("Đơn vị bán không được để trống!");
+        }
+
+        UnitType selectedSalesUnit;
+        try {
+            selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Lỗi: Đơn vị tính '" + request.getBaseUnit() + "' không tồn tại trong hệ thống!");
+        }
+
         if (!selectedSalesUnit.isSalesUnit()) {
             throw new RuntimeException("Lỗi: Đơn vị bán hàng của sản phẩm không hợp lệ! Vui lòng dùng PHAN, TO, DIA, COMBO, CHAI, v.v. Không dùng " + selectedSalesUnit.name() + ".");
         }
@@ -103,13 +119,28 @@ public class ProductService {
                 // =========================================================
                 // 🛑 CHỐT CHẶN BẢO VỆ MENU KHI UPDATE
                 // =========================================================
-                UnitType selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
-                if (!selectedSalesUnit.isSalesUnit()) {
-                    throw new RuntimeException("Lỗi: Đơn vị bán hàng của sản phẩm không hợp lệ! Vui lòng dùng PHAN, TO, DIA, COMBO, CHAI, v.v. Không dùng " + selectedSalesUnit.name() + ".");
+                try {
+                    UnitType selectedSalesUnit = UnitType.valueOf(request.getBaseUnit().toUpperCase());
+                    if (!selectedSalesUnit.isSalesUnit()) {
+                        throw new RuntimeException("Lỗi: Đơn vị bán hàng của sản phẩm không hợp lệ! Vui lòng dùng PHAN, TO, DIA, COMBO, CHAI, v.v. Không dùng " + selectedSalesUnit.name() + ".");
+                    }
+                    existingProduct.setBaseUnit(selectedSalesUnit); // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException("Lỗi: Đơn vị tính '" + request.getBaseUnit() + "' không tồn tại trong hệ thống!");
                 }
-                existingProduct.setBaseUnit(selectedSalesUnit); // 🌟 ĐÃ GẮN BIẾN ĐÃ QUA KIỂM DUYỆT
             }
-            if (request.getIsActive() != null) existingProduct.setActive(request.getIsActive());
+
+            // 🔥 KHIÊN CHẮN: Lấp lỗ hổng lách luật bật isActive khi không có công thức
+            if (request.getIsActive() != null) {
+                if (request.getIsActive()) {
+                    boolean willHaveFormula = (request.getIngredients() != null && !request.getIngredients().isEmpty()) ||
+                            (existingProduct.getFormulas() != null && !existingProduct.getFormulas().isEmpty());
+                    if (!willHaveFormula) {
+                        throw new RuntimeException("CẢNH BÁO: Không thể mở bán sản phẩm này vì CHƯA CÓ CÔNG THỨC (BOM). Vui lòng thêm nguyên liệu định lượng trước khi cập nhật mở bán!");
+                    }
+                }
+                existingProduct.setActive(request.getIsActive());
+            }
 
             // Xử lý Category
             if (request.getCategoryId() != null) {
