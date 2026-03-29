@@ -24,6 +24,22 @@ import java.util.Optional;
  * Đảm nhiệm vòng đời đăng nhập, cấp phát token JWT, xác thực 2 bước (2FA) qua OTP,
  * cũng như các chức năng quên mật khẩu, cập nhật hồ sơ cá nhân và đăng xuất.
  * </p>
+ * <p>
+ * <b>Phân tích Nghiệp vụ & Bảo mật:</b> Lớp AuthService đóng vai trò là tầng nghiệp vụ bảo mật cốt lõi,
+ * đảm bảo mọi tương tác trong hệ thống Central Kitchen đều được định danh chính xác. Với cơ chế
+ * xác thực đa nhân tố (2FA) dành riêng cho cấp quản trị, hệ thống tăng cường khả năng chống lại
+ * các cuộc tấn công đánh cắp tài khoản thông qua việc gửi mã OTP thời gian thực qua MailService.
+ * Bên cạnh đó, kiến trúc của service còn hỗ trợ việc quản lý phiên làm việc thông qua Active Token
+ * lưu trữ trong cơ sở dữ liệu, cho phép kiểm soát chặt chẽ trạng thái đăng nhập và đăng xuất của nhân sự.
+ * Quy trình đăng ký được thiết kế linh hoạt để xử lý các vai trò khác nhau, từ Kitchen Manager
+ * đến Store Manager, bao gồm cả việc tự động phát sinh mã nhân viên dựa trên tiền tố chức vụ
+ * và quản lý trạng thái bổ nhiệm cửa hàng, giúp tối ưu hóa công tác quản trị nhân sự và
+ * vận hành chuỗi cung ứng lạnh xuyên suốt toàn bộ hệ thống.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Service
 @RequiredArgsConstructor
@@ -39,12 +55,6 @@ public class AuthService {
 
     private final StoreRepository storeRepository;
 
-    /**
-     * Xử lý đăng nhập: Admin bắt buộc xác thực OTP, các Role khác đăng nhập trực tiếp.
-     *
-     * @param request Payload chứa Username và Password.
-     * @return Đối tượng AuthResponse (Yêu cầu OTP với Admin, hoặc trả về Token với Role khác).
-     */
     /**
      * Xử lý đăng nhập: Admin bắt buộc xác thực OTP, các Role khác đăng nhập trực tiếp.
      *
