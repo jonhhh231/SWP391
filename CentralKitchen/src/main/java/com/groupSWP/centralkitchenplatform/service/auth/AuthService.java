@@ -36,6 +36,10 @@ import java.util.Optional;
  * và quản lý trạng thái bổ nhiệm cửa hàng, giúp tối ưu hóa công tác quản trị nhân sự và
  * vận hành chuỗi cung ứng lạnh xuyên suốt toàn bộ hệ thống.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Service
 @RequiredArgsConstructor
