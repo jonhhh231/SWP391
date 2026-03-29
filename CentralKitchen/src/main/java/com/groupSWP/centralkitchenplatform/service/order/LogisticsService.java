@@ -23,6 +23,10 @@ import java.util.UUID;
  * dữ liệu phổ thông như String. Điều này giúp đảm bảo tính tương thích tuyệt đối với các thư viện
  * JSON và giúp Frontend dễ dàng xử lý mà không cần quan tâm đến cấu trúc lưu trữ phức tạp bên dưới.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Service
 @RequiredArgsConstructor
