@@ -18,6 +18,18 @@ import org.springframework.http.MediaType;
 
 /**
  * Controller cung cấp các API thống kê và phân tích dữ liệu (Analytics) dành cho cấp Quản lý.
+ * <p>
+ * Lớp này đóng vai trò quan trọng trong hệ thống CentralKitchen, giúp các cấp quản lý
+ * (Manager, Admin) có cái nhìn tổng quan về tình hình hoạt động của nền tảng.
+ * Thông qua các API được cung cấp, hệ thống sẽ trích xuất, tổng hợp và định dạng
+ * các luồng dữ liệu phức tạp từ cơ sở dữ liệu thành các con số thống kê trực quan.
+ * Hỗ trợ theo dõi sát sao tình hình xuất nhập kho, doanh thu, và hiệu suất hoạt động
+ * theo từng mốc thời gian cụ thể, từ đó đưa ra các quyết định chiến lược kịp thời.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @RestController
@@ -26,18 +38,22 @@ import org.springframework.http.MediaType;
 @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')") // 🌟 BẢO MẬT: Khóa chặt cho cấp Quản lý
 public class AnalyticsController {
 
+    /**
+     * Service xử lý các nghiệp vụ thống kê phức tạp, tính toán số liệu cho Dashboard.
+     */
     private final AnalyticsService analyticsService;
 
     /**
      * API Lấy dữ liệu tổng hợp cho trang chủ Dashboard (Hỗ trợ lọc theo ngày).
      * <p>
      * Truy xuất dữ liệu "sống" 100% từ Database. Hỗ trợ Frontend truyền startDate và endDate
-     * để xem theo tuần, tháng, quý, năm.
+     * để xem theo tuần, tháng, quý, năm. Nếu không cung cấp tham số thời gian, hệ thống
+     * sẽ tự động lấy dữ liệu mặc định của 7 ngày gần nhất tính đến thời điểm hiện tại.
      * </p>
      *
-     * @param startDate Ngày bắt đầu (Định dạng: YYYY-MM-DD)
-     * @param endDate   Ngày kết thúc (Định dạng: YYYY-MM-DD)
-     * @return Phản hồi HTTP 200 chứa đối tượng {@link DashboardSummary}.
+     * @param startDate Ngày bắt đầu để lọc dữ liệu (Định dạng: YYYY-MM-DD). Không bắt buộc.
+     * @param endDate   Ngày kết thúc để lọc dữ liệu (Định dạng: YYYY-MM-DD). Không bắt buộc.
+     * @return Phản hồi HTTP 200 chứa đối tượng {@link DashboardSummary} bao gồm các chỉ số thống kê.
      */
     @GetMapping("/dashboard") // 🔥 FIX: Đổi tên /revenue thành /dashboard
     public ResponseEntity<DashboardSummary> getDashboardStats(
@@ -66,8 +82,15 @@ public class AnalyticsController {
     /**
      * API Xuất file báo cáo Thống kê ra định dạng EXCEL (CSV).
      * <p>
-     * Frontend gọi API này, Browser sẽ tự động tải file về máy tính của Admin.
+     * Frontend gọi API này, Browser sẽ tự động nhận diện header Content-Disposition
+     * và tải file .csv về máy tính của người dùng. Dữ liệu trong file được tổng hợp
+     * theo đúng khoảng thời gian được yêu cầu, phục vụ cho mục đích lưu trữ ngoại tuyến,
+     * báo cáo định kỳ hoặc import vào các công cụ phân tích dữ liệu chuyên sâu khác.
      * </p>
+     *
+     * @param startDate Ngày bắt đầu lấy dữ liệu báo cáo (Định dạng: YYYY-MM-DD). Không bắt buộc.
+     * @param endDate   Ngày kết thúc lấy dữ liệu báo cáo (Định dạng: YYYY-MM-DD). Không bắt buộc.
+     * @return Phản hồi HTTP 200 chứa mảng byte (byte[]) của nội dung file CSV kèm các header cần thiết để tải file.
      */
     @GetMapping(value = "/export/csv", produces = "text/csv")
     public ResponseEntity<byte[]> exportDashboardCsv(
