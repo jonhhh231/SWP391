@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.controllers.store;
 
+import com.groupSWP.centralkitchenplatform.dto.kitchen.PendingOrderResponse;
 import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionResponse;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun.ProductionStatus;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controller quản lý các nghiệp vụ liên quan đến Bếp trung tâm.
@@ -40,14 +42,38 @@ public class KitchenController {
      * Thay thế cho luồng gom sản phẩm cũ. API này trả về danh sách các đơn hàng
      * đang chờ Bếp xử lý. Hệ thống đã tự động sắp xếp ưu tiên các đơn hàng
      * Khẩn Cấp (URGENT / KCAP) lên đầu danh sách để Bếp trưởng dễ dàng ra quyết định.
+     * ĐÃ SỬA LỖI VÒNG LẶP JSON BẰNG CÁCH MAP QUA DTO.
      * </p>
      *
      * @return Phản hồi HTTP 200 chứa danh sách đơn hàng đã được sắp xếp ưu tiên.
      */
     @GetMapping("/orders")
     @PreAuthorize("hasAnyAuthority('KITCHEN_MANAGER', 'ROLE_KITCHEN_MANAGER', 'MANAGER', 'ROLE_MANAGER', 'ADMIN', 'ROLE_ADMIN')")
-    public ResponseEntity<List<Order>> getKitchenOrders() {
-        return ResponseEntity.ok(orderRepository.findOrdersToAggregate());
+    public ResponseEntity<List<PendingOrderResponse>> getKitchenOrders() {
+        // 1. Lấy dữ liệu nguyên bản từ Database
+        List<Order> orders = orderRepository.findOrdersToAggregate();
+
+        // 2. Chặt đứt vòng lặp vô hạn: Bóc tách Entity sang DTO
+        List<PendingOrderResponse> responseList = orders.stream().map(o ->
+                PendingOrderResponse.builder()
+                        .orderId(o.getOrderId())
+                        // LƯU Ý: Nếu Entity Store của Sếp dùng getStoreName(), hãy sửa lại chỗ này nhé!
+                        .storeName(o.getStore() != null ? o.getStore().getName() : "Unknown")
+                        .orderType(o.getOrderType() != null ? o.getOrderType().name() : "STANDARD")
+                        .status(o.getStatus().name())
+                        .createdAt(o.getCreatedAt())
+                        .items(o.getOrderItems().stream().map(i ->
+                                PendingOrderResponse.Item.builder()
+                                        .productId(i.getProduct().getProductId())
+                                        .productName(i.getProduct().getProductName())
+                                        .quantity(i.getQuantity())
+                                        .build()
+                        ).collect(Collectors.toList()))
+                        .build()
+        ).collect(Collectors.toList());
+
+        // 3. Trả về cho FE dữ liệu sạch sẽ, không vòng lặp
+        return ResponseEntity.ok(responseList);
     }
 
     /**
