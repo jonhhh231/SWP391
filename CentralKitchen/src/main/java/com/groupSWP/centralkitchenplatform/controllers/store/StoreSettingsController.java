@@ -24,6 +24,10 @@ import java.security.Principal;
  * thì các thao tác ảnh hưởng đến vận hành hệ thống như Bật/Tắt trạng thái hoạt động
  * đều được khóa chặt và chỉ dành riêng cho Quản trị viên (ADMIN) để đảm bảo tính toàn vẹn của dữ liệu và hệ thống.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestController
 @RequestMapping("/api/store/settings")
