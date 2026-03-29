@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String> {
@@ -29,6 +30,13 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     boolean existsByShipment_ShipmentIdAndStatusNot(String shipmentId, Order.OrderStatus status);
 
+    // 🌟 Gom đơn: Lấy đơn NEW/APPROVED, ưu tiên URGENT trước, ai đặt trước xếp trước
+    @Query("SELECT o FROM Order o WHERE o.status = 'NEW' OR o.status = 'APPROVED' " +
+            "ORDER BY CASE WHEN o.orderType = 'URGENT' THEN 0 ELSE 1 END, o.createdAt ASC")
+    List<Order> findOrdersToAggregate();
+
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.product", "store"})
+    Optional<Order> findWithItemsByOrderId(String orderId);
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.product", "store"})
     List<Order> findByStatusAndShipmentIsNull(Order.OrderStatus status);
