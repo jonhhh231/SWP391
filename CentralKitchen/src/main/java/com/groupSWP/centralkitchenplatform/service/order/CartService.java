@@ -31,6 +31,24 @@ import java.util.List;
  * Đóng vai trò như một trạm trung chuyển (Drafting Station), cho phép thêm, bớt,
  * sửa số lượng các mặt hàng trước khi quyết định chốt thành một Đơn đặt hàng (Order) chính thức.
  * </p>
+ * <p>
+ * <b>Kiến trúc Service (Service Architecture):</b> Lớp CartService hoạt động như một bộ não
+ * trung tâm xử lý toàn bộ logic nghiệp vụ (business logic) trước khi đơn hàng được chốt.
+ * Việc tách biệt luồng Giỏ hàng (Cart) ra khỏi luồng Đơn hàng (Order) giúp hệ thống Central Kitchen
+ * tối ưu hóa hiệu suất cơ sở dữ liệu. Nó cho phép các Cửa hàng trưởng (Store Manager) thực hiện
+ * hàng chục thao tác thêm/bớt/sửa/xóa liên tục trong ngày mà không gây "rác" cho bảng Order chính.
+ * </p>
+ * <p>
+ * Đồng thời, service này ứng dụng triệt để cơ chế `@Transactional` của Spring Data JPA.
+ * Điều này cực kỳ quan trọng trong giai đoạn Checkout: nếu quá trình đẩy dữ liệu từ Cart sang Order
+ * gặp bất kỳ sự cố nào (ví dụ: mất kết nối DB, lỗi logic tính toán bên OrderService), toàn bộ
+ * thao tác sẽ được Rollback lại trạng thái ban đầu một cách an toàn, đảm bảo không bao giờ
+ * xảy ra tình trạng "giỏ hàng bị xóa sạch nhưng đơn hàng lại chưa được tạo ra".
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @Service
