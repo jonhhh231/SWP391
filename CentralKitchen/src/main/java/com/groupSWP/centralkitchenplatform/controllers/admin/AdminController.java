@@ -27,11 +27,21 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
+    /**
+     * Service xử lý các nghiệp vụ liên quan đến xác thực và phân quyền (Authentication/Authorization).
+     */
     private final AuthService authService;
+
+    /**
+     * Service xử lý các nghiệp vụ liên quan đến quản lý tài khoản người dùng trong hệ thống CentralKitchen.
+     */
     private final AccountService accountService;
 
     /**
      * API Cấp phát tài khoản nhân sự mới.
+     *
+     * @param request Đối tượng DTO chứa thông tin đăng ký tài khoản (username, password, role...).
+     * @return ResponseEntity chứa thông báo xác nhận cấp tài khoản thành công cùng username tương ứng.
      */
     @PostMapping("/register")
     public ResponseEntity<String> createEmployee(@RequestBody RegisterRequest request) {
@@ -41,6 +51,9 @@ public class AdminController {
 
     /**
      * API Tra cứu danh sách tài khoản linh hoạt (Tất cả hoặc theo từ khóa).
+     *
+     * @param keyword Từ khóa tìm kiếm (có thể là tên, username...), không bắt buộc. Nếu để trống sẽ trả về toàn bộ.
+     * @return ResponseEntity chứa danh sách các tài khoản (AccountResponse) khớp với điều kiện tìm kiếm.
      */
     @GetMapping("/list-accounts")
     public ResponseEntity<List<AccountResponse>> getAccounts(
@@ -50,6 +63,8 @@ public class AdminController {
 
     /**
      * API Lọc danh sách các tài khoản đang hoạt động (Active).
+     *
+     * @return ResponseEntity chứa danh sách các tài khoản có trạng thái đang hoạt động (status = true).
      */
     @GetMapping("/list-accounts/active")
     public ResponseEntity<List<AccountResponse>> getActiveAccounts() {
@@ -58,6 +73,8 @@ public class AdminController {
 
     /**
      * API Lọc danh sách các tài khoản đã bị khóa/ngưng hoạt động (Inactive).
+     *
+     * @return ResponseEntity chứa danh sách các tài khoản có trạng thái ngưng hoạt động (status = false).
      */
     @GetMapping("/list-accounts/inactive")
     public ResponseEntity<List<AccountResponse>> getInactiveAccounts() {
@@ -72,6 +89,8 @@ public class AdminController {
      *
      * @param accountId ID của tài khoản cần thay đổi (UUID).
      * @param roleName  Tên Role mới (VD: STORE_MANAGER, COORDINATOR...).
+     * @param storeId ID của cửa hàng (tuỳ chọn, bắt buộc nếu là nghiệp vụ thăng chức).
+     * @param replacementAccountId ID của tài khoản thay thế (tuỳ chọn, bắt buộc nếu là nghiệp vụ giáng chức).
      * @return Thông báo chi tiết sau khi cập nhật Role và luân chuyển cửa hàng.
      */
     @PatchMapping("/accounts/{accountId}/role")
@@ -87,6 +106,10 @@ public class AdminController {
 
     /**
      * API Khóa / Mở khóa tài khoản (Xóa mềm) kèm luân chuyển nhân sự.
+     *
+     * @param accountId ID của tài khoản cần thay đổi trạng thái hoạt động.
+     * @param replacementAccountId ID của nhân sự thế chỗ (tuỳ chọn, dùng khi khóa tài khoản đang giữ vị trí tại cửa hàng).
+     * @return ResponseEntity chứa thông báo kết quả thao tác khóa hoặc mở khóa thành công.
      */
     @PutMapping("/accounts/{accountId}/status")
     public ResponseEntity<String> toggleAccountStatus(
@@ -106,6 +129,10 @@ public class AdminController {
     /**
      * API Gán hoặc thay đổi cửa hàng làm việc cho tài khoản.
      * <p>Sử dụng để gán cửa hàng mới hoặc rút nhân sự về dự bị (storeId = null).</p>
+     *
+     * @param accountId ID của tài khoản nhân sự cần gán.
+     * @param storeId ID của cửa hàng cần gán (có thể truyền null nếu muốn rút nhân sự về dự bị).
+     * @return ResponseEntity chứa thông báo kết quả gán cửa hàng thành công.
      */
     @PatchMapping("/accounts/{accountId}/store")
     public ResponseEntity<String> assignStoreToAccount(
