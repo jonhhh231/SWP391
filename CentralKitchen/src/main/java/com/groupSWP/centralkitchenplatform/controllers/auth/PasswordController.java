@@ -27,6 +27,10 @@ import java.security.Principal;
  * Mọi điểm cuối (endpoints) trong Controller này đều yêu cầu yêu cầu phải đi kèm JWT Token
  * hợp lệ trong Header của Request để xác thực quyền hạn.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestController
 @RequestMapping("/api/settings")
