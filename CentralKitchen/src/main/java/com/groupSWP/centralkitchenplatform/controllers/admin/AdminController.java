@@ -20,6 +20,9 @@ import java.util.UUID;
  * tài khoản người dùng, bao gồm: cấp phát tài khoản mới, tra cứu và lọc danh sách nhân sự.
  * </p>
  * <p><b>Chính sách bảo mật:</b> Toàn bộ các API trong Controller này đều bị ràng buộc bởi quyền ADMIN.</p>
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestController
 @RequestMapping("/api/admin")
