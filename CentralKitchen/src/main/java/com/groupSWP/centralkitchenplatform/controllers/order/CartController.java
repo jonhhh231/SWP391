@@ -34,6 +34,10 @@ import java.security.Principal;
  * tối ưu hóa hiệu suất của cơ sở dữ liệu và đảm bảo tính toàn vẹn (ACID) của toàn bộ hệ thống
  * Central Kitchen trong các khung giờ cao điểm khi hàng chục cửa hàng cùng lên đơn một lúc.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @RestController
