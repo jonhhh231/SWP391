@@ -26,6 +26,10 @@ import org.springframework.http.MediaType;
  * Hỗ trợ theo dõi sát sao tình hình xuất nhập kho, doanh thu, và hiệu suất hoạt động
  * theo từng mốc thời gian cụ thể, từ đó đưa ra các quyết định chiến lược kịp thời.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @RestController
