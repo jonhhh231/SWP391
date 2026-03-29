@@ -27,6 +27,10 @@ import java.util.Map;
  * ánh xạ thông báo lỗi lên giao diện người dùng mà còn giúp đội ngũ phát triển nhanh chóng
  * khoanh vùng sự cố thông qua các thông tin lỗi rõ ràng, tường minh.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -99,7 +103,7 @@ public class GlobalExceptionHandler {
      * </p>
      *
      * @param ex Ngoại lệ {@link RuntimeException} chứa thông báo lỗi.
-     * @return Phản hồi HTTP 400 (Bad Request) với cấu trúc JSON: {@code {"error": "Bad Request", "message": "..."}}.
+     * @return Phản hồi HTTP 400 (Bad Request) with cấu trúc JSON: {@code {"error": "Bad Request", "message": "..."}}.
      */
     @ExceptionHandler(RuntimeException.class)
     public org.springframework.http.ResponseEntity<java.util.Map<String, String>> handleRuntimeException(RuntimeException ex) {
