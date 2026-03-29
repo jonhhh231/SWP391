@@ -35,6 +35,10 @@ import java.util.List;
  * đồng bộ thông tin ngay lập tức giữa các bộ phận quản lý chi nhánh, kho vận và nhà bếp,
  * từ đó duy trì tính nhất quán và minh bạch cho toàn bộ chuỗi cung ứng lạnh của dự án.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @Service
