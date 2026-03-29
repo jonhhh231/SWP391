@@ -24,6 +24,20 @@ import java.security.Principal;
  * đều được trích xuất danh tính trực tiếp từ {@link Principal} (thông qua JWT Token)
  * để đảm bảo tính định danh tuyệt đối.
  * </p>
+ * <p>
+ * <b>Kiến trúc và Luồng Dữ liệu:</b> Việc sử dụng giỏ hàng đóng vai trò như một bộ đệm (buffer)
+ * cực kỳ quan trọng giúp giảm tải cho hệ thống xử lý Đơn hàng cốt lõi. Thay vì tạo trực tiếp
+ * các bản ghi Order rác mỗi khi Cửa hàng trưởng thay đổi ý định, hệ thống chỉ lưu lại trạng thái
+ * tạm thời trong Cart. Chỉ khi API Checkout được gọi, một Transaction duy nhất mới được mở ra
+ * để thực hiện hàng loạt các nghiệp vụ: trừ tồn kho dự kiến, ghi nhận lịch sử đặt hàng, và
+ * kích hoạt các thông báo (Notification) liên quan đến Bếp trung tâm. Quá trình này giúp
+ * tối ưu hóa hiệu suất của cơ sở dữ liệu và đảm bảo tính toàn vẹn (ACID) của toàn bộ hệ thống
+ * Central Kitchen trong các khung giờ cao điểm khi hàng chục cửa hàng cùng lên đơn một lúc.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @RestController
