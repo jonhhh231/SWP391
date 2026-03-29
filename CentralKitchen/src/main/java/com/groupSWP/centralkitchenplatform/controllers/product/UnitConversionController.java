@@ -26,6 +26,10 @@ import java.math.BigDecimal;
  * giá trị hàng tồn kho, dự báo nguyên liệu và đảm bảo rằng báo cáo tài chính luôn khớp
  * với số lượng thực tế trong kho bãi.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestController
 @RequestMapping("/api/manager/conversions")
