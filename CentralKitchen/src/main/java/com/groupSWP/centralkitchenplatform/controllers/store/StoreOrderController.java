@@ -16,6 +16,25 @@ import com.groupSWP.centralkitchenplatform.dto.order.OrderResponse;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Controller chuyên trách xử lý các nghiệp vụ liên quan đến Đơn hàng (Order) tại khu vực Cửa hàng (Store).
+ * <p>
+ * Lớp này là điểm chạm (endpoint) quan trọng để các Quản lý Cửa hàng (Store Manager) tương tác với
+ * hệ thống Bếp Trung Tâm (Central Kitchen). Nó cung cấp đầy đủ các tính năng từ việc tra cứu lịch sử,
+ * xem chi tiết đơn hàng, cho đến việc khởi tạo các yêu cầu nhập hàng mới (đơn tiêu chuẩn hoặc khẩn cấp).
+ * </p>
+ * <p>
+ * <b>Điểm nhấn về Bảo mật:</b> Controller này áp dụng triệt để cơ chế chống lỗ hổng IDOR
+ * (Insecure Direct Object Reference). Thay vì tin tưởng tham số Store ID do Frontend truyền lên,
+ * toàn bộ các API đều tự động trích xuất Store ID trực tiếp từ Token định danh (Principal) của
+ * người dùng đang đăng nhập. Điều này đảm bảo tuyệt đối rằng một cửa hàng chỉ có quyền xem
+ * và thao tác trên chính dữ liệu của mình.
+ * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/store/orders")
@@ -28,6 +47,10 @@ public class StoreOrderController {
     /**
      * Hàm Helper: Lấy Store ID từ Token đăng nhập.
      * <p>Đảm bảo an toàn bảo mật IDOR bằng cách luôn lấy ID cửa hàng từ danh tính thật của người dùng.</p>
+     *
+     * @param principal Đối tượng bảo mật của Spring Security chứa thông tin User đang gọi API.
+     * @return Chuỗi Store ID tương ứng với tài khoản.
+     * @throws RuntimeException Nếu tài khoản không tồn tại hoặc chưa được gán vào cửa hàng nào.
      */
     private String getStoreIdFromPrincipal(Principal principal) {
         String username = principal.getName();
