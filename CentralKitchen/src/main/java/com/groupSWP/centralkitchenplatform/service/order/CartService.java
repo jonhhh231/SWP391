@@ -45,6 +45,10 @@ import java.util.List;
  * thao tác sẽ được Rollback lại trạng thái ban đầu một cách an toàn, đảm bảo không bao giờ
  * xảy ra tình trạng "giỏ hàng bị xóa sạch nhưng đơn hàng lại chưa được tạo ra".
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Slf4j
 @Service
