@@ -24,6 +24,17 @@ import java.util.List;
  * Cung cấp cơ chế lưu trữ và truy xuất các tham số vận hành chung (như giờ mở cửa, phụ phí...).
  * Tích hợp Cache RAM (Spring Cache) để tối ưu hóa hiệu suất truy vấn cấu hình liên tục.
  * </p>
+ * <p>
+ * <b>Kiến trúc và Tầm quan trọng:</b> Lớp Service này đóng vai trò là "bộ não" điều phối các tham số
+ * biến thiên của toàn bộ nền tảng Central Kitchen. Việc ứng dụng Spring Cache (Cacheable/CacheEvict)
+ * giúp hệ thống giảm tải đáng kể cho cơ sở dữ liệu khi xử lý hàng ngàn yêu cầu truy vấn cấu hình mỗi giây
+ * trong khung giờ cao điểm. Các tham số như khung giờ chốt đơn (Cutoff Time) hay phụ phí (Surcharge)
+ * đều được thẩm định qua lớp bảo vệ Validation nghiêm ngặt, ngăn chặn triệt để các lỗi định dạng
+ * có thể gây đứt gãy quy trình tính toán tự động. Sau mỗi lần cập nhật, hệ thống không chỉ
+ * làm mới bộ nhớ đệm mà còn tự động kích hoạt luồng Broadcast Notification, đảm bảo sự
+ * đồng bộ thông tin ngay lập tức giữa các bộ phận quản lý chi nhánh, kho vận và nhà bếp,
+ * từ đó duy trì tính nhất quán và minh bạch cho toàn bộ chuỗi cung ứng lạnh của dự án.
+ * </p>
  */
 @Slf4j
 @Service
@@ -35,6 +46,14 @@ public class SystemConfigService {
 
     /**
      * Lấy giá trị cấu hình theo Khóa (Config Key) - Có áp dụng Cache.
+     * <p>
+     * Dữ liệu sẽ được ưu tiên lấy từ bộ nhớ đệm RAM. Nếu không có (Cache Miss),
+     * hệ thống mới thực hiện truy vấn xuống Database.
+     * </p>
+     *
+     * @param configKey    Khóa định danh của cấu hình (VD: OPEN_TIME).
+     * @param defaultValue Giá trị trả về nếu không tìm thấy cấu hình trong DB.
+     * @return Chuỗi giá trị cấu hình tương ứng.
      */
     @Cacheable(value = "systemConfigs", key = "#configKey")
     public String getConfigValue(String configKey, String defaultValue) {
@@ -45,7 +64,11 @@ public class SystemConfigService {
     }
 
     /**
-     * Tiện ích: Lấy cấu hình dạng Giờ (LocalTime).
+     * Tiện ích: Lấy cấu hình và chuyển đổi sang dạng Giờ (LocalTime).
+     *
+     * @param configKey    Khóa cấu hình cần tra cứu.
+     * @param defaultValue Giá trị thời gian mặc định (định dạng HH:mm).
+     * @return Đối tượng {@link LocalTime} sau khi đã phân tích chuỗi giá trị.
      */
     public LocalTime getLocalTimeConfig(String configKey, String defaultValue) {
         String value = getConfigValue(configKey, defaultValue);
@@ -54,6 +77,10 @@ public class SystemConfigService {
 
     /**
      * Tiện ích: Lấy cấu hình dạng Tiền tệ/Số học (BigDecimal).
+     *
+     * @param configKey    Khóa cấu hình cần tra cứu.
+     * @param defaultValue Giá trị số mặc định dưới dạng chuỗi.
+     * @return Đối tượng {@link BigDecimal} tương ứng.
      */
     public BigDecimal getBigDecimalConfig(String configKey, String defaultValue) {
         String value = getConfigValue(configKey, defaultValue);
@@ -61,7 +88,9 @@ public class SystemConfigService {
     }
 
     /**
-     * Lấy toàn bộ danh sách cấu hình.
+     * Lấy toàn bộ danh sách cấu hình hiện hành trong hệ thống.
+     *
+     * @return Danh sách các thực thể {@link SystemConfig}.
      */
     public List<SystemConfig> getAllConfigs() {
         return systemConfigRepository.findAll();
@@ -76,6 +105,7 @@ public class SystemConfigService {
      * @param description Mô tả thay đổi.
      * @param updatedBy   Người thực hiện cập nhật.
      * @return Thực thể cấu hình sau cập nhật.
+     * @throws RuntimeException Nếu khóa không hợp lệ hoặc giá trị mới sai định dạng (Giờ/Tiền).
      */
     @CacheEvict(value = "systemConfigs", key = "#configKey")
     public SystemConfig updateConfig(String configKey, String configValue, String description, SystemUser updatedBy) {
