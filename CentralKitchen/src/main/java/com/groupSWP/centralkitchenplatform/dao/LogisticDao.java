@@ -22,6 +22,10 @@ import java.util.Map;
  * (Active) cho đến khi hoàn tất bàn giao (History). Các câu lệnh SQL được tối ưu hóa để đảm bảo
  * tính thời gian thực (Real-time) cho các thao tác giám sát xe và tài xế trong chuỗi cung ứng.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Repository
 @RequiredArgsConstructor
