@@ -27,6 +27,10 @@ import java.util.List;
  * {@link BigDecimal} xuyên suốt quá trình tính toán giúp hệ thống tránh được các lỗi làm tròn
  * số học thường gặp, từ đó bảo vệ tính chính xác của các báo cáo tài chính kho.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Service
 @RequiredArgsConstructor
