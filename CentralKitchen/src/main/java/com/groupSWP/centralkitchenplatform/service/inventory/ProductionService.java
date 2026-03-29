@@ -186,36 +186,58 @@ public class ProductionService {
     }
 
     // =========================================================================
-    // 🌟 5. HELPER: MAPPER TRẢ DATA CHO FRONTEND (CẬP NHẬT GIAO DIỆN MỚI)
+    // 🌟 5. HELPER: MAPPER TRẢ DATA CHO FRONTEND (BỌC THÉP CHỐNG LỖI 100%)
     // =========================================================================
     private ProductionResponse mapToResponse(ProductionRun run) {
         Order order = run.getOrder();
 
-        List<ProductionResponse.OrderItemDetail> itemDetails = order.getOrderItems().stream().map(item -> {
-            Product p = item.getProduct();
-
-// 🌟 Đổi getUnit() thành getBaseUnit().name()
-            List<ProductionResponse.FormulaDetail> formulas = p.getFormulas().stream().map(f ->
-                    ProductionResponse.FormulaDetail.builder()
-                            .ingredientName(f.getIngredient().getName())
-                            .amountNeeded(f.getAmountNeeded())
-                            // 👇 SỬA DÒNG NÀY: Gọi getBaseUnit() và ép sang chữ bằng .name()
-                            .unit(f.getIngredient().getUnit() != null ? f.getIngredient().getUnit().name() : "")
-                            .build()
-            ).collect(Collectors.toList());
-
-            return ProductionResponse.OrderItemDetail.builder()
-                    .productId(p.getProductId())
-                    .productName(p.getProductName())
-                    .quantity(item.getQuantity())
-                    .isCooked(run.getCookedProductIds().contains(p.getProductId())) // Check xem đã tick nấu chưa
-                    .formulas(formulas)
+        // 🛡️ CHỐT CHẶN 1: Nếu Phiếu nấu là "bóng ma" cũ không có Order -> Trả data rỗng ngay!
+        if (order == null) {
+            return ProductionResponse.builder()
+                    .runId(run.getRunId())
+                    .orderId("N/A")
+                    .storeName("⚠️ Dữ liệu cũ (Bóng ma)")
+                    .orderType("STANDARD")
+                    .status(run.getStatus() != null ? run.getStatus().name() : "UNKNOWN")
+                    .productionDate(run.getProductionDate())
+                    .items(new ArrayList<>()) // Mảng rỗng để FE không bị vòng lặp / crash
                     .build();
-        }).collect(Collectors.toList());
+        }
 
+        // 🛡️ CHỐT CHẶN 2: Phòng hờ Order không có OrderItems (Tránh NullPointerException)
+        List<ProductionResponse.OrderItemDetail> itemDetails = new ArrayList<>();
+        if (order.getOrderItems() != null) {
+            itemDetails = order.getOrderItems().stream().map(item -> {
+                Product p = item.getProduct();
+
+                // 🛡️ CHỐT CHẶN 3: Phòng hờ Món ăn bị xóa mất Công thức (BOM)
+                List<ProductionResponse.FormulaDetail> formulas = new ArrayList<>();
+                if (p != null && p.getFormulas() != null) {
+                    formulas = p.getFormulas().stream().map(f ->
+                            ProductionResponse.FormulaDetail.builder()
+                                    .ingredientName(f.getIngredient().getName())
+                                    .amountNeeded(f.getAmountNeeded())
+                                    .unit(f.getIngredient().getUnit() != null ? f.getIngredient().getUnit().name() : "")
+                                    .build()
+                    ).collect(Collectors.toList());
+                }
+
+                return ProductionResponse.OrderItemDetail.builder()
+                        .productId(p != null ? p.getProductId() : "N/A")
+                        .productName(p != null ? p.getProductName() : "Món đã bị xóa")
+                        .quantity(item.getQuantity())
+                        // Phòng hờ list cookedProductIds bị null ở dưới Database
+                        .isCooked(run.getCookedProductIds() != null && run.getCookedProductIds().contains(p != null ? p.getProductId() : ""))
+                        .formulas(formulas)
+                        .build();
+            }).collect(Collectors.toList());
+        }
+
+        // Trả về DTO chuẩn mực
         return ProductionResponse.builder()
                 .runId(run.getRunId())
                 .orderId(order.getOrderId())
+                // Lưu ý: Nếu Entity Store của Sếp xài getName() thay vì getStoreName() thì đổi ở đây nhé!
                 .storeName(order.getStore() != null ? order.getStore().getName() : "Unknown")
                 .orderType(order.getOrderType() != null ? order.getOrderType().name() : "STANDARD")
                 .status(run.getStatus().name())
