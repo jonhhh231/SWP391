@@ -25,6 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
  * khẩn cấp của cửa hàng đều sẽ tự động kích hoạt các luồng cảnh báo theo thời gian thực (Real-time alerts)
  * gửi trực tiếp đến Cửa hàng trưởng, đảm bảo sự minh bạch và phản hồi nhanh chóng trong chuỗi cung ứng.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @Service
 @RequiredArgsConstructor // Sử dụng Lombok để thay thế constructor thủ công
