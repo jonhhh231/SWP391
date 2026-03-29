@@ -38,6 +38,10 @@ import java.util.Map;
  * <b>Bảo mật:</b> Toàn bộ API trong Controller này yêu cầu Token hợp lệ và
  * quyền truy cập tối thiểu từ cấp độ {@code COORDINATOR} trở lên.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'COORDINATOR')")
 @RestController
