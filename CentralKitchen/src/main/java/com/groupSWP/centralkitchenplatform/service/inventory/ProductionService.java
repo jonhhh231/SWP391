@@ -1,28 +1,29 @@
 package com.groupSWP.centralkitchenplatform.service.inventory;
 
-import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionRequest;
 import com.groupSWP.centralkitchenplatform.dto.kitchen.ProductionResponse;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Formula;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.InventoryLog;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.ProductionRun;
-import com.groupSWP.centralkitchenplatform.entities.logistic.Order; // 🔥 Thêm import Order
-import com.groupSWP.centralkitchenplatform.entities.notification.Notification; // 🔥 Thêm import
+import com.groupSWP.centralkitchenplatform.entities.logistic.Order;
+import com.groupSWP.centralkitchenplatform.entities.logistic.OrderItem;
+import com.groupSWP.centralkitchenplatform.entities.notification.Notification;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ImportItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.InventoryLogRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ProductionRunRepository;
-import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository; // 🔥 Thêm import OrderRepository
+import com.groupSWP.centralkitchenplatform.repositories.order.OrderRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.ProductRepository;
-import com.groupSWP.centralkitchenplatform.service.notification.NotificationService; // 🔥 Thêm import
+import com.groupSWP.centralkitchenplatform.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -30,11 +31,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service quản lý các nghiệp vụ Sản xuất (Production Management) tại Bếp Trung Tâm.
- * <p>
- * Đảm nhiệm việc khởi tạo kế hoạch nấu ăn (Planned Runs), theo dõi trạng thái chế biến,
- * và đặc biệt là xử lý thuật toán trừ kho vật lý tự động dựa trên phương pháp FIFO
- * (First In, First Out) để tính toán chính xác chi phí giá vốn của từng mẻ nấu.
- * </p>
+ * Đã nâng cấp (Refactored) sang luồng Order-based (Sản xuất theo đơn).
  */
 @Service
 @RequiredArgsConstructor
@@ -45,91 +42,63 @@ public class ProductionService {
     private final IngredientRepository ingredientRepository;
     private final ImportItemRepository importItemRepository;
     private final InventoryLogRepository inventoryLogRepository;
-    private final NotificationService notificationService; // 🔥 Tiêm NotificationService
-    private final OrderRepository orderRepository; // 🔥 Thêm tiêm OrderRepository để xử lý luồng ngầm cho FE
+    private final NotificationService notificationService;
+    private final OrderRepository orderRepository;
 
-    /**
-     * Khởi tạo Kế hoạch mẻ nấu (Production Run).
-     * <p>
-     * Lưu ý quan trọng: API này chỉ khởi tạo mẻ nấu ở trạng thái PLANNED (Lên kế hoạch).
-     * Tại thời điểm này, nguyên liệu trong kho vật lý CHƯA bị trừ và chi phí CHƯA được tính toán.
-     * </p>
-     *
-     * @param request Payload chứa Mã món ăn và Số lượng cần nấu.
-     * @return Đối tượng {@link ProductionResponse} chứa thông tin Kế hoạch mẻ nấu vừa tạo.
-     * @throws RuntimeException Nếu món ăn không tồn tại hoặc chưa được cài đặt công thức (BOM).
-     */
+    // =========================================================================
+    // 🌟 1. TẠO PHIẾU NẤU TỪ DANH SÁCH ĐƠN HÀNG (THAY THẾ HÀM CŨ)
+    // =========================================================================
     @Transactional
-    public ProductionResponse createProductionRun(ProductionRequest request) {
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Món ăn không tồn tại!"));
+    public void createTicketsFromOrders(List<String> orderIds) {
+        for (String id : orderIds) {
+            Order order = orderRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + id));
 
-        if (product.getFormulas() == null || product.getFormulas().isEmpty()) {
-            throw new RuntimeException("Món này chưa có công thức (BOM), không thể nấu!");
+            // Đổi trạng thái đơn thành PLANNED (Đã vào kế hoạch bếp)
+            order.setStatus(Order.OrderStatus.PLANNED);
+
+            // Khởi tạo Phiếu nấu nháp (Chưa trừ kho)
+            ProductionRun run = new ProductionRun();
+            run.setRunId("TICKET-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            run.setOrder(order);
+            run.setCookedProductIds(new ArrayList<>()); // Danh sách rỗng ban đầu
+            run.setTotalCostAtProduction(BigDecimal.ZERO);
+            run.setProductionDate(LocalDateTime.now());
+            run.setStatus(ProductionRun.ProductionStatus.PLANNED);
+
+            productionRunRepository.save(run);
         }
-
-        String generatedRunId = "RUN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-
-        // 1. Chỉ khởi tạo Kế hoạch mẻ nấu (PLANNED) - CHƯA TRỪ KHO VÀ CHƯA TÍNH TIỀN
-        ProductionRun run = new ProductionRun();
-        run.setRunId(generatedRunId);
-        run.setProduct(product);
-        run.setPlannedQty(request.getQuantity());
-        run.setActualQty(BigDecimal.ZERO);
-        run.setWasteQty(BigDecimal.ZERO);
-        run.setTotalCostAtProduction(BigDecimal.ZERO);
-        run.setProductionDate(LocalDateTime.now());
-        run.setStatus(ProductionRun.ProductionStatus.PLANNED);
-        run.setBatchCode("BATCH-" + System.currentTimeMillis());
-
-        ProductionRun savedRun = productionRunRepository.save(run);
-
-        // 👉 ĐIỂM ĂN TIỀN: Đã gỡ bỏ vòng lặp trừ kho ở đây. Kế hoạch chỉ là kế hoạch, hàng trong kho vẫn nguyên si!
-
-        return mapToResponse(savedRun);
     }
 
-    /**
-     * Thay đổi trạng thái mẻ nấu và Kích hoạt thuật toán Trừ kho.
-     * <p>
-     * Khi mẻ nấu chuyển từ PLANNED sang COOKING (hoặc COMPLETED), hệ thống sẽ
-     * kích hoạt cơ chế duyệt qua công thức sản phẩm, kiểm tra tồn kho và gọi thuật toán
-     * FIFO để trừ thực tế từng lô nguyên liệu, đồng thời tính toán giá vốn mẻ nấu.
-     * </p>
-     *
-     * @param runId     Mã định danh của mẻ nấu.
-     * @param newStatus Trạng thái đích muốn chuyển sang.
-     * @return DTO chứa thông tin mẻ nấu sau khi cập nhật.
-     * @throws RuntimeException Nếu không đủ nguyên liệu hoặc vi phạm luồng trạng thái (Lùi bước).
-     */
+    // =========================================================================
+    // 🌟 2. NÚT TICK CHỌN NẤU TỪNG MÓN -> TRỪ KHO FIFO VÀ TÍNH TIỀN
+    // =========================================================================
     @Transactional
-    public ProductionResponse changeProductionStatus(String runId, ProductionRun.ProductionStatus newStatus) {
+    public void cookSpecificItems(String runId, List<String> productIdsToCook) {
         ProductionRun run = productionRunRepository.findById(runId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy mẻ nấu ID: " + runId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Phiếu nấu: " + runId));
+        Order order = run.getOrder();
+        BigDecimal currentRunCost = run.getTotalCostAtProduction() != null ? run.getTotalCostAtProduction() : BigDecimal.ZERO;
 
-        ProductionRun.ProductionStatus oldStatus = run.getStatus();
+        for (String productId : productIdsToCook) {
+            // Bỏ qua nếu món này đã được tick nấu trước đó rồi (Chống trừ kho 2 lần)
+            if (run.getCookedProductIds().contains(productId)) continue;
 
-        if (oldStatus == newStatus) {
-            return mapToResponse(run);
-        }
+            OrderItem item = order.getOrderItems().stream()
+                    .filter(oi -> oi.getProduct().getProductId().equals(productId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Món " + productId + " không nằm trong đơn hàng này!"));
 
-        // 🌟 KỊCH BẢN: Đổi từ PLANNED (Kế hoạch) sang COOKING (Đang nấu) hoặc COMPLETED -> CHÍNH THỨC TRỪ KHO!
-        if (oldStatus == ProductionRun.ProductionStatus.PLANNED &&
-                (newStatus == ProductionRun.ProductionStatus.COOKING || newStatus == ProductionRun.ProductionStatus.COMPLETED)) {
+            Product product = item.getProduct();
 
-            BigDecimal totalProductionCost = BigDecimal.ZERO;
-            Product product = run.getProduct();
-
-            // Lôi công thức ra và bắt đầu TRỪ KHO FIFO
+            // Lôi công thức ra và bắt đầu TRỪ KHO FIFO (Bê y nguyên logic cũ của Sếp vào đây)
             for (Formula formula : product.getFormulas()) {
                 Ingredient ingredient = formula.getIngredient();
-
-                // Tính tổng lượng nguyên liệu cần thiết cho toàn bộ mẻ nấu này
-                BigDecimal totalNeeded = formula.getAmountNeeded().multiply(run.getPlannedQty());
-
+                // Tính lượng cần: Định lượng 1 món * Số lượng khách đặt
+                BigDecimal totalNeeded = formula.getAmountNeeded().multiply(new BigDecimal(item.getQuantity()));
                 BigDecimal currentStock = ingredient.getKitchenStock() != null ? ingredient.getKitchenStock() : BigDecimal.ZERO;
 
-                // Chốt chặn an toàn: Kiểm tra kho trước khi trừ
+                // Chốt chặn an toàn
                 if (currentStock.compareTo(totalNeeded) < 0) {
                     throw new RuntimeException("Không đủ nguyên liệu: " + ingredient.getName() +
                             ". Cần: " + totalNeeded + " " + ingredient.getUnit() +
@@ -138,86 +107,75 @@ public class ProductionService {
 
                 // Chạy hàm FIFO trừ kho và tính tiền
                 BigDecimal ingredientCost = deductIngredientWithFIFO(ingredient, totalNeeded, run);
-                totalProductionCost = totalProductionCost.add(ingredientCost);
+                currentRunCost = currentRunCost.add(ingredientCost);
 
-                // 🔥 THÔNG BÁO: Kiểm tra tồn kho sau khi trừ, nếu rớt xuống dưới mức ngưỡng thì báo động!
+                // 🔥 THÔNG BÁO: Cảnh báo tồn kho (Giữ nguyên)
                 if (ingredient.getMinThreshold() != null && ingredient.getKitchenStock().compareTo(ingredient.getMinThreshold()) < 0) {
                     notificationService.broadcastNotification(
                             List.of("MANAGER"),
                             "📉 CẢNH BÁO TỒN KHO",
-                            "Nguyên liệu " + ingredient.getName() + " vừa rớt xuống dưới mức an toàn (" + ingredient.getKitchenStock() + " " + ingredient.getUnit() + "). Vui lòng lên kế hoạch nhập hàng!",
+                            "Nguyên liệu " + ingredient.getName() + " vừa rớt xuống mức " + ingredient.getKitchenStock() + ". Cần nhập hàng!",
                             Notification.NotificationType.WARNING
                     );
                 }
             }
 
-            // Ghi nhận giá vốn thực tế vào mẻ nấu
-            run.setTotalCostAtProduction(totalProductionCost);
+            // Đánh dấu món này đã nấu xong
+            run.getCookedProductIds().add(productId);
         }
 
-        // =================================================================================
-        // 🔥 LOGIC MỚI BỔ SUNG: QUÉT NGẦM VÀ ĐỔI TRẠNG THÁI ĐƠN HÀNG LÊN "PREPARING" (YÊU CẦU CỦA FE)
-        // =================================================================================
-        if (oldStatus == ProductionRun.ProductionStatus.PLANNED && newStatus == ProductionRun.ProductionStatus.COOKING) {
-            List<Order> plannedOrders = orderRepository.findByStatusAndOrderItems_Product_ProductId(
-                    Order.OrderStatus.PLANNED, run.getProduct().getProductId()
-            );
-            if (!plannedOrders.isEmpty()) {
-                plannedOrders.forEach(o -> o.setStatus(Order.OrderStatus.PREPARING));
-                orderRepository.saveAll(plannedOrders);
-            }
+        // Cập nhật giá vốn
+        run.setTotalCostAtProduction(currentRunCost);
+
+        // Tự động chuyển trạng thái Đơn hàng sang Đang Chuẩn Bị nếu đây là món đầu tiên được nấu
+        if (run.getStatus() == ProductionRun.ProductionStatus.PLANNED) {
+            run.setStatus(ProductionRun.ProductionStatus.COOKING);
+            order.setStatus(Order.OrderStatus.PREPARING);
         }
 
-        // Chặn lùi trạng thái (Đã nấu rồi thì không được lùi về Kế hoạch để tránh lỗi kho kép)
+        productionRunRepository.save(run);
+    }
+
+    // =========================================================================
+    // 🌟 3. CẬP NHẬT TRẠNG THÁI PHIẾU NẤU (HOÀN TẤT)
+    // =========================================================================
+    @Transactional
+    public ProductionResponse changeProductionStatus(String runId, ProductionRun.ProductionStatus newStatus) {
+        ProductionRun run = productionRunRepository.findById(runId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy mẻ nấu ID: " + runId));
+
+        ProductionRun.ProductionStatus oldStatus = run.getStatus();
+        if (oldStatus == newStatus) return mapToResponse(run);
+
+        // Chặn lùi trạng thái
         if (oldStatus == ProductionRun.ProductionStatus.COOKING && newStatus == ProductionRun.ProductionStatus.PLANNED) {
-            throw new RuntimeException("Mẻ nấu đang diễn ra (COOKING), không thể lùi về trạng thái Kế Hoạch (PLANNED)!");
+            throw new RuntimeException("Mẻ nấu đang diễn ra, không thể lùi về Kế Hoạch!");
         }
 
-        // =================================================================================
-        // 🔥 LOGIC MỚI BỔ SUNG: KHI NẤU XONG (COMPLETED) - ĐÃ FIX HIỂN THỊ MÃ ĐƠN
-        // =================================================================================
+        Order order = run.getOrder();
+
+        // NẤU XONG -> Cập nhật Order và Gọi xe (Fix triệt để lỗi quét nhầm đơn)
         if (newStatus == ProductionRun.ProductionStatus.COMPLETED) {
+            order.setStatus(Order.OrderStatus.READY_TO_SHIP);
+            orderRepository.save(order);
 
-            // 1. Tính toán chốt sổ số lượng thực tế (Giúp FE không cần nhập tay)
-            BigDecimal waste = run.getWasteQty() != null ? run.getWasteQty() : BigDecimal.ZERO;
-            run.setActualQty(run.getPlannedQty().subtract(waste));
-
-            // 2. Quét ngầm và cập nhật trạng thái Đơn hàng lên "READY_TO_SHIP" (YÊU CẦU CỦA FE)
-            List<Order> preparingOrders = orderRepository.findByStatusAndOrderItems_Product_ProductId(
-                    Order.OrderStatus.PREPARING, run.getProduct().getProductId()
+            // Reo chuông cho Điều phối viên (Coordinator) ra xếp xe
+            notificationService.broadcastNotification(
+                    List.of("COORDINATOR"),
+                    "✅ ĐƠN HÀNG SẴN SÀNG",
+                    "Đơn hàng [" + order.getOrderId() + "] của " + order.getStore().getName() + " đã nấu xong. Vui lòng điều phối xe!",
+                    Notification.NotificationType.INFO
             );
-
-            if (!preparingOrders.isEmpty()) {
-                // 🔥 ĐIỂM FIX MỚI CỦA SẾP: Rút danh sách Mã Đơn ra để báo cáo chi tiết
-                String orderIdsList = preparingOrders.stream()
-                        .map(Order::getOrderId)
-                        .collect(Collectors.joining(", "));
-
-                preparingOrders.forEach(o -> o.setStatus(Order.OrderStatus.READY_TO_SHIP));
-                orderRepository.saveAll(preparingOrders);
-
-                // Reo chuông cho Điều phối viên (Coordinator) ra xếp xe (Có kèm list mã đơn)
-                notificationService.broadcastNotification(
-                        List.of("COORDINATOR"),
-                        "✅ HÀNG ĐÃ NẤU XONG",
-                        "Mẻ nấu " + run.getProduct().getProductName() + " đã hoàn tất. Các đơn hàng [" + orderIdsList + "] đã sẵn sàng (READY_TO_SHIP). Vui lòng điều phối tài xế!",
-                        Notification.NotificationType.INFO
-                );
-            }
         }
 
         run.setStatus(newStatus);
         ProductionRun savedRun = productionRunRepository.save(run);
-
         return mapToResponse(savedRun);
     }
 
-    /**
-     * Lấy danh sách các mẻ nấu đang ở trạng thái Hoạt động.
-     * <p>Truy xuất các mẻ đang chờ nấu (PLANNED) hoặc đang nấu (COOKING).</p>
-     *
-     * @return Danh sách DTO các mẻ nấu hiện hành.
-     */
+    // =========================================================================
+    // 🌟 4. LẤY DANH SÁCH MẺ ĐANG HOẠT ĐỘNG
+    // =========================================================================
     public List<ProductionResponse> getActiveProductionRuns() {
         List<ProductionRun.ProductionStatus> activeStatuses = Arrays.asList(
                 ProductionRun.ProductionStatus.PLANNED,
@@ -227,40 +185,74 @@ public class ProductionService {
         return activeRuns.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    /**
-     * Hàm Helper: Chuyển đổi Entity ProductionRun sang DTO.
-     */
+    // =========================================================================
+    // 🌟 5. HELPER: MAPPER TRẢ DATA CHO FRONTEND (BỌC THÉP CHỐNG LỖI 100%)
+    // =========================================================================
     private ProductionResponse mapToResponse(ProductionRun run) {
+        Order order = run.getOrder();
+
+        // 🛡️ CHỐT CHẶN 1: Nếu Phiếu nấu là "bóng ma" cũ không có Order -> Trả data rỗng ngay!
+        if (order == null) {
+            return ProductionResponse.builder()
+                    .runId(run.getRunId())
+                    .orderId("N/A")
+                    .storeName("⚠️ Dữ liệu cũ (Bóng ma)")
+                    .orderType("STANDARD")
+                    .status(run.getStatus() != null ? run.getStatus().name() : "UNKNOWN")
+                    .productionDate(run.getProductionDate())
+                    .items(new ArrayList<>()) // Mảng rỗng để FE không bị vòng lặp / crash
+                    .build();
+        }
+
+        // 🛡️ CHỐT CHẶN 2: Phòng hờ Order không có OrderItems (Tránh NullPointerException)
+        List<ProductionResponse.OrderItemDetail> itemDetails = new ArrayList<>();
+        if (order.getOrderItems() != null) {
+            itemDetails = order.getOrderItems().stream().map(item -> {
+                Product p = item.getProduct();
+
+                // 🛡️ CHỐT CHẶN 3: Phòng hờ Món ăn bị xóa mất Công thức (BOM)
+                List<ProductionResponse.FormulaDetail> formulas = new ArrayList<>();
+                if (p != null && p.getFormulas() != null) {
+                    formulas = p.getFormulas().stream().map(f ->
+                            ProductionResponse.FormulaDetail.builder()
+                                    .ingredientName(f.getIngredient().getName())
+                                    .amountNeeded(f.getAmountNeeded())
+                                    .unit(f.getIngredient().getUnit() != null ? f.getIngredient().getUnit().name() : "")
+                                    .build()
+                    ).collect(Collectors.toList());
+                }
+
+                return ProductionResponse.OrderItemDetail.builder()
+                        .productId(p != null ? p.getProductId() : "N/A")
+                        .productName(p != null ? p.getProductName() : "Món đã bị xóa")
+                        .quantity(item.getQuantity())
+                        // Phòng hờ list cookedProductIds bị null ở dưới Database
+                        .isCooked(run.getCookedProductIds() != null && run.getCookedProductIds().contains(p != null ? p.getProductId() : ""))
+                        .formulas(formulas)
+                        .build();
+            }).collect(Collectors.toList());
+        }
+
+        // Trả về DTO chuẩn mực
         return ProductionResponse.builder()
                 .runId(run.getRunId())
-                .productName(run.getProduct().getProductName())
-                .plannedQty(run.getPlannedQty())
+                .orderId(order.getOrderId())
+                // Lưu ý: Nếu Entity Store của Sếp xài getName() thay vì getStoreName() thì đổi ở đây nhé!
+                .storeName(order.getStore() != null ? order.getStore().getName() : "Unknown")
+                .orderType(order.getOrderType() != null ? order.getOrderType().name() : "STANDARD")
                 .status(run.getStatus().name())
                 .productionDate(run.getProductionDate())
+                .items(itemDetails)
                 .build();
     }
 
     // =========================================================================
-    // HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH)
+    // 🌟 6. HÀM TRỪ KHO FIFO (PHIÊN BẢN HOÀN CHỈNH CỦA SẾP - GIỮ NGUYÊN 100%)
     // =========================================================================
-    /**
-     * Thuật toán trừ kho FIFO (First In, First Out) và tính giá vốn.
-     * <p>
-     * Quét qua các lô hàng nhập cũ nhất của nguyên liệu này. Lô nào hết trước sẽ trừ lô đó,
-     * thiếu thì trừ tiếp vào lô sau. Đồng thời nhân với giá nhập thực tế của từng lô
-     * để ra được tổng chi phí xuất kho chuẩn xác đến từng đồng.
-     * </p>
-     *
-     * @param ingredient     Thực thể Nguyên liệu cần trừ.
-     * @param quantityNeeded Tổng số lượng cần trừ.
-     * @param run            Kế hoạch mẻ nấu đang thực hiện (Dùng để ghi Log).
-     * @return Tổng chi phí (Giá vốn) của lượng nguyên liệu bị trừ.
-     */
     private BigDecimal deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, ProductionRun run) {
         BigDecimal remainingToDeduct = quantityNeeded;
         BigDecimal totalIngredientCost = BigDecimal.ZERO;
 
-        // Lấy danh sách các lô hàng còn tồn của nguyên liệu này, xếp theo lô cũ nhất (ID tăng dần)
         List<ImportItem> availableBatches = importItemRepository
                 .findByIngredientAndRemainingQuantityGreaterThanOrderByIdAsc(ingredient, BigDecimal.ZERO);
 
@@ -271,23 +263,19 @@ public class ProductionService {
             BigDecimal deductedAmount;
 
             if (batchQty.compareTo(remainingToDeduct) >= 0) {
-                // Lô này đủ sức gánh toàn bộ số lượng cần trừ
                 batch.setRemainingQuantity(batchQty.subtract(remainingToDeduct));
                 deductedAmount = remainingToDeduct;
                 remainingToDeduct = BigDecimal.ZERO;
             } else {
-                // Lô này không đủ, trừ hết lô này rồi chuyển sang lô tiếp theo
                 batch.setRemainingQuantity(BigDecimal.ZERO);
                 deductedAmount = batchQty;
                 remainingToDeduct = remainingToDeduct.subtract(batchQty);
             }
             importItemRepository.save(batch);
 
-            // Tính tiền lô hàng này (Số lượng bị trừ * Giá nhập của lô)
             BigDecimal costForThisBatch = deductedAmount.multiply(batch.getImportPrice());
             totalIngredientCost = totalIngredientCost.add(costForThisBatch);
 
-            // Ghi nhận biến động kho vào Log
             InventoryLog log = InventoryLog.builder()
                     .importItem(batch)
                     .ingredient(ingredient)
@@ -299,12 +287,10 @@ public class ProductionService {
             inventoryLogRepository.save(log);
         }
 
-        // Chốt chặn cuối: Nếu duyệt hết kho mà vẫn thiếu (Lỗi đồng bộ dữ liệu)
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
             throw new RuntimeException("LỖI NGHIÊM TRỌNG: Tồn kho các lô không khớp với tổng tồn. Thiếu: " + remainingToDeduct);
         }
 
-        // Trừ tổng tồn kho chung của nguyên liệu
         ingredient.setKitchenStock(ingredient.getKitchenStock().subtract(quantityNeeded));
         ingredientRepository.save(ingredient);
 

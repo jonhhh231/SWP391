@@ -38,9 +38,9 @@ public class Product extends BaseEntity {
     @JsonIgnore
     private List<Formula> formulas; // BOM
 
-    @OneToMany(mappedBy = "product")
-    @JsonIgnore
-    private List<ProductionRun> productionRuns;
+//    @OneToMany(mappedBy = "product")
+//    @JsonIgnore
+//    private List<ProductionRun> productionRuns;
 
     @OneToMany(mappedBy = "product")
     @JsonIgnore
