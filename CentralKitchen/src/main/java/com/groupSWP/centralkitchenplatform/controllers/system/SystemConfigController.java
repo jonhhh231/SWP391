@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
  * Đặc biệt, cơ chế lưu vết (Audit Trail) được tích hợp sẵn giúp ghi lại chính xác danh tính
  * của người thực hiện thay đổi, đảm bảo tính minh bạch và trách nhiệm giải trình trong quản lý.
  * </p>
+ *
+ * @author Đạt, Huy, Triển
+ * @version 1.0
+ * @since 2026-03-29
  */
 @RestController
 @RequestMapping("/api/manager/configs")
