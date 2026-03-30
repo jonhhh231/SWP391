@@ -1,10 +1,12 @@
 package com.groupSWP.centralkitchenplatform.service.inventory;
 
 import com.groupSWP.centralkitchenplatform.dto.inventory.StocktakeRequest;
+import com.groupSWP.centralkitchenplatform.entities.auth.Account; // 🔥 Thêm import Account
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.InventoryLog;
 import com.groupSWP.centralkitchenplatform.entities.notification.Notification;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
+import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository; // 🔥 Thêm import Account Repo
 import com.groupSWP.centralkitchenplatform.repositories.inventory.ImportItemRepository;
 import com.groupSWP.centralkitchenplatform.repositories.inventory.InventoryLogRepository;
 import com.groupSWP.centralkitchenplatform.repositories.product.IngredientRepository;
@@ -29,12 +31,18 @@ public class StocktakeService {
     private final ImportItemRepository importItemRepository;
     private final InventoryLogRepository inventoryLogRepository;
     private final NotificationService notificationService;
+    private final AccountRepository accountRepository; // 👉 Bổ sung Repo lấy tên
 
     @Transactional
-    public void processStocktake(StocktakeRequest request) {
+    public void processStocktake(StocktakeRequest request, String username) { // 👉 Yêu cầu Controller truyền username vào đây
         log.info("Manager bắt đầu xử lý Kiểm kê kho định kỳ...");
         int totalDiscrepancies = 0;
         boolean hasSevereLoss = false; // Cờ theo dõi xem có vụ mất cắp/hao hụt nghiêm trọng nào không
+
+        // 👉 LẤY ĐÍCH DANH TÊN NGƯỜI KIỂM KÊ TỪ DATABASE
+        Account account = accountRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản người dùng!"));
+        String performerName = account.getSystemUser() != null ? account.getSystemUser().getFullName() : username;
 
         // 🌟 TẠO MÃ PHIÊN KIỂM KÊ (SESSION CODE) DUY NHẤT CHO ĐỢT NÀY
         // Format: KK-YYMMDD-RANDOM (VD: KK-260327-A8F2)
@@ -78,7 +86,7 @@ public class StocktakeService {
 
                 // Thuật toán FIFO y chang lúc nấu ăn để tiền vốn khớp 100%
                 // 🌟 Truyền sessionCode vào để gom nhóm log
-                deductIngredientWithFIFO(ingredient, discrepancy, item.getNote(), sessionCode);
+                deductIngredientWithFIFO(ingredient, discrepancy, item.getNote(), sessionCode, performerName); // 👉 Thêm performerName
 
                 // Cập nhật lại tồn kho tổng
                 ingredient.setKitchenStock(actualQty);
@@ -95,7 +103,8 @@ public class StocktakeService {
                 InventoryLog logEntry = InventoryLog.builder()
                         .ingredient(ingredient)
                         .quantityDeducted(discrepancy) // Số âm thể hiện việc cộng thêm vào
-                        .note("Kiểm kê bởi Manager: Điều chỉnh tăng kho. Ghi chú: " + item.getNote())
+                        .note(item.getNote() != null && !item.getNote().isEmpty() ? item.getNote() : "Không có ghi chú") // 👉 CHỈ LƯU ĐÚNG GHI CHÚ
+                        .createdBy(performerName) // 👉 LƯU TÊN NGƯỜI KIỂM KÊ
                         .createdAt(LocalDateTime.now())
                         .referenceCode(sessionCode) // 🌟 Gán mã sessionCode cho hàng Dư kho
                         .build();
@@ -111,7 +120,7 @@ public class StocktakeService {
             notificationService.broadcastNotification(
                     List.of("ADMIN", "KITCHEN_MANAGER"),
                     "🚨 BÁO ĐỘNG: HAO HỤT KHO NGHIÊM TRỌNG",
-                    "Phát hiện nguyên liệu bị thất thoát trên 50% sau kiểm kê. Quản lý (Manager) đã phải dùng quyền Ghi đè hệ thống. Bếp trưởng vui lòng rà soát lại nhân viên ngay lập tức!",
+                    "Phát hiện nguyên liệu bị thất thoát trên 50% sau kiểm kê. Quản lý (" + performerName + ") đã phải dùng quyền Ghi đè hệ thống. Bếp trưởng vui lòng rà soát lại nhân viên ngay lập tức!",
                     Notification.NotificationType.URGENT
             );
         } else if (totalDiscrepancies > 0) {
@@ -119,7 +128,7 @@ public class StocktakeService {
             notificationService.broadcastNotification(
                     List.of("ADMIN", "KITCHEN_MANAGER"),
                     "⚠️ BÁO CÁO KIỂM KÊ KHO",
-                    "Quản lý (Manager) vừa hoàn tất kiểm kê định kỳ (" + sessionCode + "). Phát hiện " + totalDiscrepancies + " nguyên liệu có sự chênh lệch (Hao hụt nhẹ) so với sổ sách.",
+                    "Quản lý (" + performerName + ") vừa hoàn tất kiểm kê định kỳ (" + sessionCode + "). Phát hiện " + totalDiscrepancies + " nguyên liệu có sự chênh lệch (Hao hụt nhẹ) so với sổ sách.",
                     Notification.NotificationType.WARNING
             );
         }
@@ -129,7 +138,7 @@ public class StocktakeService {
     // HÀM TRỪ KHO FIFO DÀNH RIÊNG CHO KIỂM KÊ
     // =========================================================================
     // 🌟 Thêm tham số sessionCode vào hàm này
-    private void deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, String userNote, String sessionCode) {
+    private void deductIngredientWithFIFO(Ingredient ingredient, BigDecimal quantityNeeded, String userNote, String sessionCode, String performerName) { // 👉 Thêm performerName
         BigDecimal remainingToDeduct = quantityNeeded;
 
         List<ImportItem> availableBatches = importItemRepository
@@ -152,13 +161,13 @@ public class StocktakeService {
             }
             importItemRepository.save(batch);
 
-            String finalNote = "Hao hụt kiểm kê kho bởi Manager. " + (userNote != null ? "- Ghi chú: " + userNote : "");
-
+            // 👉 Xóa dòng nối chuỗi cũ để tách dữ liệu sạch sẽ cho FE
             InventoryLog logEntry = InventoryLog.builder()
                     .importItem(batch)
                     .ingredient(ingredient)
                     .quantityDeducted(deductedAmount)
-                    .note(finalNote)
+                    .note(userNote != null && !userNote.isEmpty() ? userNote : "Không có ghi chú") // 👉 CHỈ LƯU GHI CHÚ
+                    .createdBy(performerName) // 👉 LƯU TÊN NGƯỜI KIỂM KÊ
                     .createdAt(LocalDateTime.now())
                     .referenceCode(sessionCode) // 🌟 Thay vì tự sinh mã mới, dùng mã truyền vào
                     .build();
@@ -168,5 +177,54 @@ public class StocktakeService {
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
             log.error("CẢNH BÁO: Hao hụt nhiều hơn cả số lượng trong các lô hàng. Đã trừ sạch các lô!");
         }
+    }
+
+    // =========================================================
+    // 🌟 API 2: LẤY CHI TIẾT KIỂM KÊ (ĐÃ XỬ LÝ GOM NHÓM FIFO & ĐẢO DẤU)
+    // =========================================================
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getStocktakeDetails(String sessionCode) {
+        List<InventoryLog> details = inventoryLogRepository.findByReferenceCode(sessionCode);
+
+        if (details.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy dữ liệu cho mã kiểm kê: " + sessionCode);
+        }
+
+        java.util.Map<String, java.util.Map<String, Object>> groupedData = new java.util.HashMap<>();
+
+        for (InventoryLog log : details) {
+            String ingId = log.getIngredient().getIngredientId();
+
+            // 🌟 ĐẢO DẤU CHO FE: Dư là (+), Hao hụt là (-)
+            BigDecimal displayChange = log.getQuantityDeducted().negate();
+
+            if (groupedData.containsKey(ingId)) {
+                java.util.Map<String, Object> existingItem = groupedData.get(ingId);
+
+                // 🌟 Lấy ra và cộng dồn bằng biến mới quantityChange
+                BigDecimal currentQty = (BigDecimal) existingItem.get("quantityChange");
+                existingItem.put("quantityChange", currentQty.add(displayChange));
+
+            } else {
+                java.util.Map<String, Object> newItem = new java.util.HashMap<>();
+                newItem.put("logId", log.getId());
+
+                // 🌟 Lưu bằng key quantityChange
+                newItem.put("quantityChange", displayChange);
+
+                newItem.put("note", log.getNote() != null ? log.getNote() : "Không có ghi chú");
+                newItem.put("createdBy", log.getCreatedBy() != null ? log.getCreatedBy() : "Hệ thống");
+
+                newItem.put("ingredient", java.util.Map.of(
+                        "id", ingId,
+                        "name", log.getIngredient().getName()
+                ));
+
+                groupedData.put(ingId, newItem);
+            }
+        }
+
+        // Trả về List thuần túy sau khi xào nấu xong
+        return new java.util.ArrayList<>(groupedData.values());
     }
 }

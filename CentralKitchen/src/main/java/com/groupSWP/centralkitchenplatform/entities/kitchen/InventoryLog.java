@@ -40,4 +40,7 @@ public class InventoryLog {
 
     @Column(name = "reference_code")
     private String referenceCode;
+
+    @Column(name = "created_by")
+    private String createdBy;
 }
