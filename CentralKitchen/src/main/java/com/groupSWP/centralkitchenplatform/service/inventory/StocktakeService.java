@@ -174,8 +174,23 @@ public class StocktakeService {
             inventoryLogRepository.save(logEntry);
         }
 
+        // =========================================================
+        // 🌟 FIX LỖI FE BÁO: CHẤP NHẬN TRỪ LỐ (OVER-DEDUCT) DỮ LIỆU RÁC
+        // Nếu đã vét sạch các lô mà vẫn còn số lượng cần trừ, ép tạo Log!
+        // =========================================================
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
-            log.error("CẢNH BÁO: Hao hụt nhiều hơn cả số lượng trong các lô hàng. Đã trừ sạch các lô!");
+            log.error("CẢNH BÁO: Hao hụt nhiều hơn cả số lượng trong các lô hàng. Đã trừ sạch các lô, phần còn dư sẽ gán vào Lô ảo!");
+
+            InventoryLog fallbackLog = InventoryLog.builder()
+                    .importItem(null) // 👉 Lô hàng ảo (Ép lưu log dù không có lô hàng gốc)
+                    .ingredient(ingredient)
+                    .quantityDeducted(remainingToDeduct) // Trừ nốt phần còn thiếu
+                    .note(userNote != null && !userNote.isEmpty() ? userNote : "Không có ghi chú")
+                    .createdBy(performerName)
+                    .createdAt(LocalDateTime.now())
+                    .referenceCode(sessionCode)
+                    .build();
+            inventoryLogRepository.save(fallbackLog);
         }
     }
 
