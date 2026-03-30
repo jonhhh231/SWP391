@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication; // 👉 THÊM IMPORT NÀY ĐỂ BẮT INFO NGƯỜI DÙNG
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,8 +28,8 @@ public class StocktakeController {
     @PostMapping("/stocktake")
     // 🌟 SỬA Ở ĐÂY: Dùng hasAnyAuthority bao trọn gói cả có ROLE_ và không có ROLE_
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
-    public ResponseEntity<?> processStocktake(@Valid @RequestBody StocktakeRequest request) {
-        stocktakeService.processStocktake(request);
+    public ResponseEntity<?> processStocktake(@Valid @RequestBody StocktakeRequest request, Authentication authentication) { // 👉 LẤY AUTHENTICATION
+        stocktakeService.processStocktake(request, authentication.getName()); // 👉 TRUYỀN USERNAME XUỐNG SERVICE
         return ResponseEntity.ok(java.util.Map.of("message", "Đã hoàn tất quá trình đối soát và kiểm kê kho!"));
     }
 
@@ -59,7 +60,8 @@ public class StocktakeController {
                 // 🌟 Đổi getLogId() thành getId()
                 "logId", log.getId(),
                 "quantityDeducted", log.getQuantityDeducted(),
-                "note", log.getNote() != null ? log.getNote() : "",
+                "note", log.getNote() != null ? log.getNote() : "Không có ghi chú",
+                "createdBy", log.getCreatedBy() != null ? log.getCreatedBy() : "Hệ thống", // 👉 BƠM TÊN NGƯỜI LÀM CHO FE LÊN POPUP
                 "ingredient", java.util.Map.of(
                         // 🌟 Đổi getId() thành getIngredientId() (hoặc sửa lại theo Entity của Sếp)
                         "id", log.getIngredient().getIngredientId(),

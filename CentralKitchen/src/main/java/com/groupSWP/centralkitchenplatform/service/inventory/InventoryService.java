@@ -118,6 +118,22 @@ public class InventoryService {
             // 🌟 FIX LỖI TIỀN LẺ: Chia lấy 4 số thập phân để đảm bảo chính xác tuyệt đối khi nhân ngược lại
             BigDecimal baseUnitCost = lineTotal.divide(baseQuantity, 4, RoundingMode.HALF_UP);
 
+            // =========================================================================
+            // 🌟 TÍNH TOÁN LẠI GIÁ VỐN BÌNH QUÂN GIA QUYỀN (MOVING AVERAGE COST - MAC)
+            // =========================================================================
+            BigDecimal currentStock = (ingredient.getKitchenStock() == null) ? BigDecimal.ZERO : ingredient.getKitchenStock();
+            BigDecimal currentUnitCost = (ingredient.getUnitCost() == null) ? BigDecimal.ZERO : ingredient.getUnitCost();
+
+            BigDecimal oldTotalValue = currentStock.multiply(currentUnitCost);
+            BigDecimal newTotalValue = lineTotal;
+            BigDecimal newStock = currentStock.add(baseQuantity);
+
+            BigDecimal movingAverageCost = BigDecimal.ZERO;
+            if (newStock.compareTo(BigDecimal.ZERO) > 0) {
+                movingAverageCost = oldTotalValue.add(newTotalValue).divide(newStock, 4, RoundingMode.HALF_UP);
+            }
+            // =========================================================================
+
             // 🔥 ĐIỂM ĂN TIỀN LÀ ĐÂY: Thêm remainingQuantity để FIFO có data mà trừ!
             ImportItem importItem = ImportItem.builder()
                     .importTicket(ticket)
@@ -131,9 +147,9 @@ public class InventoryService {
             // 👉 CỘNG THẲNG TIỀN VÀO TỔNG PHIẾU NHẬP (Không nhân thêm quantity nữa)
             totalAmount = totalAmount.add(lineTotal);
 
-            BigDecimal currentStock = (ingredient.getKitchenStock() == null) ? BigDecimal.ZERO : ingredient.getKitchenStock();
-            ingredient.setKitchenStock(currentStock.add(baseQuantity));
-            ingredient.setUnitCost(baseUnitCost);
+            // 🌟 Cập nhật lại kho và đè đơn giá bằng thuật toán MAC
+            ingredient.setKitchenStock(newStock);
+            ingredient.setUnitCost(movingAverageCost);
 
             ingredientRepository.save(ingredient);
         }
