@@ -47,28 +47,7 @@ public class StocktakeController {
     @GetMapping("/stocktake/history/{sessionCode}")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<?> getStocktakeDetails(@PathVariable String sessionCode) {
-        List<InventoryLog> details = inventoryLogRepository.findByReferenceCode(sessionCode);
-
-        if (details.isEmpty()) {
-            throw new RuntimeException("Không tìm thấy dữ liệu cho mã kiểm kê: " + sessionCode);
-        }
-
-        // =========================================================
-        // 🛑 CHỐT CHẶN VÒNG LẶP VÔ HẠN (Đã sửa lại getter)
-        // =========================================================
-        var responseData = details.stream().map(log -> java.util.Map.of(
-                // 🌟 Đổi getLogId() thành getId()
-                "logId", log.getId(),
-                "quantityDeducted", log.getQuantityDeducted(),
-                "note", log.getNote() != null ? log.getNote() : "Không có ghi chú",
-                "createdBy", log.getCreatedBy() != null ? log.getCreatedBy() : "Hệ thống", // 👉 BƠM TÊN NGƯỜI LÀM CHO FE LÊN POPUP
-                "ingredient", java.util.Map.of(
-                        // 🌟 Đổi getId() thành getIngredientId() (hoặc sửa lại theo Entity của Sếp)
-                        "id", log.getIngredient().getIngredientId(),
-                        "name", log.getIngredient().getName()
-                )
-        )).toList();
-
-        return ResponseEntity.ok(responseData);
+        // Lễ tân chỉ việc gọi Đầu bếp (Service) và bưng ra cho khách (FE)
+        return ResponseEntity.ok(stocktakeService.getStocktakeDetails(sessionCode));
     }
 }

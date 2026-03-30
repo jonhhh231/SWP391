@@ -178,4 +178,44 @@ public class StocktakeService {
             log.error("CẢNH BÁO: Hao hụt nhiều hơn cả số lượng trong các lô hàng. Đã trừ sạch các lô!");
         }
     }
+
+    // =========================================================
+    // 🌟 API 2: LẤY CHI TIẾT KIỂM KÊ (ĐÃ XỬ LÝ GOM NHÓM FIFO)
+    // =========================================================
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getStocktakeDetails(String sessionCode) {
+        List<InventoryLog> details = inventoryLogRepository.findByReferenceCode(sessionCode);
+
+        if (details.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy dữ liệu cho mã kiểm kê: " + sessionCode);
+        }
+
+        java.util.Map<String, java.util.Map<String, Object>> groupedData = new java.util.HashMap<>();
+
+        for (InventoryLog log : details) {
+            String ingId = log.getIngredient().getIngredientId();
+
+            if (groupedData.containsKey(ingId)) {
+                java.util.Map<String, Object> existingItem = groupedData.get(ingId);
+                BigDecimal currentQty = (BigDecimal) existingItem.get("quantityDeducted");
+                existingItem.put("quantityDeducted", currentQty.add(log.getQuantityDeducted()));
+            } else {
+                java.util.Map<String, Object> newItem = new java.util.HashMap<>();
+                newItem.put("logId", log.getId());
+                newItem.put("quantityDeducted", log.getQuantityDeducted());
+                newItem.put("note", log.getNote() != null ? log.getNote() : "Không có ghi chú");
+                newItem.put("createdBy", log.getCreatedBy() != null ? log.getCreatedBy() : "Hệ thống");
+
+                newItem.put("ingredient", java.util.Map.of(
+                        "id", ingId,
+                        "name", log.getIngredient().getName()
+                ));
+
+                groupedData.put(ingId, newItem);
+            }
+        }
+
+        // Trả về List thuần túy sau khi xào nấu xong
+        return new java.util.ArrayList<>(groupedData.values());
+    }
 }
