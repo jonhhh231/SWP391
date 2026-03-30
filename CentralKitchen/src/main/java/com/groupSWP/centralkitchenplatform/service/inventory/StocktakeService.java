@@ -180,7 +180,7 @@ public class StocktakeService {
     }
 
     // =========================================================
-    // 🌟 API 2: LẤY CHI TIẾT KIỂM KÊ (ĐÃ XỬ LÝ GOM NHÓM FIFO)
+    // 🌟 API 2: LẤY CHI TIẾT KIỂM KÊ (ĐÃ XỬ LÝ GOM NHÓM FIFO & ĐẢO DẤU)
     // =========================================================
     @Transactional(readOnly = true)
     public List<java.util.Map<String, Object>> getStocktakeDetails(String sessionCode) {
@@ -195,14 +195,23 @@ public class StocktakeService {
         for (InventoryLog log : details) {
             String ingId = log.getIngredient().getIngredientId();
 
+            // 🌟 ĐẢO DẤU CHO FE: Dư là (+), Hao hụt là (-)
+            BigDecimal displayChange = log.getQuantityDeducted().negate();
+
             if (groupedData.containsKey(ingId)) {
                 java.util.Map<String, Object> existingItem = groupedData.get(ingId);
-                BigDecimal currentQty = (BigDecimal) existingItem.get("quantityDeducted");
-                existingItem.put("quantityDeducted", currentQty.add(log.getQuantityDeducted()));
+
+                // 🌟 Lấy ra và cộng dồn bằng biến mới quantityChange
+                BigDecimal currentQty = (BigDecimal) existingItem.get("quantityChange");
+                existingItem.put("quantityChange", currentQty.add(displayChange));
+
             } else {
                 java.util.Map<String, Object> newItem = new java.util.HashMap<>();
                 newItem.put("logId", log.getId());
-                newItem.put("quantityDeducted", log.getQuantityDeducted());
+
+                // 🌟 Lưu bằng key quantityChange
+                newItem.put("quantityChange", displayChange);
+
                 newItem.put("note", log.getNote() != null ? log.getNote() : "Không có ghi chú");
                 newItem.put("createdBy", log.getCreatedBy() != null ? log.getCreatedBy() : "Hệ thống");
 
