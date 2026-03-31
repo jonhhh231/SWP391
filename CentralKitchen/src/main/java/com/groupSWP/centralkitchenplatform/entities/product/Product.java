@@ -29,20 +29,18 @@ public class Product extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private UnitType baseUnit;
     private boolean isActive;
-    @Column(name = "image_url") // Thêm dòng này
-    private String imageUrl;    // Thêm dòng này
 
     @OneToMany(mappedBy = "product")
     @JsonIgnore
     private List<Stock> stocks;
 
-    @OneToMany(mappedBy = "product")
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Formula> formulas; // BOM
 
-    @OneToMany(mappedBy = "product")
-    @JsonIgnore
-    private List<ProductionRun> productionRuns;
+//    @OneToMany(mappedBy = "product")
+//    @JsonIgnore
+//    private List<ProductionRun> productionRuns;
 
     @OneToMany(mappedBy = "product")
     @JsonIgnore

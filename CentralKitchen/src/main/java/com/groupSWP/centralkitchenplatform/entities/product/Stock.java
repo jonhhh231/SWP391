@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "stocks")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Builder
 public class Stock {
     @EmbeddedId
     private StockKey id;

@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ChartDataPoint {
-    private String date;        // Ngày (VD: "2026-02-10")
-    private BigDecimal revenue; // Doanh thu
-    private Long totalOrders;   // Số đơn
+    private String timeLabel;       // Nhãn thời gian (Ngày/Tháng/Năm tùy bộ lọc FE chọn)
+    private BigDecimal exportValue; // Tổng giá trị xuất kho
+    private Long totalOrders;       // Số lượng đơn hàng
 }
