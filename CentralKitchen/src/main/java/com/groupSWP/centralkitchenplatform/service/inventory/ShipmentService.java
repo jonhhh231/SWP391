@@ -199,7 +199,7 @@ public class ShipmentService {
         if (hasIssue) {
             String missingDetails = String.join(", ", missingItemNames);
             notificationService.broadcastNotification(
-                    List.of("COORDINATOR", "KITCHEN_MANAGER"),
+                    List.of("COORDINATOR", "KITCHEN_MANAGER","MANAGER"),
                     "⚠️ KHIẾU NẠI THIẾU HÀNG",
                     "Cửa hàng " + targetStore.getName() + " vừa báo thiếu hàng tại chuyến " + shipmentId + ". Chi tiết: " + missingDetails + ". Vui lòng xử lý đền bù!",
                     Notification.NotificationType.WARNING
