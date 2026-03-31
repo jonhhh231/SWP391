@@ -110,31 +110,47 @@ public class ShipmentService {
         }
 
         boolean hasIssue = false;
-        List<String> missingItemNames = new ArrayList<>(); // 🔥 Thêm List để gom danh sách món bị thiếu
+        List<String> missingItemNames = new ArrayList<>();
 
-        if (request != null && request.getReportedItems() != null && !request.getReportedItems().isEmpty()) {
+        // ==============================================================
+        // 1. TẠO BẢN ĐỒ CÁC MÓN BỊ BÁO CÁO THIẾU TỪ FRONTEND
+        // ==============================================================
+        Map<String, Integer> reportedQuantities = new HashMap<>();
+        Map<String, String> reportedNotes = new HashMap<>();
+
+        if (request != null && request.getReportedItems() != null) {
             for (ReportShipmentRequest.ItemReport report : request.getReportedItems()) {
-                ShipmentDetail detail = shipment.getShipmentDetails().stream()
-                        .filter(d -> d.getProduct().getProductId().equals(report.getProductId()))
-                        .findFirst()
-                        .orElseThrow(() -> new RuntimeException("Sản phẩm " + report.getProductId() + " không có trong chuyến hàng này!"));
-
-                detail.setReceivedQuantity(report.getReceivedQuantity());
-                detail.setIssueNote(report.getNote());
-
-                if (detail.getMissingQuantity() > 0) {
-                    hasIssue = true;
-                    // 🔥 Ghi nhận lại tên món và số lượng thiếu
-                    missingItemNames.add(detail.getProduct().getProductName() + " (Thiếu: " + detail.getMissingQuantity() + ")");
-                }
+                reportedQuantities.put(report.getProductId(), report.getReceivedQuantity());
+                reportedNotes.put(report.getProductId(), report.getNote());
             }
-        } else {
-            shipment.getShipmentDetails().forEach(detail -> {
-                detail.setReceivedQuantity(detail.getExpectedQuantity());
-            });
         }
 
-        // CỘNG DỒN KHO
+        // ==============================================================
+        // 🔥 2. DUYỆT QUA TẤT CẢ CÁC MÓN TRÊN XE ĐỂ CẬP NHẬT CHÍNH XÁC
+        // ==============================================================
+        for (ShipmentDetail detail : shipment.getShipmentDetails()) {
+            String productId = detail.getProduct().getProductId();
+
+            if (reportedQuantities.containsKey(productId)) {
+                // TRƯỜNG HỢP A: Có gửi báo cáo -> Cập nhật số lượng thực nhận từ FE
+                detail.setReceivedQuantity(reportedQuantities.get(productId));
+                detail.setIssueNote(reportedNotes.get(productId));
+            } else {
+                // TRƯỜNG HỢP B: FE không nhắc tới -> Tự động đánh dấu nhận đủ 100%
+                detail.setReceivedQuantity(detail.getExpectedQuantity());
+                detail.setIssueNote("Nhận đủ");
+            }
+
+            // Gọi hàm getMissingQuantity() của Entity để kiểm tra xem có thiếu hay không
+            if (detail.getMissingQuantity() > 0) {
+                hasIssue = true;
+                missingItemNames.add(detail.getProduct().getProductName() + " (Thiếu: " + detail.getMissingQuantity() + ")");
+            }
+        }
+
+        // ==============================================================
+        // 3. CỘNG DỒN KHO CHO CỬA HÀNG (Chỉ cộng những món có Thực nhận > 0)
+        // ==============================================================
         String storeId = targetStore.getStoreId();
         List<StockKey> stockKeys = shipment.getShipmentDetails().stream()
                 .filter(d -> d.getReceivedQuantity() > 0)
@@ -159,6 +175,7 @@ public class ShipmentService {
                     stock.setProduct(detail.getProduct());
                 }
 
+                // Cộng dồn đúng số lượng thực tế cửa hàng nhận được
                 stock.setQuantity(stock.getQuantity() + detail.getReceivedQuantity());
                 stocksToSave.add(stock);
             }
@@ -167,6 +184,9 @@ public class ShipmentService {
         stockRepository.saveAll(stocksToSave);
         log.info("Đã cập nhật kho cho cửa hàng {} từ chuyến xe {}", storeId, shipmentId);
 
+        // ==============================================================
+        // 4. CẬP NHẬT TRẠNG THÁI VÀ BẮN THÔNG BÁO
+        // ==============================================================
         shipment.setStatus(hasIssue ? Shipment.ShipmentStatus.ISSUE_REPORTED : Shipment.ShipmentStatus.RESOLVED);
         shipmentRepository.save(shipment);
 
@@ -176,18 +196,18 @@ public class ShipmentService {
             orderRepository.saveAll(shipment.getOrders());
         }
 
-        // 🔥 THÔNG BÁO XỊN SÒ CÓ KÈM CHI TIẾT MÓN THIẾU
         if (hasIssue) {
-            String missingDetails = String.join(", ", missingItemNames); // Nối các món lại thành chuỗi đẹp mắt
+            String missingDetails = String.join(", ", missingItemNames);
             notificationService.broadcastNotification(
                     List.of("COORDINATOR", "KITCHEN_MANAGER"),
                     "⚠️ KHIẾU NẠI THIẾU HÀNG",
                     "Cửa hàng " + targetStore.getName() + " vừa báo thiếu hàng tại chuyến " + shipmentId + ". Chi tiết: " + missingDetails + ". Vui lòng xử lý đền bù!",
                     Notification.NotificationType.WARNING
             );
+            return "Đã ghi nhận sự cố thiếu hàng. Đã báo cho Bếp trung tâm lên đơn bù!";
+        } else {
+            return "Xác nhận nhận đủ hàng. Kho cửa hàng đã được cập nhật!";
         }
-
-        return hasIssue ? "Đã ghi nhận sự cố thiếu hàng. Đã báo cho Bếp trung tâm lên đơn bù!" : "Xác nhận nhận đủ hàng. Kho cửa hàng đã được cập nhật!";
     }
 
     // =========================================================================
