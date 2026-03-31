@@ -7,10 +7,13 @@ import com.groupSWP.centralkitchenplatform.repositories.auth.AccountRepository;
 import com.groupSWP.centralkitchenplatform.repositories.notification.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate; // 🔥 Thêm import WebSocket
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map; // 🔥 Thêm import Map
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -21,6 +24,9 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final AccountRepository accountRepository; // Để Admin lôi danh sách nhân viên ra phát loa
+
+    // 🔥 Tiêm vũ khí bắn Real-time WebSocket vào đây
+    private final SimpMessagingTemplate messagingTemplate;
 
     // =========================================================================
     // 1. HÀM LÕI: TẠO VÀ LƯU THÔNG BÁO CHO 1 NGƯỜI (DÙNG NỘI BỘ)
@@ -36,10 +42,32 @@ public class NotificationService {
                 .referenceLink(referenceLink)
                 .build();
 
-        notificationRepository.save(notification);
+        // LƯU VÀO DB TRƯỚC (Bộ nhớ dài hạn)
+        Notification savedNote = notificationRepository.save(notification);
         log.info("Đã lưu chuông báo cho user {}: {}", account.getUsername(), title);
 
-        // 🔥 TODO: Mốt anh em mình cài WebSocket xong thì chỉ cần chèn 1 dòng code bắn tín hiệu Real-time ở đây là nó nhảy Ting Ting!
+        // 🔥 ĐÃ GIẢI QUYẾT TODO: Bắn tín hiệu Real-time qua WebSocket (Ting Ting!)
+        try {
+            // Kênh nhận của FE: /user/{username}/topic/notifications
+            String destination = "/user/" + account.getUsername() + "/topic/notifications";
+
+            // 👉 CHỐT HẠ ĐỈNH CAO: Dùng luôn DTO có sẵn của Sếp, vứt Map đi! IDE hết dám cãi.
+            NotificationResponse payload = NotificationResponse.builder()
+                    .id(savedNote.getId())
+                    .title(title)
+                    .message(message)
+                    .type(type.name())
+                    .isRead(false)
+                    .referenceLink(referenceLink)
+                    .createdAt(savedNote.getCreatedAt() != null ? savedNote.getCreatedAt() : java.time.LocalDateTime.now())
+                    .build();
+
+            messagingTemplate.convertAndSend(destination, payload);
+            log.info("🚀 Đã bắn Ting-Ting thành công tới user {}", account.getUsername());
+
+        } catch (Exception e) {
+            log.error("❌ Lỗi khi bắn WebSocket tới {}: {}", account.getUsername(), e.getMessage());
+        }
     }
 
     // =========================================================================
