@@ -2,6 +2,7 @@ package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
 // [1] THÊM IMPORT NÀY
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.common.UnitType;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import jakarta.persistence.*;
@@ -12,7 +13,7 @@ import java.util.List;
 @Entity
 @Table(name = "ingredients")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class Ingredient {
+public class Ingredient extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String ingredientId;

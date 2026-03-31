@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.procurement;
 
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.kitchen.Ingredient;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,7 +9,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "import_items")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class ImportItem {
+public class ImportItem extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

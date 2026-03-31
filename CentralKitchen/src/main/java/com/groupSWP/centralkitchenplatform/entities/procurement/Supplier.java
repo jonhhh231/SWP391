@@ -1,7 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.procurement;
 
 import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
-import com.groupSWP.centralkitchenplatform.entities.procurement.ImportTicket;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;

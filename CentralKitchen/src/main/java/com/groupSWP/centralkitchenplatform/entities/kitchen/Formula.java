@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import jakarta.persistence.*;
 import lombok.*;
@@ -10,7 +11,7 @@ import java.math.BigDecimal;
 @Table(name = "formulas")
 @Getter
 @Setter @NoArgsConstructor @AllArgsConstructor
-public class Formula {
+public class Formula extends BaseEntity {
     @EmbeddedId
     private FormulaKey id;
 

@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.cart;
 
 import com.groupSWP.centralkitchenplatform.entities.auth.Store;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ import java.util.List;
 @Entity
 @Table(name = "cart")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class Cart {
+public class Cart extends BaseEntity {
 
     @Id
     @Column(name = "cart_id")

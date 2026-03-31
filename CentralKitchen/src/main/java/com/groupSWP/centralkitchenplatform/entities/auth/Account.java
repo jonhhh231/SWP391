@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.auth;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +10,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "accounts")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class Account {
+public class Account extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "account_id", columnDefinition = "BINARY(16)")

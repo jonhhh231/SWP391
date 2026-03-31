@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.kitchen;
 
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportItem;
 import jakarta.persistence.*;
 import lombok.*;
@@ -9,7 +10,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "inventory_logs")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class InventoryLog {
+public class InventoryLog extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

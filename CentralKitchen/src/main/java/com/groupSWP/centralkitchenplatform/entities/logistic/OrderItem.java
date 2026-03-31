@@ -1,5 +1,6 @@
 package com.groupSWP.centralkitchenplatform.entities.logistic;
 
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.product.Product;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,7 +9,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "order_items")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class OrderItem {
+public class OrderItem extends BaseEntity {
     @EmbeddedId
     private OrderItemKey id;
 

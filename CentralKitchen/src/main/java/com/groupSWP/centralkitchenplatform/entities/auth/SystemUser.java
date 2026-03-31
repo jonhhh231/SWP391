@@ -1,6 +1,7 @@
 package com.groupSWP.centralkitchenplatform.entities.auth;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.groupSWP.centralkitchenplatform.entities.common.BaseEntity;
 import com.groupSWP.centralkitchenplatform.entities.logistic.Shipment;
 import com.groupSWP.centralkitchenplatform.entities.procurement.ImportTicket;
 import jakarta.persistence.*;
@@ -14,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder // Thêm Builder để dễ dàng tạo object khi coding
-public class SystemUser {
+public class SystemUser extends BaseEntity {
 
     @Id
     @Column(name = "user_id", length = 20) // Giới hạn độ dài cho mã nhân viên (NV001)
